@@ -2,11 +2,17 @@ import { useState, useEffect } from 'react'
 import { initialData } from './data/mockData'
 
 function App() {
-  const [data, setData] = useState(initialData)
+  const [data, setData] = useState(() => {
+    const savedData = localStorage.getItem('ai-ekonomi-data')
+    return savedData ? JSON.parse(savedData) : initialData
+  })
   const [showAddModal, setShowAddModal] = useState(false)
   const [showLimitModal, setShowLimitModal] = useState(false)
 
-  const [userLimits, setUserLimits] = useState({ u1: 75000, u2: 75000 })
+  const [userLimits, setUserLimits] = useState(() => {
+    const savedLimits = localStorage.getItem('ai-ekonomi-limits')
+    return savedLimits ? JSON.parse(savedLimits) : { u1: 75000, u2: 75000 }
+  })
 
   const [limitModalUser, setLimitModalUser] = useState(null)
 
@@ -60,6 +66,16 @@ function App() {
       localStorage.setItem('theme', 'light')
     }
   }, [darkMode])
+
+  // Data Sync Effect
+  useEffect(() => {
+    localStorage.setItem('ai-ekonomi-data', JSON.stringify(data))
+  }, [data])
+
+  // Limits Sync Effect
+  useEffect(() => {
+    localStorage.setItem('ai-ekonomi-limits', JSON.stringify(userLimits))
+  }, [userLimits])
 
   // Notification & Welcome Back Logic
   useEffect(() => {
@@ -361,7 +377,7 @@ function App() {
                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-indigo-200 ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
                         {user.name.charAt(0)}
                       </div>
-                      <span className="font-bold text-gray-800 text-lg">{user.name}</span>
+                      <span className="font-bold text-gray-800 dark:text-white text-lg transition-colors">{user.name}</span>
                     </div>
 
                     <div className="flex justify-between items-end mb-4">
