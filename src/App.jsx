@@ -837,7 +837,10 @@ function App() {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
-                              if (amount) setTransactionStep(2);
+                              if (amount) {
+                                e.target.blur();
+                                setTransactionStep(2);
+                              }
                             }
                           }}
                         />
@@ -846,7 +849,12 @@ function App() {
                     <div className="mt-auto">
                       <button
                         type="button"
-                        onClick={() => { if (amount) setTransactionStep(2) }}
+                        onClick={(e) => {
+                          if (amount) {
+                            document.activeElement?.blur();
+                            setTransactionStep(2);
+                          }
+                        }}
                         className={`w-full py-5 rounded-[24px] font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2 group ${amount ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-gray-200 dark:shadow-slate-700 hover:bg-black dark:hover:bg-gray-200 active:scale-[0.98]' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed'}`}
                         disabled={!amount}
                       >
@@ -916,7 +924,6 @@ function App() {
                             placeholder="Örn: Market alışverişi"
                             value={description}
                             onChange={e => setDescription(e.target.value)}
-                            autoFocus
                           />
                         </div>
                       </div>
