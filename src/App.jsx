@@ -46,12 +46,20 @@ function App() {
   const [showNotification, setShowNotification] = useState(false)
 
   // Dark Mode State
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('theme') === 'dark'
+  })
 
-  // Force Light Mode Cleanup
+  // Theme Sync Effect
   useEffect(() => {
-    document.documentElement.classList.remove('dark')
-    localStorage.removeItem('theme')
-  }, [])
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }, [darkMode])
 
   // Notification & Welcome Back Logic
   useEffect(() => {
@@ -295,7 +303,13 @@ function App() {
               <h1 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Merhaba, <span className="text-indigo-600 dark:text-indigo-400">Hoş Geldin!</span></h1>
             </div>
             <div className="flex items-center gap-3">
-
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="w-10 h-10 bg-white dark:bg-slate-800 shadow-sm rounded-full flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-all active:scale-90"
+                title={darkMode ? 'Aydınlık Tema' : 'Karanlık Tema'}
+              >
+                {darkMode ? '☀️' : '🌙'}
+              </button>
               <div className="w-10 h-10 bg-white dark:bg-slate-800 shadow-sm rounded-full flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-400 relative transition-colors">
                 🔔
                 {showNotification && (
