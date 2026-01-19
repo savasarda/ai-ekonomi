@@ -285,7 +285,7 @@ function App() {
 
         <div className="relative z-10 flex-1 flex flex-col overflow-y-auto custom-scrollbar">
 
-          <header className="px-8 pt-12 pb-6 flex justify-between items-center bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl sticky top-0 z-20 border-b border-white/40 dark:border-slate-800/50 transition-colors duration-300">
+          <header className="px-8 pt-[calc(3rem+var(--safe-area-inset-top))] pb-6 flex justify-between items-center bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl sticky top-0 z-20 border-b border-white/40 dark:border-slate-800/50 transition-colors duration-300">
             <div>
               <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
                 <span>{new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}</span>
@@ -383,7 +383,7 @@ function App() {
             </div>
           </div>
 
-          <div className="bg-gray-50 dark:bg-slate-900/50 flex-1 rounded-t-[40px] px-6 pt-8 pb-24 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] transition-colors duration-300">
+          <div className="bg-gray-50 dark:bg-slate-900/50 flex-1 rounded-t-[40px] px-6 pt-8 pb-[calc(1.5rem+var(--safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] transition-colors duration-300">
 
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Hesap Özetleri</h3>
             <div className="flex gap-4 mb-4">

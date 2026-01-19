@@ -4,11 +4,22 @@
   font-family: 'Outfit', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Safe Area Variables */
+  --safe-area-inset-top: env(safe-area-inset-top);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom);
+
+  /* Native Mobile Feel */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   background-color: #F2F4F8;
   /* Soft blue-gray background */
 }
