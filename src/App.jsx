@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react'
 import { initialData } from './data/mockData'
+import { supabase } from './lib/supabaseClient'
+import { toCamelCase, toSnakeCase } from './lib/dataTransformers'
 
 function App() {
   const [data, setData] = useState(() => {
     const savedData = localStorage.getItem('ai-ekonomi-data')
     return savedData ? JSON.parse(savedData) : initialData
   })
+
+  // Active Data Helpers (Soft Delete Logic: status !== 0)
+  const activeUsers = data.users ? data.users.filter(u => u.status != 0) : []
+  const activeAccounts = data.accounts ? data.accounts.filter(a => a.status != 0) : []
+  const activeTransactions = data.transactions ? data.transactions.filter(t => t.status != 0) : []
+
   const [showAddModal, setShowAddModal] = useState(false)
   const [showLimitModal, setShowLimitModal] = useState(false)
 
@@ -21,10 +29,10 @@ function App() {
 
   // Card Management State
   const [newCardName, setNewCardName] = useState('')
-  const [newCardUser, setNewCardUser] = useState(data.users[0].id)
+  const [newCardUser, setNewCardUser] = useState(activeUsers[0]?.id)
 
-  const [newUser, setNewUser] = useState(data.users[0].id)
-  const [newAccount, setNewAccount] = useState(data.accounts.filter(a => a.userId === data.users[0].id)[0]?.id)
+  const [newUser, setNewUser] = useState(activeUsers[0]?.id)
+  const [newAccount, setNewAccount] = useState(activeAccounts.filter(a => a.userId === activeUsers[0]?.id)[0]?.id)
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
@@ -51,6 +59,26 @@ function App() {
   // Notification State
   const [showNotification, setShowNotification] = useState(false)
 
+  // Toggled Section States
+  const [showPeriodModal, setShowPeriodModal] = useState(false)
+  const [showExtractModal, setShowExtractModal] = useState(false)
+
+  // Menu Reordering State
+  const defaultMenuOrder = ['periods', 'limit', 'future', 'cards', 'users', 'extract', 'reset']
+  const [menuOrder, setMenuOrder] = useState(() => {
+    const saved = localStorage.getItem('menuOrder')
+    return saved ? JSON.parse(saved) : defaultMenuOrder
+  })
+  const [reorderMode, setReorderMode] = useState(false)
+  const [swapSource, setSwapSource] = useState(null)
+
+  useEffect(() => {
+    localStorage.setItem('menuOrder', JSON.stringify(menuOrder))
+  }, [menuOrder])
+
+  // Extract Filter
+  const [extractFilterUser, setExtractFilterUser] = useState(null)
+
   // Dark Mode State
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('theme') === 'dark'
@@ -67,14 +95,84 @@ function App() {
     }
   }, [darkMode])
 
-  // Data Sync Effect
+
+  // Supabase Sync Logic
+  const isSupabaseConfigured = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return
+
+    const fetchInitialData = async () => {
+      try {
+        const { data: users } = await supabase.from('users').select('*')
+        const { data: accounts } = await supabase.from('accounts').select('*')
+        const { data: transactions } = await supabase.from('transactions').select('*')
+        const { data: userLimitsData } = await supabase.from('user_limits').select('*')
+
+        if (users && accounts && transactions) {
+          // Transform snake_case from DB to camelCase for App
+          setData({
+            users: toCamelCase(users),
+            accounts: toCamelCase(accounts),
+            transactions: toCamelCase(transactions)
+          })
+        }
+
+        if (userLimitsData) {
+          const limitsObj = {}
+          userLimitsData.forEach(l => {
+            limitsObj[l.user_id] = l.limit_amount
+          })
+          setUserLimits(limitsObj)
+        }
+      } catch (error) {
+        console.error('Error fetching from Supabase:', error)
+      }
+    }
+
+    fetchInitialData()
+
+    // Real-time subscriptions
+    const transactionSubscription = supabase
+      .channel('public:transactions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, fetchInitialData)
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(transactionSubscription)
+    }
+  }, [isSupabaseConfigured])
+
+  // Function to save to Supabase
+  const syncToSupabase = async (newData, newLimits) => {
+    if (!isSupabaseConfigured) return
+
+    try {
+      // Transform camelCase from App to snake_case for DB
+      if (newData.users) await supabase.from('users').upsert(toSnakeCase(newData.users))
+      if (newData.accounts) await supabase.from('accounts').upsert(toSnakeCase(newData.accounts))
+      if (newData.transactions) await supabase.from('transactions').upsert(toSnakeCase(newData.transactions))
+
+      const limitsArray = Object.entries(newLimits).map(([user_id, limit_amount]) => ({
+        user_id,
+        limit_amount
+      }))
+      if (limitsArray.length > 0) await supabase.from('user_limits').upsert(limitsArray)
+    } catch (error) {
+      console.error('Error syncing to Supabase:', error)
+    }
+  }
+
+  // Update data sync effect to include Supabase
   useEffect(() => {
     localStorage.setItem('ai-ekonomi-data', JSON.stringify(data))
+    syncToSupabase(data, userLimits)
   }, [data])
 
-  // Limits Sync Effect
+  // Update limits sync effect to include Supabase
   useEffect(() => {
     localStorage.setItem('ai-ekonomi-limits', JSON.stringify(userLimits))
+    syncToSupabase(data, userLimits)
   }, [userLimits])
 
   // Notification & Welcome Back Logic
@@ -101,7 +199,7 @@ function App() {
 
   const getMonthlyBreakdown = () => {
     const groups = {}
-    data.transactions.forEach(t => {
+    activeTransactions.forEach(t => {
       const monthKey = t.date.slice(0, 7)
       if (!groups[monthKey]) groups[monthKey] = 0
       groups[monthKey] += t.amount
@@ -114,15 +212,15 @@ function App() {
   const monthlyBreakdown = getMonthlyBreakdown()
 
   const getDebtByUser = (userId) => {
-    const userAccountIds = data.accounts.filter(acc => acc.userId === userId).map(acc => acc.id)
-    return data.transactions
+    const userAccountIds = activeAccounts.filter(acc => acc.userId === userId).map(acc => acc.id)
+    return activeTransactions
       .filter(t => userAccountIds.includes(t.accountId))
       .reduce((acc, curr) => acc + curr.amount, 0)
   }
 
   const handleUserChange = (uId) => {
     setNewUser(uId)
-    const userAccs = data.accounts.filter(a => a.userId === uId)
+    const userAccs = activeAccounts.filter(a => a.userId === uId)
     if (userAccs.length > 0) setNewAccount(userAccs[0].id)
   }
 
@@ -134,7 +232,7 @@ function App() {
     setDate(t.date)
     setNewAccount(t.accountId)
     // Find user for this account
-    const acc = data.accounts.find(a => a.id === t.accountId)
+    const acc = activeAccounts.find(a => a.id === t.accountId)
     if (acc) setNewUser(acc.userId)
 
     // Installment handling is tricky on edit. For MVP, let's treat it as a flat update of THAT specific transaction/installment.
@@ -149,14 +247,29 @@ function App() {
     if (window.confirm('Bu işlemi silmek istediğinize emin misiniz?')) {
       setData(prev => ({
         ...prev,
-        transactions: prev.transactions.filter(t => t.id !== id)
+        transactions: prev.transactions.map(t => t.id === id ? { ...t, status: 0 } : t)
       }))
     }
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!amount || !description) return
+
+    if (!amount) {
+      alert("Lütfen bir tutar giriniz.")
+      setTransactionStep(1)
+      return
+    }
+
+    if (!description) {
+      alert("Lütfen bir açıklama giriniz.")
+      return
+    }
+
+    if (!newAccount) {
+      alert("Lütfen bir hesap/kart seçiniz.")
+      return
+    }
 
     // Turkish locale specific parsing: verify thousands separator vs decimal
     // If input has dot but no comma, and dot is used as thousands separator in TR:
@@ -208,7 +321,8 @@ function App() {
         amount: amountVal,
         date: date,
         description: description,
-        type: isInstallment ? 'installment' : 'debt'
+        type: isInstallment ? 'taksitli' : 'tek cekim',
+        status: 1
       }
 
       if (isInstallment) {
@@ -228,7 +342,8 @@ function App() {
             amount: installmentAmount,
             date: dateStr,
             description: `${description} (${i + 1}/${installmentCount})`,
-            type: 'installment'
+            type: 'taksitli',
+            status: 1
           })
         }
 
@@ -260,7 +375,7 @@ function App() {
       id: 'acc' + (data.accounts.length + 1) + Math.random().toString(36).substr(2, 5),
       userId: newCardUser,
       name: newCardName,
-      limit: 20000
+      status: 1
     }
     setData(prev => ({ ...prev, accounts: [...prev.accounts, newCard] }))
     setNewCardName('')
@@ -268,7 +383,7 @@ function App() {
 
   const handleDeleteCard = (cardId) => {
     if (window.confirm('Bu kartı silmek istediğinize emin misiniz?')) {
-      setData(prev => ({ ...prev, accounts: prev.accounts.filter(a => a.id !== cardId) }))
+      setData(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === cardId ? { ...a, status: 0 } : a) }))
     }
   }
 
@@ -276,7 +391,8 @@ function App() {
     if (!newUserName.trim()) return
     const newUserObj = {
       id: 'u' + (data.users.length + 1) + Math.random().toString(36).substr(2, 5),
-      name: newUserName.trim()
+      name: newUserName.trim(),
+      status: 1
     }
     setData(prev => ({
       ...prev,
@@ -288,20 +404,33 @@ function App() {
   }
 
   const handleDeleteUser = (userId) => {
-    if (data.users.length <= 1) {
+    if (activeUsers.length <= 1) {
       alert('En az bir kullanıcı kalmalıdır.')
       return
     }
     if (window.confirm('Bu kişiyi silmek istediğinize emin misiniz?')) {
-      setData(prev => ({ ...prev, users: prev.users.filter(u => u.id !== userId) }))
+      setData(prev => ({ ...prev, users: prev.users.map(u => u.id === userId ? { ...u, status: 0 } : u) }))
       // Cleanup associated limits? optional
     }
   }
 
-  const handleResetAllData = () => {
+  const handleResetAllData = async () => {
     if (window.confirm('DİKKAT: Bütün harcamalar, kişiler ve kartlar silinecek. Emin misiniz?')) {
       localStorage.removeItem('ai-ekonomi-data')
       localStorage.removeItem('ai-ekonomi-limits')
+
+      if (isSupabaseConfigured) {
+        try {
+          // Clear Supabase tables
+          await supabase.from('transactions').delete().neq('id', 'temp')
+          await supabase.from('accounts').delete().neq('id', 'temp')
+          await supabase.from('users').delete().neq('id', 'temp')
+          await supabase.from('user_limits').delete().neq('user_id', 'temp')
+        } catch (error) {
+          console.error('Error resetting Supabase:', error)
+        }
+      }
+
       setData(initialData)
       setUserLimits({ u1: 75000, u2: 75000 })
       setShowLimitModal(false)
@@ -327,6 +456,11 @@ function App() {
                 <span>{new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}</span>
                 <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
                 <span className="text-indigo-500">{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate()} gün kaldı</span>
+                <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                <span className={`inline-flex items-center gap-1 ${isSupabaseConfigured ? 'text-green-500' : 'text-orange-500'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? 'bg-green-500' : 'bg-orange-500'} animate-pulse`}></span>
+                  {isSupabaseConfigured ? 'Bulut Senk.' : 'Yerel Kayıt'}
+                </span>
               </p>
               <h1 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Merhaba, <span className="text-indigo-600 dark:text-indigo-400">Hoş Geldin!</span></h1>
             </div>
@@ -368,11 +502,11 @@ function App() {
           </div>
 
           <div className="mx-6 mb-4">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Bütçe Durumu</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Kişi Bütçeleri</h3>
             <div className="space-y-3 mb-4">
-              {data.users.map(user => {
-                const userAccountIds = data.accounts.filter(acc => acc.userId === user.id).map(acc => acc.id)
-                const userSpending = data.transactions
+              {activeUsers.map(user => {
+                const userAccountIds = activeAccounts.filter(acc => acc.userId === user.id).map(acc => acc.id)
+                const userSpending = activeTransactions
                   .filter(t => t.date.startsWith(currentMonth) && userAccountIds.includes(t.accountId))
                   .reduce((acc, curr) => acc + curr.amount, 0)
 
@@ -427,312 +561,115 @@ function App() {
 
           <div className="bg-gray-50 dark:bg-slate-900/50 flex-1 rounded-t-[40px] px-6 pt-8 pb-[calc(1.5rem+var(--safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] transition-colors duration-300">
 
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Hesap Özetleri</h3>
-            <div className="flex gap-4 mb-4">
-              {data.users.map(user => (
-                <div
-                  key={user.id}
-                  onClick={() => setSelectedUserSummary(user.id)}
-                  className="flex-1 bg-white dark:bg-slate-800 p-4 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.02)] border border-gray-50 dark:border-slate-700 flex flex-col items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
-                >
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-md ${user.id === 'u1' ? 'bg-indigo-100 text-indigo-600' : 'bg-pink-100 text-pink-600'}`}>
-                    {user.name.charAt(0)}
-                  </div>
-                  <div className="text-center">
-                    <p className="text-gray-400 text-[10px] font-bold uppercase mb-0.5">{user.name}</p>
-                    <p className="text-sm font-bold text-gray-800 dark:text-white transition-colors">
-                      {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(getDebtByUser(user.id))}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
 
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">İşlemler</h3>
-            <div className="grid grid-cols-4 gap-4 mb-4">
-              <button
-                onClick={() => document.getElementById('monthly-report').scrollIntoView({ behavior: 'smooth' })}
-                className="flex flex-col items-center gap-2 group active:scale-90 transition-transform"
-              >
-                <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-100 dark:border-slate-700 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
-                  📊
-                </div>
-                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Rapor</span>
-              </button>
 
+            <div className="flex justify-between items-center mb-2 px-1">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">İşlemler</h3>
               <button
                 onClick={() => {
-                  setLimitModalUser(data.users[0].id)
-                  setShowLimitModal(true)
+                  setReorderMode(!reorderMode)
+                  setSwapSource(null)
                 }}
-                className="flex flex-col items-center gap-2 group active:scale-90 transition-transform"
+                className={`text-xs font-bold px-2 py-1 rounded-lg transition-colors ${reorderMode ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
               >
-                <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-100 dark:border-slate-700 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
-                  ⚙️
-                </div>
-                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Limit</span>
-              </button>
-
-              <button
-                onClick={() => setShowFutureDebtsModal(true)}
-                className="flex flex-col items-center gap-2 group active:scale-90 transition-transform"
-              >
-                <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-100 dark:border-slate-700 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
-                  📅
-                </div>
-                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Gelecek</span>
-              </button>
-
-              <button
-                onClick={() => setShowCardsModal(true)}
-                className="flex flex-col items-center gap-2 group active:scale-90 transition-transform"
-              >
-                <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-100 dark:border-slate-700 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
-                  💳
-                </div>
-                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Kartlar</span>
-              </button>
-
-              <button
-                onClick={() => setShowUserModal(true)}
-                className="flex flex-col items-center gap-2 group active:scale-90 transition-transform"
-              >
-                <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-gray-100 dark:border-slate-700 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
-                  👥
-                </div>
-                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Kişiler</span>
-              </button>
-
-              <button
-                onClick={handleResetAllData}
-                className="flex flex-col items-center gap-2 group active:scale-90 transition-transform"
-              >
-                <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-[24px] shadow-[0_4px_20px_rgba(239,68,68,0.1)] border border-red-100 dark:border-red-900/30 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
-                  🗑️
-                </div>
-                <span className="text-xs font-bold text-red-500/80 dark:text-red-400">Sıfırla</span>
+                {reorderMode ? 'Bitti' : 'Düzenle'}
               </button>
             </div>
 
-            <h3 id="monthly-report" className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Dönem Özetleri</h3>
+            <div className="grid grid-cols-4 gap-4 mb-4">
+              {menuOrder.map(itemId => {
+                const isSelected = swapSource === itemId;
+                const isShake = reorderMode && !swapSource;
 
-            <div className="bg-white dark:bg-slate-900/40 rounded-2xl border border-gray-100 dark:border-slate-800 overflow-hidden mb-8 transition-colors duration-300">
-              {!selectedMonth ? (
-                // Level 0: List Months
-                <div className="divide-y divide-gray-100 dark:divide-slate-800">
-                  {monthlyBreakdown.map((item) => {
-                    const dateObj = new Date(item.date + '-01');
-                    const monthName = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
-                    const totalMonthlyLimit = Object.values(userLimits).reduce((a, b) => a + b, 0);
-                    const isLimitExceeded = item.total > totalMonthlyLimit;
+                // Handlers
+                const handleMenuClick = () => {
+                  if (reorderMode) {
+                    if (!swapSource) {
+                      setSwapSource(itemId)
+                    } else {
+                      if (swapSource === itemId) {
+                        setSwapSource(null) // Deselect
+                      } else {
+                        // Swap
+                        const newOrder = [...menuOrder]
+                        const idx1 = newOrder.indexOf(swapSource)
+                        const idx2 = newOrder.indexOf(itemId)
+                        newOrder[idx1] = itemId
+                        newOrder[idx2] = swapSource
+                        setMenuOrder(newOrder)
+                        setSwapSource(null)
+                      }
+                    }
+                  } else {
+                    // Normal Action
+                    switch (itemId) {
+                      case 'periods':
+                        setSelectedMonth(null)
+                        setSelectedBreakdownUser(null)
+                        setSelectedBreakdownAccount(null)
+                        setShowPeriodModal(true)
+                        break;
+                      case 'limit':
+                        setLimitModalUser(activeUsers[0]?.id)
+                        setShowLimitModal(true)
+                        break;
+                      case 'future':
+                        setShowFutureDebtsModal(true)
+                        break;
+                      case 'cards':
+                        setShowCardsModal(true)
+                        break;
+                      case 'users':
+                        setShowUserModal(true)
+                        break;
+                      case 'reset':
+                        handleResetAllData()
+                        break;
+                      case 'extract':
+                        setExtractFilterUser(null)
+                        setShowExtractModal(true)
+                        break;
+                    }
+                  }
+                }
 
-                    return (
-                      <div
-                        key={item.date}
-                        onClick={() => setSelectedMonth(item.date)}
-                        className="p-5 flex justify-between items-center bg-white dark:bg-slate-800 rounded-3xl mb-3 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-50 dark:border-slate-700 hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-bold text-xs shadow-inner">
-                            {dateObj.toLocaleDateString('tr-TR', { month: 'short' }).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-bold text-gray-800 dark:text-white text-base transition-colors">{monthName}</p>
-                            <p className="text-[10px] text-gray-400 font-bold tracking-wide uppercase">Toplam Harcama</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className={`font-black text-lg tracking-tight ${isLimitExceeded ? 'text-red-500' : 'text-gray-900 dark:text-white transition-colors'}`}>
-                            {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.total)}
-                          </p>
-                          {isLimitExceeded && <span className="inline-block bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded-full font-bold mt-1">Limit Aşıldı</span>}
-                        </div>
-                      </div>
+                // Config
+                let label, icon, colorClass, borderColorClass;
+                switch (itemId) {
+                  case 'periods': label = 'Dönemler'; icon = '📊'; break;
+                  case 'limit': label = 'Limit'; icon = '⚙️'; break;
+                  case 'future': label = 'Gelecek'; icon = '📅'; break;
+                  case 'cards': label = 'Kartlar'; icon = '💳'; break;
+                  case 'users': label = 'Kişiler'; icon = '👥'; break;
+                  case 'reset': label = 'Sıfırla'; icon = '🗑️'; colorClass = 'bg-red-50 dark:bg-red-900/20 text-red-500/80 dark:text-red-400'; borderColorClass = 'border-red-100 dark:border-red-900/30'; break;
+                  case 'extract': label = 'Ekstre'; icon = '🧾'; break;
+                  default: return null;
+                }
 
-                    )
-                  })}
-                </div>
-              ) : !selectedBreakdownUser ? (
-                // Level 1: List Users for Selected Month
-                <div>
-                  <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/30 rounded-3xl mb-4 flex items-center gap-4 transition-colors">
-                    <button
-                      onClick={() => setSelectedMonth(null)}
-                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-gray-600 dark:text-white shadow-sm font-bold text-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      ←
-                    </button>
-                    <div>
-                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Seçilen Ay</p>
-                      <span className="font-black text-xl text-gray-800 dark:text-white tracking-tight transition-colors">
-                        {new Date(selectedMonth + '-01').toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
-                      </span>
+                return (
+                  <button
+                    key={itemId}
+                    onClick={handleMenuClick}
+                    className={`flex flex-col items-center gap-2 group active:scale-90 transition-all ${isShake ? 'animate-pulse' : ''} ${isSelected ? 'scale-110 z-10' : ''}`}
+                  >
+                    <div className={`w-16 h-16 rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.05)] border flex items-center justify-center text-2xl transition-all 
+                      ${colorClass || 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700'} 
+                      ${borderColorClass || ''}
+                      ${reorderMode ? 'ring-2 ring-offset-2 ring-indigo-500/50 cursor-grab' : 'group-hover:scale-105 cursor-pointer'}
+                      ${isSelected ? 'ring-4 ring-indigo-600 shadow-xl scale-105' : ''}
+                    `}>
+                      {icon}
                     </div>
-                  </div>
-                  <div className="space-y-3">
-                    {data.users.map(user => {
-                      const userTotal = data.transactions
-                        .filter(t => {
-                          const acc = data.accounts.find(a => a.id === t.accountId);
-                          return t.date.startsWith(selectedMonth) && acc && acc.userId === user.id;
-                        })
-                        .reduce((sum, t) => sum + t.amount, 0);
-
-                      if (userTotal === 0) return null; // Hide users with no spending
-
-                      return (
-                        <div
-                          key={user.id}
-                          onClick={() => setSelectedBreakdownUser(user.id)}
-                          className="p-5 flex justify-between items-center bg-white dark:bg-slate-800 rounded-3xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-50 dark:border-slate-700 hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
-                              {user.name.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="font-bold text-gray-800 dark:text-white text-base transition-colors">{user.name}</p>
-                              <p className="text-[10px] text-gray-400 font-bold tracking-wide uppercase">Kişi Bazlı Toplam</p>
-                            </div>
-                          </div>
-                          <p className="font-black text-lg text-gray-900 dark:text-white tracking-tight transition-colors">
-                            {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(userTotal)}
-                          </p>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : !selectedBreakdownAccount ? (
-                // Level 2: List Accounts for Selected User
-                <div>
-                  <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-2 bg-gray-50 dark:bg-slate-900/50 transition-colors">
-                    <button
-                      onClick={() => setSelectedBreakdownUser(null)}
-                      className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 shadow-sm text-gray-500 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white font-bold transition-colors"
-                    >
-                      ←
-                    </button>
-                    <span className="font-bold text-gray-700 dark:text-gray-200 transition-colors">
-                      {data.users.find(u => u.id === selectedBreakdownUser)?.name}
+                    <span className={`text-xs font-bold ${itemId === 'reset' ? 'text-red-500/80 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                      {label}
+                      {reorderMode && <span className="absolute -top-1 -right-1 bg-indigo-500 text-white w-4 h-4 text-[8px] flex items-center justify-center rounded-full">↕</span>}
                     </span>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {data.accounts
-                      .filter(acc => acc.userId === selectedBreakdownUser)
-                      .map(acc => {
-                        const accTotal = data.transactions
-                          .filter(t => t.date.startsWith(selectedMonth) && t.accountId === acc.id)
-                          .reduce((sum, t) => sum + t.amount, 0);
-
-                        if (accTotal === 0) return null;
-
-                        return (
-                          <div
-                            key={acc.id}
-                            onClick={() => setSelectedBreakdownAccount(acc.id)}
-                            className="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-700 rounded-xl flex items-center justify-center text-xs font-bold text-gray-50 dark:text-gray-400 transition-colors">
-                                {acc.name.charAt(0)}
-                              </div>
-                              <p className="font-bold text-gray-800 dark:text-white text-sm transition-colors">{acc.name}</p>
-                            </div>
-                            <p className="font-black text-gray-900 dark:text-white text-sm tracking-tight transition-colors">
-                              {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(accTotal)}
-                            </p>
-                          </div>
-                        )
-                      })}
-                  </div>
-                </div>
-              ) : (
-                // Level 3: List Transactions for Selected Account
-                <div>
-                  <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-2 bg-gray-50 dark:bg-slate-900/50 transition-colors">
-                    <button
-                      onClick={() => setSelectedBreakdownAccount(null)}
-                      className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 shadow-sm text-gray-500 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white font-bold transition-colors"
-                    >
-                      ←
-                    </button>
-                    <span className="font-bold text-gray-700 dark:text-gray-200 transition-colors">
-                      {data.accounts.find(a => a.id === selectedBreakdownAccount)?.name}
-                    </span>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {data.transactions
-                      .filter(t => t.date.startsWith(selectedMonth) && t.accountId === selectedBreakdownAccount)
-                      .map(t => (
-                        <div key={t.id} className="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${t.type === 'installment' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
-                              {t.type === 'installment' ? '📅' : '💸'}
-                            </div>
-                            <div>
-                              <p className="font-bold text-gray-800 dark:text-white text-sm transition-colors">{t.description}</p>
-                              <p className="text-[10px] text-gray-400">{t.date}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-gray-900 dark:text-white text-sm transition-colors">
-                              {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
-                            </p>
-                            <div className="flex gap-1 ml-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={(e) => { e.stopPropagation(); handleEditTransaction(t); }} className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-xs hover:bg-indigo-100 hover:text-indigo-600 transition-colors">✎</button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-xs hover:bg-red-100 hover:text-red-500 transition-colors">🗑️</button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    {data.transactions.filter(t => t.date.startsWith(selectedMonth) && t.accountId === selectedBreakdownAccount).length === 0 && (
-                      <div className="p-4 text-center text-gray-400 text-sm">Bu dönemde işlem yok.</div>
-                    )}
-                  </div>
-                </div>
-              )}
+                  </button>
+                )
+              })}
             </div>
 
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Bu Ayki Ekstre</h3>
-            <div className="space-y-4">
-              {data.transactions
-                .filter(t => t.date.startsWith(currentMonth))
-                .slice().reverse().slice(0, 5)
-                .map(t => {
-                  const account = data.accounts.find(a => a.id === t.accountId);
-                  const user = data.users.find(u => u.id === account.userId);
-                  return (
 
-                    <div key={t.id} className="group bg-white dark:bg-slate-800 p-4 rounded-3xl shadow-[0_2px_15px_rgba(0,0,0,0.02)] border border-white dark:border-slate-700 hover:scale-[1.02] transition-all flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner ${t.type === 'installment' ? 'bg-orange-50 text-orange-500' : 'bg-blue-50 text-blue-500'}`}>
-                        {t.type === 'installment' ? '📅' : '💸'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-gray-800 dark:text-white truncate text-base transition-colors">{t.description}</h4>
-                        <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5 font-medium">
-                          <span className={`w-2 h-2 rounded-full ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}></span>
-                          {user.name} • {account.name}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-black text-gray-800 dark:text-white text-base tracking-tight transition-colors">
-                          -{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
-                        </p>
-                        <p className="text-[10px] text-gray-400 mt-0.5 font-bold">{t.date}</p>
-                        <div className="flex gap-1 justify-end mt-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={(e) => { e.stopPropagation(); handleEditTransaction(t); }} className="w-6 h-6 flex items-center justify-center bg-gray-50 rounded-full text-xs hover:bg-indigo-100 hover:text-indigo-600 transition-colors">✎</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="w-6 h-6 flex items-center justify-center bg-gray-50 rounded-full text-xs hover:bg-red-100 hover:text-red-500 transition-colors">🗑️</button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-
-                })}
-              {data.transactions.filter(t => t.date.startsWith(currentMonth)).length === 0 && (
-                <div className="text-center py-8 text-gray-400 text-sm">Bu ay henüz bir işlem yok.</div>
-              )}
-            </div>
           </div>
         </div>
       </div>
@@ -745,7 +682,7 @@ function App() {
               <h3 className="text-xl font-black text-gray-800 dark:text-white mb-8 tracking-tight transition-colors">Limit Ayarları</h3>
 
               <div className="bg-gray-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl flex mb-8 backdrop-blur-md transition-colors">
-                {data.users.map(u => (
+                {activeUsers.map(u => (
                   <button
                     key={u.id}
                     onClick={() => setLimitModalUser(u.id)}
@@ -792,6 +729,7 @@ function App() {
                 onClick={() => {
                   setShowLimitModal(false)
                   setLimitModalUser(null)
+                  alert('Limit ayarları başarıyla kaydedildi. ' + (isSupabaseConfigured ? 'Bulut ile senkronize ediliyor.' : 'Şu an yerel olarak kaydedildi, API anahtarlarınızı girdiğinizde bulut ile senkronize olacaktır.'))
                 }}
                 className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-100"
               >
@@ -884,7 +822,7 @@ function App() {
                       </div>
 
                       <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
-                        {data.users.map(u => (
+                        {activeUsers.map(u => (
                           <button
                             key={u.id}
                             type="button"
@@ -908,7 +846,7 @@ function App() {
                               value={newAccount}
                               onChange={e => setNewAccount(e.target.value)}
                             >
-                              {data.accounts.filter(a => a.userId === newUser).map(acc => (
+                              {activeAccounts.filter(a => a.userId === newUser).map(acc => (
                                 <option key={acc.id} value={acc.id}>{acc.name}</option>
                               ))}
                             </select>
@@ -1044,9 +982,9 @@ function App() {
                         </div>
 
                         <div className="flex gap-3 relative z-10">
-                          {data.users.map(u => {
-                            const userAccs = data.accounts.filter(a => a.userId === u.id).map(a => a.id);
-                            const userMonthTotal = data.transactions
+                          {activeUsers.map(u => {
+                            const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
+                            const userMonthTotal = activeTransactions
                               .filter(t => t.date.startsWith(item.date) && userAccs.includes(t.accountId))
                               .reduce((acc, curr) => acc + curr.amount, 0);
 
@@ -1106,10 +1044,10 @@ function App() {
               </div>
 
               <div className="space-y-4">
-                {data.accounts
+                {activeAccounts
                   .filter(acc => acc.userId === selectedUserSummary)
                   .map(acc => {
-                    const accountDebt = data.transactions
+                    const accountDebt = activeTransactions
                       .filter(t => t.accountId === acc.id)
                       .reduce((acc, curr) => acc + curr.amount, 0)
 
@@ -1134,9 +1072,9 @@ function App() {
                   })
                 }
                 {
-                  data.accounts
+                  activeAccounts
                     .filter(acc => acc.userId === selectedUserSummary)
-                    .every(acc => data.transactions.filter(t => t.accountId === acc.id).reduce((a, c) => a + c.amount, 0) === 0) && (
+                    .every(acc => activeTransactions.filter(t => t.accountId === acc.id).reduce((a, c) => a + c.amount, 0) === 0) && (
                     <div className="text-center py-10 text-gray-400">
                       <p className="text-sm">Bu kullanıcı için aktif borç bulunamadı.</p>
                     </div>
@@ -1166,7 +1104,7 @@ function App() {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar mb-8 pr-2">
                 <div className="space-y-4">
-                  {data.users.map(user => (
+                  {activeUsers.map(user => (
                     <div key={user.id} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 dark:border-slate-700 flex justify-between items-center group hover:scale-[1.01] transition-all">
                       <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-bold shadow-inner ${user.id === 'u1' ? 'bg-indigo-50 text-indigo-500' : 'bg-pink-50 text-pink-500'}`}>
@@ -1233,8 +1171,8 @@ function App() {
 
               <div className="flex-1 overflow-y-auto custom-scrollbar mb-8 pr-2">
                 <div className="space-y-4">
-                  {data.accounts.map(acc => {
-                    const user = data.users.find(u => u.id === acc.userId)
+                  {activeAccounts.map(acc => {
+                    const user = activeUsers.find(u => u.id === acc.userId)
                     return (
                       <div key={acc.id} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 dark:border-slate-700 flex justify-between items-center group hover:scale-[1.01] transition-all">
                         <div className="flex items-center gap-4">
@@ -1265,7 +1203,7 @@ function App() {
                   Yeni Kart Ekle
                 </h4>
                 <div className="flex gap-2 mb-4">
-                  {data.users.map(u => (
+                  {activeUsers.map(u => (
                     <button
                       key={u.id}
                       onClick={() => setNewCardUser(u.id)}
@@ -1295,6 +1233,293 @@ function App() {
           </div>
         )
       }
+
+      {/* Period Summaries Modal */}
+      {showPeriodModal && (
+        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-all" onClick={() => setShowPeriodModal(false)}></div>
+          <div className="bg-[#F8FAFC] dark:bg-slate-900 w-full sm:max-w-[420px] h-[90vh] sm:h-[800px] rounded-t-[40px] sm:rounded-[40px] p-0 relative z-10 animate-slide-up sm:animate-scale-up flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.1)] border-t border-white/50 dark:border-slate-800/50">
+
+            <div className="px-8 pt-8 pb-4 flex justify-between items-center bg-white dark:bg-slate-900 sticky top-0 z-20 rounded-t-[40px]">
+              <div>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Dönem Özetleri</h3>
+                <p className="text-sm text-gray-400 font-medium">Aylık harcama raporları</p>
+              </div>
+              <button onClick={() => {
+                setShowPeriodModal(false)
+                setSelectedMonth(null)
+                setSelectedBreakdownUser(null)
+                setSelectedBreakdownAccount(null)
+              }} className="w-10 h-10 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 pb-8 custom-scrollbar">
+              <div className="bg-white dark:bg-slate-900/40 rounded-2xl border border-gray-100 dark:border-slate-800 overflow-hidden mb-8 transition-colors duration-300">
+                {!selectedMonth ? (
+                  // Level 0: List Months
+                  <div className="divide-y divide-gray-100 dark:divide-slate-800">
+                    {monthlyBreakdown.map((item) => {
+                      const dateObj = new Date(item.date + '-01');
+                      const monthName = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+                      const totalMonthlyLimit = Object.values(userLimits).reduce((a, b) => a + b, 0);
+                      const isLimitExceeded = item.total > totalMonthlyLimit;
+
+                      return (
+                        <div
+                          key={item.date}
+                          onClick={() => setSelectedMonth(item.date)}
+                          className="p-5 flex justify-between items-center bg-white dark:bg-slate-800 rounded-3xl mb-3 shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-50 dark:border-slate-700 hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 font-bold text-xs shadow-inner">
+                              {dateObj.toLocaleDateString('tr-TR', { month: 'short' }).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-gray-800 dark:text-white text-base transition-colors">{monthName}</p>
+                              <p className="text-[10px] text-gray-400 font-bold tracking-wide uppercase">Toplam Harcama</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={`font-black text-lg tracking-tight ${isLimitExceeded ? 'text-red-500' : 'text-gray-900 dark:text-white transition-colors'}`}>
+                              {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.total)}
+                            </p>
+                            {isLimitExceeded && <span className="inline-block bg-red-100 text-red-600 text-[10px] px-2 py-0.5 rounded-full font-bold mt-1">Limit Aşıldı</span>}
+                          </div>
+                        </div>
+
+                      )
+                    })}
+                  </div>
+                ) : !selectedBreakdownUser ? (
+                  // Level 1: List Users for Selected Month
+                  <div>
+                    <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/30 rounded-3xl mb-4 flex items-center gap-4 transition-colors">
+                      <button
+                        onClick={() => setSelectedMonth(null)}
+                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-gray-600 dark:text-white shadow-sm font-bold text-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        ←
+                      </button>
+                      <div>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Seçilen Ay</p>
+                        <span className="font-black text-xl text-gray-800 dark:text-white tracking-tight transition-colors">
+                          {new Date(selectedMonth + '-01').toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {activeUsers.map(user => {
+                        const userTotal = activeTransactions
+                          .filter(t => {
+                            const acc = activeAccounts.find(a => a.id === t.accountId);
+                            return t.date.startsWith(selectedMonth) && acc && acc.userId === user.id;
+                          })
+                          .reduce((sum, t) => sum + t.amount, 0);
+
+                        if (userTotal === 0) return null; // Hide users with no spending
+
+                        return (
+                          <div
+                            key={user.id}
+                            onClick={() => setSelectedBreakdownUser(user.id)}
+                            className="p-5 flex justify-between items-center bg-white dark:bg-slate-800 rounded-3xl shadow-[0_2px_10px_rgba(0,0,0,0.02)] border border-gray-50 dark:border-slate-700 hover:scale-[1.02] active:scale-[0.98] cursor-pointer transition-all"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
+                                {user.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-800 dark:text-white text-base transition-colors">{user.name}</p>
+                                <p className="text-[10px] text-gray-400 font-bold tracking-wide uppercase">Kişi Bazlı Toplam</p>
+                              </div>
+                            </div>
+                            <p className="font-black text-lg text-gray-900 dark:text-white tracking-tight transition-colors">
+                              {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(userTotal)}
+                            </p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : !selectedBreakdownAccount ? (
+                  // Level 2: List Accounts for Selected User
+                  <div>
+                    <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-2 bg-gray-50 dark:bg-slate-900/50 transition-colors">
+                      <button
+                        onClick={() => setSelectedBreakdownUser(null)}
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 shadow-sm text-gray-500 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white font-bold transition-colors"
+                      >
+                        ←
+                      </button>
+                      <span className="font-bold text-gray-700 dark:text-gray-200 transition-colors">
+                        {activeUsers.find(u => u.id === selectedBreakdownUser)?.name}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {activeAccounts
+                        .filter(acc => acc.userId === selectedBreakdownUser)
+                        .map(acc => {
+                          const accTotal = activeTransactions
+                            .filter(t => t.date.startsWith(selectedMonth) && t.accountId === acc.id)
+                            .reduce((sum, t) => sum + t.amount, 0);
+
+                          if (accTotal === 0) return null;
+
+                          return (
+                            <div
+                              key={acc.id}
+                              onClick={() => setSelectedBreakdownAccount(acc.id)}
+                              className="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-white dark:bg-slate-950 border border-gray-100 dark:border-slate-700 rounded-xl flex items-center justify-center text-xs font-bold text-gray-50 dark:text-gray-400 transition-colors">
+                                  {acc.name.charAt(0)}
+                                </div>
+                                <p className="font-bold text-gray-800 dark:text-white text-sm transition-colors">{acc.name}</p>
+                              </div>
+                              <p className="font-black text-gray-900 dark:text-white text-sm tracking-tight transition-colors">
+                                {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(accTotal)}
+                              </p>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </div>
+                ) : (
+                  // Level 3: List Transactions for Selected Account
+                  <div>
+                    <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center gap-2 bg-gray-50 dark:bg-slate-900/50 transition-colors">
+                      <button
+                        onClick={() => setSelectedBreakdownAccount(null)}
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 shadow-sm text-gray-500 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white font-bold transition-colors"
+                      >
+                        ←
+                      </button>
+                      <span className="font-bold text-gray-700 dark:text-gray-200 transition-colors">
+                        {activeAccounts.find(a => a.id === selectedBreakdownAccount)?.name}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {activeTransactions
+                        .filter(t => t.date.startsWith(selectedMonth) && t.accountId === selectedBreakdownAccount)
+                        .map(t => (
+                          <div key={t.id} className="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${t.type === 'taksitli' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                                {t.type === 'taksitli' ? '📅' : '💸'}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-800 dark:text-white text-sm transition-colors">{t.description}</p>
+                                <p className="text-[10px] text-gray-400">{t.date}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-gray-900 dark:text-white text-sm transition-colors">
+                                {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
+                              </p>
+                              <div className="flex gap-1 ml-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e) => { e.stopPropagation(); handleEditTransaction(t); }} className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-xs hover:bg-indigo-100 hover:text-indigo-600 transition-colors">✎</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-xs hover:bg-red-100 hover:text-red-500 transition-colors">🗑️</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      {activeTransactions.filter(t => t.date.startsWith(selectedMonth) && t.accountId === selectedBreakdownAccount).length === 0 && (
+                        <div className="p-4 text-center text-gray-400 text-sm">Bu dönemde işlem yok.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Extract Modal */}
+      {showExtractModal && (
+        <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4">
+          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-all" onClick={() => setShowExtractModal(false)}></div>
+          <div className="bg-[#F8FAFC] dark:bg-slate-900 w-full sm:max-w-[420px] h-[90vh] sm:h-[800px] rounded-t-[40px] sm:rounded-[40px] p-0 relative z-10 animate-slide-up sm:animate-scale-up flex flex-col shadow-[0_-10px_40px_rgba(0,0,0,0.1)] border-t border-white/50 dark:border-slate-800/50">
+
+            <div className="px-8 pt-8 pb-4 flex justify-between items-center bg-white dark:bg-slate-900 sticky top-0 z-20 rounded-t-[40px]">
+              <div>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Bu Ayki Ekstre</h3>
+                <p className="text-sm text-gray-400 font-medium">Güncel harcama listesi</p>
+              </div>
+              <button onClick={() => setShowExtractModal(false)} className="w-10 h-10 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">✕</button>
+            </div>
+
+            <div className="px-6 mb-4 sticky top-[88px] z-20 bg-[#F8FAFC] dark:bg-slate-900 pb-2">
+              <div className="bg-gray-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl flex backdrop-blur-md transition-colors">
+                <button
+                  onClick={() => setExtractFilterUser(null)} // Reset (All)
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${!extractFilterUser ? 'bg-white dark:bg-slate-700 shadow-sm text-gray-800 dark:text-white scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                >
+                  Tümü
+                </button>
+                {activeUsers.map(u => (
+                  <button
+                    key={u.id}
+                    onClick={() => setExtractFilterUser(u.id)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${extractFilterUser === u.id ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400 scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                  >
+                    {u.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 pb-8 custom-scrollbar">
+              <div className="space-y-4">
+                {activeTransactions
+                  .filter(t => {
+                    const isCurrentMonth = t.date.startsWith(currentMonth);
+                    if (!isCurrentMonth) return false;
+                    if (!extractFilterUser) return true;
+                    const account = data.accounts.find(a => a.id === t.accountId);
+                    return account && account.userId === extractFilterUser;
+                  })
+                  .slice().reverse() // Show all transactions for the month, removed .slice(0, 5) limit since it's a full modal now
+                  .map(t => {
+                    const account = data.accounts.find(a => a.id === t.accountId);
+                    const user = data.users.find(u => u.id === account?.userId);
+                    return (
+
+                      <div key={t.id} className="group bg-white dark:bg-slate-800 p-4 rounded-3xl shadow-[0_2px_15px_rgba(0,0,0,0.02)] border border-white dark:border-slate-700 hover:scale-[1.02] transition-all flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner ${t.type === 'taksitli' ? 'bg-orange-50 text-orange-500' : 'bg-blue-50 text-blue-500'}`}>
+                          {t.type === 'taksitli' ? '📅' : '💸'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-gray-800 dark:text-white truncate text-base transition-colors">{t.description}</h4>
+                          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5 font-medium">
+                            <span className={`w-2 h-2 rounded-full ${user?.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}></span>
+                            {user?.name} • {account?.name}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-black text-gray-800 dark:text-white text-base tracking-tight transition-colors">
+                            -{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5 font-bold">{t.date}</p>
+                          <div className="flex gap-1 justify-end mt-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={(e) => { e.stopPropagation(); handleEditTransaction(t); }} className="w-6 h-6 flex items-center justify-center bg-gray-50 rounded-full text-xs hover:bg-indigo-100 hover:text-indigo-600 transition-colors">✎</button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteTransaction(t.id); }} className="w-6 h-6 flex items-center justify-center bg-gray-50 rounded-full text-xs hover:bg-red-100 hover:text-red-500 transition-colors">🗑️</button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+
+                  })}
+                {activeTransactions.filter(t => t.date.startsWith(currentMonth)).length === 0 && (
+                  <div className="text-center py-8 text-gray-400 text-sm">Bu ay henüz bir işlem yok.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Floating Action Button Removed */}
     </div>
   )

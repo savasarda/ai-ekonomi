@@ -1,7 +1,7 @@
 export const initialData = {
     users: [
-        { id: 'u1', name: 'Arda', color: 'bg-blue-100 text-blue-800' },
-        { id: 'u2', name: 'Gamze', color: 'bg-pink-100 text-pink-800' },
+        { id: 'u1', name: 'Arda' },
+        { id: 'u2', name: 'Gamze' },
     ],
     accounts: [
         { id: 'a1', userId: 'u1', name: 'Garanti' },
