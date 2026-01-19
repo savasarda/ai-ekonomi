@@ -298,6 +298,18 @@ function App() {
     }
   }
 
+  const handleResetAllData = () => {
+    if (window.confirm('DİKKAT: Bütün harcamalar, kişiler ve kartlar silinecek. Emin misiniz?')) {
+      localStorage.removeItem('ai-ekonomi-data')
+      localStorage.removeItem('ai-ekonomi-limits')
+      setData(initialData)
+      setUserLimits({ u1: 75000, u2: 75000 })
+      setShowLimitModal(false)
+      alert('Bütün veriler başarıyla sıfırlandı.')
+      window.location.reload()
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#F2F4F8] dark:bg-slate-950 transition-colors duration-300 flex items-center justify-center p-0 sm:p-8 font-sans relative overflow-hidden">
 
@@ -763,9 +775,16 @@ function App() {
                   setShowLimitModal(false)
                   setLimitModalUser(null)
                 }}
-                className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-gray-200 active:scale-[0.98] transition-all hover:bg-black"
+                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-100 mb-4"
               >
                 Kaydet
+              </button>
+
+              <button
+                onClick={handleResetAllData}
+                className="w-full bg-red-50 text-red-500 py-3 rounded-2xl font-bold text-sm hover:bg-red-100 transition-colors"
+              >
+                Tüm Verileri Sıfırla
               </button>
             </div>
           </div>
