@@ -762,6 +762,7 @@ function App() {
                   <span className="text-xl font-black text-indigo-600 dark:text-indigo-500 mt-1">₺</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     value={limitModalUser ? userLimits[limitModalUser] : 0}
                     onChange={(e) => setUserLimits(prev => ({ ...prev, [limitModalUser]: Number(e.target.value) }))}
                     className="w-48 text-5xl font-black text-indigo-600 dark:text-indigo-500 bg-transparent border-none outline-none text-center tracking-tighter transition-all focus:scale-105 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -826,6 +827,7 @@ function App() {
                         <span className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 text-4xl font-light">₺</span>
                         <input
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           className="w-full pl-14 pr-6 py-8 text-6xl font-black text-gray-800 dark:text-white bg-white dark:bg-slate-800 shadow-inner rounded-[40px] border border-gray-100 dark:border-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none text-center placeholder-gray-200 dark:placeholder-slate-700"
                           placeholder="0"
