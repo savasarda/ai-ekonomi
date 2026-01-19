@@ -1,0 +1,16 @@
+{
+    "name": "AI Ekonomi",
+    "short_name": "Ekonomi",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#F2F4F8",
+    "theme_color": "#ffffff",
+    "description": "Premium Bütçe ve Harcama Takip Asistanı",
+    "icons": [
+        {
+            "src": "/pwa-icon.png",
+            "sizes": "1024x1024",
+            "type": "image/png"
+        }
+    ]
+}
