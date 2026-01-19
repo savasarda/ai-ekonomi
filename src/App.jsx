@@ -321,7 +321,7 @@ function App() {
 
         <div className="relative z-10 flex-1 flex flex-col overflow-y-auto custom-scrollbar">
 
-          <header className="px-8 pt-[calc(3rem+var(--safe-area-inset-top))] pb-6 flex justify-between items-center bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl sticky top-0 z-20 border-b border-white/40 dark:border-slate-800/50 transition-colors duration-300">
+          <header className="px-8 pt-[calc(3rem+var(--safe-area-inset-top))] pb-6 flex justify-between items-center transition-colors duration-300">
             <div>
               <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
                 <span>{new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}</span>
@@ -501,6 +501,16 @@ function App() {
                   👥
                 </div>
                 <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Kişiler</span>
+              </button>
+
+              <button
+                onClick={handleResetAllData}
+                className="flex flex-col items-center gap-2 group active:scale-90 transition-transform"
+              >
+                <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-[24px] shadow-[0_4px_20px_rgba(239,68,68,0.1)] border border-red-100 dark:border-red-900/30 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
+                  🗑️
+                </div>
+                <span className="text-xs font-bold text-red-500/80 dark:text-red-400">Sıfırla</span>
               </button>
             </div>
 
@@ -748,9 +758,16 @@ function App() {
 
               <div className="mb-10 relative">
                 <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-2">Aylık Harcama Limiti</p>
-                <span className="text-5xl font-black text-indigo-600 dark:text-indigo-500 tracking-tighter drop-shadow-sm transition-colors">
-                  {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(limitModalUser ? userLimits[limitModalUser] : 0)}
-                </span>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-xl font-black text-indigo-600 dark:text-indigo-500 mt-1">₺</span>
+                  <input
+                    type="number"
+                    value={limitModalUser ? userLimits[limitModalUser] : 0}
+                    onChange={(e) => setUserLimits(prev => ({ ...prev, [limitModalUser]: Number(e.target.value) }))}
+                    className="w-48 text-5xl font-black text-indigo-600 dark:text-indigo-500 bg-transparent border-none outline-none text-center tracking-tighter transition-all focus:scale-105 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    placeholder="0"
+                  />
+                </div>
               </div>
 
               <div className="relative mb-10 px-2">
@@ -775,16 +792,9 @@ function App() {
                   setShowLimitModal(false)
                   setLimitModalUser(null)
                 }}
-                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-100 mb-4"
+                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-100"
               >
                 Kaydet
-              </button>
-
-              <button
-                onClick={handleResetAllData}
-                className="w-full bg-red-50 text-red-500 py-3 rounded-2xl font-bold text-sm hover:bg-red-100 transition-colors"
-              >
-                Tüm Verileri Sıfırla
               </button>
             </div>
           </div>
