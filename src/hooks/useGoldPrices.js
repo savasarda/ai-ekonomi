@@ -8,16 +8,34 @@ export function useGoldPrices() {
     const fetchGoldPrices = async () => {
         setGoldFetchError(false)
         try {
-            // Use Vite proxy in development, Netlify Function in production
-            const isDev = import.meta.env.DEV
-            const endpoint = isDev
-                ? '/api/truncgil/today.json'  // Vite proxy
-                : '/.netlify/functions/gold-prices'  // Netlify Function
+            // Trying GenelPara API (Proxy) & CoinGecko for ETH
+            const [resGold, resEth] = await Promise.all([
+                fetch('/api/truncgil/today.json').catch(e => null),
+                fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=try').catch(e => null)
+            ])
 
-            const response = await fetch(endpoint)
+            if (resGold && resGold.ok) {
+                const goldData = await resGold.json()
 
-            if (response.ok) {
-                const goldData = await response.json()
+                // Merge Ethereum Data if available
+                if (resEth && resEth.ok) {
+                    try {
+                        const ethData = await resEth.json()
+                        if (ethData.ethereum && ethData.ethereum.try) {
+                            const ethPrice = ethData.ethereum.try
+                            // Format like Truncgil: "123.456,78"
+                            const formattedPrice = ethPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            goldData['ethereum'] = {
+                                "Satış": formattedPrice,
+                                "Tür": "Kripto",
+                                "Alış": formattedPrice
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("ETH parse error", e)
+                    }
+                }
+
                 setGoldPrices(goldData)
                 setLastUpdateTime(new Date())
                 return

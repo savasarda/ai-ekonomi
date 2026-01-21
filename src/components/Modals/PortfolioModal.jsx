@@ -17,6 +17,8 @@ export default function PortfolioModal({
     const [portfolioHistory, setPortfolioHistory] = useState([])
     const [expandedLogId, setExpandedLogId] = useState(null)
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [editingItem, setEditingItem] = useState(null)
+    const [tempValue, setTempValue] = useState('')
 
     if (!isOpen) return null;
 
@@ -149,7 +151,6 @@ export default function PortfolioModal({
                                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">Detaylar</p>
                                                 <div className="grid grid-cols-2 gap-2 text-sm">
                                                     {Object.entries(log.items || {}).map(([key, qty]) => {
-                                                        if (key === 'custom') return null; // Handle custom separately
                                                         if (qty <= 0) return null;
                                                         let label = key;
                                                         switch (key) {
@@ -167,28 +168,6 @@ export default function PortfolioModal({
                                                             </div>
                                                         )
                                                     })}
-
-                                                    {/* Custom Assets */}
-                                                    {(log.items?.custom || []).length > 0 && (
-                                                        <>
-                                                            <div className="col-span-2 mt-2 mb-1">
-                                                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Diğer Varlıklar</p>
-                                                            </div>
-                                                            {log.items.custom.map((item, idx) => (
-                                                                <div key={idx} className="col-span-2 flex justify-between bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 rounded-lg border border-indigo-100 dark:border-indigo-800">
-                                                                    <div className="flex flex-col">
-                                                                        <span className="text-gray-700 dark:text-gray-300 font-bold">{item.name}</span>
-                                                                        <span className="text-[10px] text-gray-400">
-                                                                            {item.qty} adet × {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.price)}
-                                                                        </span>
-                                                                    </div>
-                                                                    <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                                                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.qty * item.price)}
-                                                                    </span>
-                                                                </div>
-                                                            ))}
-                                                        </>
-                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -253,6 +232,7 @@ export default function PortfolioModal({
                                     { id: 'gram', label: 'Gram Altın', code: 'gram-altin' },
                                     { id: 'ceyrek', label: 'Çeyrek Altın', code: 'ceyrek-altin' },
                                     { id: 'yarim', label: 'Yarım Altın', code: 'yarim-altin' },
+                                    { id: 'tam', label: 'Tam Altın', code: 'tam-altin' },
                                     { id: 'cumhuriyet', label: 'Cumhuriyet Altını', code: 'cumhuriyet-altini' },
                                     { id: 'ethereum', label: 'Ethereum', code: 'ethereum' },
                                 ].map(item => {
@@ -271,7 +251,41 @@ export default function PortfolioModal({
                                                         onClick={() => setPortfolio(prev => ({ ...prev, items: { ...prev.items, [item.id]: Math.max(0, prev.items[item.id] - 1) } }))}
                                                         className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-800 rounded-lg shadow-sm text-gray-500 font-bold hover:text-red-500 transition-colors"
                                                     ><Minus size={16} /></button>
-                                                    <span className="w-8 text-center font-black text-lg text-gray-800 dark:text-white">{portfolio.items[item.id]}</span>
+                                                    {editingItem === item.id ? (
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={tempValue}
+                                                            onChange={(e) => setTempValue(e.target.value)}
+                                                            onBlur={() => {
+                                                                const val = parseFloat(tempValue) || 0;
+                                                                setPortfolio(prev => ({ ...prev, items: { ...prev.items, [item.id]: Math.max(0, val) } }));
+                                                                setEditingItem(null);
+                                                                setTempValue('');
+                                                            }}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    const val = parseFloat(tempValue) || 0;
+                                                                    setPortfolio(prev => ({ ...prev, items: { ...prev.items, [item.id]: Math.max(0, val) } }));
+                                                                    setEditingItem(null);
+                                                                    setTempValue('');
+                                                                }
+                                                            }}
+                                                            autoFocus
+                                                            className="w-16 text-center font-black text-lg text-gray-800 dark:text-white bg-white dark:bg-slate-800 rounded-lg px-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            onClick={() => {
+                                                                setEditingItem(item.id);
+                                                                setTempValue(portfolio.items[item.id].toString());
+                                                            }}
+                                                            className="w-16 text-center font-black text-lg text-gray-800 dark:text-white cursor-pointer hover:bg-white dark:hover:bg-slate-800 rounded-lg px-1 transition-colors"
+                                                            title="Düzenlemek için tıklayın"
+                                                        >
+                                                            {portfolio.items[item.id] % 1 === 0 ? portfolio.items[item.id] : portfolio.items[item.id].toFixed(2)}
+                                                        </span>
+                                                    )}
                                                     <button
                                                         onClick={() => setPortfolio(prev => ({ ...prev, items: { ...prev.items, [item.id]: prev.items[item.id] + 1 } }))}
                                                         className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-800 rounded-lg shadow-sm text-gray-500 font-bold hover:text-green-500 transition-colors"
