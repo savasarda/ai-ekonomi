@@ -149,6 +149,7 @@ export default function PortfolioModal({
                                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">Detaylar</p>
                                                 <div className="grid grid-cols-2 gap-2 text-sm">
                                                     {Object.entries(log.items || {}).map(([key, qty]) => {
+                                                        if (key === 'custom') return null; // Handle custom separately
                                                         if (qty <= 0) return null;
                                                         let label = key;
                                                         switch (key) {
@@ -166,6 +167,28 @@ export default function PortfolioModal({
                                                             </div>
                                                         )
                                                     })}
+
+                                                    {/* Custom Assets */}
+                                                    {(log.items?.custom || []).length > 0 && (
+                                                        <>
+                                                            <div className="col-span-2 mt-2 mb-1">
+                                                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Diğer Varlıklar</p>
+                                                            </div>
+                                                            {log.items.custom.map((item, idx) => (
+                                                                <div key={idx} className="col-span-2 flex justify-between bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-gray-700 dark:text-gray-300 font-bold">{item.name}</span>
+                                                                        <span className="text-[10px] text-gray-400">
+                                                                            {item.qty} adet × {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.price)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.qty * item.price)}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
