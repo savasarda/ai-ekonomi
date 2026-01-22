@@ -562,7 +562,7 @@ function App() {
         console.log("Fetching last portfolio log...");
         const { data: logs, error } = await supabase
           .from('portfolio_logs')
-          .select('total_value')
+          .select('total_value, items')
           .order('created_at', { ascending: false })
           .limit(1)
 
@@ -573,10 +573,14 @@ function App() {
 
         if (logs && logs.length > 0) {
           console.log("Found log:", logs[0]);
-          setPortfolio(prev => ({ ...prev, lastTotal: logs[0].total_value }))
+          setPortfolio(prev => ({
+            ...prev,
+            lastTotal: logs[0].total_value,
+            lastItems: logs[0].items
+          }))
         } else {
           console.log("No logs found.");
-          setPortfolio(prev => ({ ...prev, lastTotal: 0 }))
+          setPortfolio(prev => ({ ...prev, lastTotal: 0, lastItems: null }))
         }
       } else {
         console.log("Supabase not configured, skipping log fetch.");

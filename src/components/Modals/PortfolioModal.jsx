@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { X, Clock, TrendingUp, TrendingDown, ChevronDown, Plus, Minus, AlertTriangle, RefreshCw, Sparkles } from 'lucide-react'
+import { X, Clock, TrendingUp, TrendingDown, ChevronDown, Plus, Minus, AlertTriangle, RefreshCw, Sparkles, RotateCcw } from 'lucide-react'
 
 export default function PortfolioModal({
     isOpen,
@@ -20,6 +20,7 @@ export default function PortfolioModal({
     const [editingItem, setEditingItem] = useState(null)
     const [tempValue, setTempValue] = useState('')
     const [showSuccessPopup, setShowSuccessPopup] = useState(false)
+    const [showRestoreModal, setShowRestoreModal] = useState(false)
 
     if (!isOpen) return null;
 
@@ -150,9 +151,9 @@ export default function PortfolioModal({
                                         {expandedLogId === log.id && (
                                             <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700 animate-fade-in">
                                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">Detaylar</p>
-                                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                                <div className="grid grid-cols-2 gap-2 text-sm mb-4">
                                                     {Object.entries(log.items || {}).map(([key, qty]) => {
-                                                        if (qty <= 0) return null;
+                                                        if (qty <= 0 || key === 'custom') return null;
                                                         let label = key;
                                                         switch (key) {
                                                             case 'gram': label = 'Gram'; break;
@@ -170,6 +171,7 @@ export default function PortfolioModal({
                                                         )
                                                     })}
                                                 </div>
+
                                             </div>
                                         )}
                                     </div>
@@ -204,7 +206,14 @@ export default function PortfolioModal({
                                         const isProfit = diff >= 0;
 
                                         return (
-                                            <div className="flex items-center gap-2 bg-white/20 rounded-xl p-2 backdrop-blur-sm self-start inline-flex">
+                                            <div className="flex items-center gap-2 bg-white/20 rounded-xl p-2 backdrop-blur-sm self-start inline-flex cursor-pointer hover:bg-white/30 transition-colors active:scale-95"
+                                                title="Bu değerleri yüklemek için tıklayın"
+                                                onClick={() => {
+                                                    if (portfolio.lastItems) {
+                                                        setShowRestoreModal(true);
+                                                    }
+                                                }}
+                                            >
                                                 <span className="text-lg">
                                                     {isProfit ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
                                                 </span>
@@ -429,6 +438,41 @@ export default function PortfolioModal({
                             {/* Decorative circles */}
                             <div className="absolute -top-4 -left-4 w-24 h-24 bg-white/20 rounded-full blur-xl"></div>
                             <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+                        </div>
+                    </div>
+                )}
+                {/* Restore Confirmation Modal */}
+                {showRestoreModal && (
+                    <div className="absolute inset-0 flex items-center justify-center z-50 p-4">
+                        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-all" onClick={() => setShowRestoreModal(false)}></div>
+                        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[340px] rounded-[32px] p-6 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+                            <div className="text-center mb-6">
+                                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <RotateCcw size={32} className="text-blue-500" />
+                                </div>
+                                <h4 className="text-xl font-black text-gray-800 dark:text-white mb-2">Değerleri Yükle?</h4>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Son kaydedilen portföy değerleri yüklenecek. Mevcut girdiğiniz değerler değişecektir.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowRestoreModal(false)}
+                                    className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-3 rounded-xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+                                >
+                                    İptal
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setPortfolio(prev => ({ ...prev, items: portfolio.lastItems }));
+                                        setShowRestoreModal(false);
+                                    }}
+                                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+                                >
+                                    Yükle
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
