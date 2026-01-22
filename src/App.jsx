@@ -6,7 +6,7 @@ import PortfolioModal from './components/Modals/PortfolioModal'
 import MoneyTipModal from './components/Modals/MoneyTipModal'
 import FeedbackModal from './components/Modals/FeedbackModal' // NEW
 import { moneyTips } from './data/moneyTips'
-import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight } from 'lucide-react'
+import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle } from 'lucide-react'
 
 function App() {
   const [data, setData] = useState({ users: [], accounts: [], transactions: [] })
@@ -105,6 +105,15 @@ function App() {
 
   /* Feedback Logic */
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+
+  /* Reset Password Modal */
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false)
+
+  /* Success Modal */
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
   /* Money Tip Logic */
   const [showTipModal, setShowTipModal] = useState(false)
@@ -501,26 +510,42 @@ function App() {
   }
 
   const handleResetAllData = async () => {
-    if (window.confirm('DİKKAT: Bütün harcamalar, kişiler ve kartlar silinecek. Emin misiniz?')) {
+    // Show password modal
+    setPasswordInput('')
+    setShowPasswordModal(true)
+  }
 
-      if (isSupabaseConfigured) {
-        try {
-          // Clear Supabase tables
-          await supabase.from('transactions').delete().neq('id', 'temp')
-          await supabase.from('accounts').delete().neq('id', 'temp')
-          await supabase.from('users').delete().neq('id', 'temp')
-          await supabase.from('user_limits').delete().neq('user_id', 'temp')
-        } catch (error) {
-          console.error('Error resetting Supabase:', error)
-        }
-      }
-
-      setData({ users: [], accounts: [], transactions: [] })
-      setUserLimits({})
-      setShowLimitModal(false)
-      alert('Bütün veriler başarıyla sıfırlandı.')
-      window.location.reload()
+  const handlePasswordSubmit = () => {
+    if (passwordInput !== '5898') {
+      alert('Yanlış şifre! İşlem iptal edildi.')
+      setPasswordInput('')
+      return
     }
+
+    setShowPasswordModal(false)
+    setShowResetConfirmModal(true)
+  }
+
+  const handleConfirmReset = async () => {
+    setShowResetConfirmModal(false)
+
+    if (isSupabaseConfigured) {
+      try {
+        // Clear Supabase tables
+        await supabase.from('transactions').delete().neq('id', 'temp')
+        await supabase.from('accounts').delete().neq('id', 'temp')
+        await supabase.from('users').delete().neq('id', 'temp')
+        await supabase.from('user_limits').delete().neq('user_id', 'temp')
+      } catch (error) {
+        console.error('Error resetting Supabase:', error)
+      }
+    }
+
+    setData({ users: [], accounts: [], transactions: [] })
+    setUserLimits({})
+    setShowLimitModal(false)
+    alert('Bütün veriler başarıyla sıfırlandı.')
+    window.location.reload()
   }
 
   const handleOpenPortfolio = async () => {
@@ -889,7 +914,8 @@ function App() {
                 onClick={() => {
                   setShowLimitModal(false)
                   setLimitModalUser(null)
-                  alert('Limit ayarları başarıyla kaydedildi. ' + (isSupabaseConfigured ? 'Bulut ile senkronize ediliyor.' : 'Åu an yerel olarak kaydedildi, API anahtarlarınızı girdiğinizde bulut ile senkronize olacaktır.'))
+                  setSuccessMessage('Limit ayarları başarıyla kaydedildi. ' + (isSupabaseConfigured ? 'Bulut ile senkronize ediliyor.' : 'Şu an yerel olarak kaydedildi, API anahtarlarınızı girdiğinizde bulut ile senkronize olacaktır.'))
+                  setShowSuccessModal(true)
                 }}
                 className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-100"
               >
@@ -1571,13 +1597,116 @@ function App() {
         tip={currentTip}
       />
 
+      {/* Password Modal for Reset */}
+      {showPasswordModal && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowPasswordModal(false)}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[340px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock size={32} className="text-red-500" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-2">Şifre Gerekli</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Sıfırlama işlemi için şifre giriniz</p>
+            </div>
+
+            <input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+              placeholder="Şifre"
+              className="w-full px-6 py-4 rounded-2xl bg-gray-100 dark:bg-slate-800 border-2 border-transparent focus:border-indigo-500 outline-none text-center text-2xl font-bold tracking-widest transition-all mb-6"
+              autoFocus
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handlePasswordSubmit}
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+              >
+                Devam
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Reset */}
+      {showResetConfirmModal && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowResetConfirmModal(false)}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle size={40} className="text-red-500" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Dikkat!</h3>
+              <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                Bütün <span className="font-bold text-red-500">harcamalar</span>, <span className="font-bold text-red-500">kişiler</span> ve <span className="font-bold text-red-500">kartlar</span> kalıcı olarak silinecek.
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-500 mt-3">
+                Bu işlem geri alınamaz!
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowResetConfirmModal(false)}
+                className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleConfirmReset}
+                className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+              >
+                Sıfırla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <FeedbackModal
         isOpen={showFeedbackModal}
         onClose={() => setShowFeedbackModal(false)}
       />
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowSuccessModal(false)}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <CheckCircle size={48} className="text-green-500" strokeWidth={2.5} />
+              </div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Başarılı!</h3>
+              <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                {successMessage}
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="w-full bg-gradient-to-r from-green-600 to-green-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+            >
+              Tamam
+            </button>
+          </div>
+        </div>
+      )}
     </div >
   )
 }
 
 export default App
+
 

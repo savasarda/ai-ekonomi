@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { X, Clock, TrendingUp, TrendingDown, ChevronDown, Plus, Minus, AlertTriangle, RefreshCw } from 'lucide-react'
+import { X, Clock, TrendingUp, TrendingDown, ChevronDown, Plus, Minus, AlertTriangle, RefreshCw, Sparkles } from 'lucide-react'
 
 export default function PortfolioModal({
     isOpen,
@@ -19,6 +19,7 @@ export default function PortfolioModal({
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [editingItem, setEditingItem] = useState(null)
     const [tempValue, setTempValue] = useState('')
+    const [showSuccessPopup, setShowSuccessPopup] = useState(false)
 
     if (!isOpen) return null;
 
@@ -389,7 +390,8 @@ export default function PortfolioModal({
                                             lastUpdated: new Date().toISOString()
                                         }));
 
-                                        alert('Portföy durumu günlüğe kaydedildi. Bir sonraki girişinizde bu değer referans alınacaktır.');
+                                        setShowSuccessPopup(true)
+                                        setTimeout(() => setShowSuccessPopup(false), 3000)
                                     }}
                                     className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all"
                                 >
@@ -400,6 +402,36 @@ export default function PortfolioModal({
                         </>
                     )}
                 </div>
+
+                {/* Fun Success Popup */}
+                {showSuccessPopup && (
+                    <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+                        <div className="bg-gradient-to-br from-green-400 via-emerald-500 to-teal-500 text-white px-8 py-6 rounded-3xl shadow-2xl animate-bounce pointer-events-auto relative overflow-hidden">
+                            {/* Sparkle effects */}
+                            <div className="absolute top-2 right-2 animate-ping">
+                                <Sparkles size={20} className="text-yellow-300" />
+                            </div>
+                            <div className="absolute bottom-2 left-2 animate-pulse">
+                                <Sparkles size={16} className="text-yellow-200" />
+                            </div>
+
+                            <div className="text-center relative z-10">
+                                <div className="text-5xl mb-3 animate-bounce">🎉</div>
+                                <h4 className="text-2xl font-black mb-2">Harika!</h4>
+                                <p className="text-sm font-bold opacity-90">
+                                    Portföyün kasaya kilitlendi! 💰
+                                </p>
+                                <p className="text-xs opacity-75 mt-1">
+                                    Artık zenginliğini takip edebilirsin 😎
+                                </p>
+                            </div>
+
+                            {/* Decorative circles */}
+                            <div className="absolute -top-4 -left-4 w-24 h-24 bg-white/20 rounded-full blur-xl"></div>
+                            <div className="absolute -bottom-4 -right-4 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )
