@@ -1,12 +1,16 @@
 exports.handler = async function (event, context) {
     try {
-        // Extract the path after /api/truncgil/
-        const path = event.path.replace('/.netlify/functions/gold-proxy/', '')
+        // The splat parameter contains the path after /api/truncgil/
+        // For example: /api/truncgil/today.json -> splat = "today.json"
+        const path = event.path.split('/').pop() || 'today.json'
+
+        console.log('Fetching gold prices from:', `https://finans.truncgil.com/${path}`)
 
         // Fetch from the actual API
         const response = await fetch(`https://finans.truncgil.com/${path}`, {
             headers: {
                 'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0'
             }
         })
 
