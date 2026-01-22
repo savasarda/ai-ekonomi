@@ -6,3 +6,4 @@
   from = "/api/truncgil/*"
   to = "/.netlify/functions/gold-proxy/:splat"
   status = 200
+  force = true
