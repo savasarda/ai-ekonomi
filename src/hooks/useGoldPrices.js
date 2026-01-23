@@ -51,8 +51,21 @@ export function useGoldPrices() {
 
     useEffect(() => {
         fetchGoldPrices(); // Fetch immediately
+
         const interval = setInterval(fetchGoldPrices, 60000); // Update every 60s
-        return () => clearInterval(interval);
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchGoldPrices();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [])
 
     return { goldPrices, goldFetchError, fetchGoldPrices, lastUpdateTime }
