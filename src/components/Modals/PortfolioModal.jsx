@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { X, Clock, TrendingUp, TrendingDown, ChevronDown, Plus, Minus, AlertTriangle, RefreshCw, Sparkles, RotateCcw } from 'lucide-react'
+import { X, Clock, TrendingUp, TrendingDown, ChevronDown, Plus, Minus, AlertTriangle, RefreshCw, Sparkles, RotateCcw, Trash2 } from 'lucide-react'
 
 export default function PortfolioModal({
     isOpen,
@@ -21,6 +21,7 @@ export default function PortfolioModal({
     const [tempValue, setTempValue] = useState('')
     const [showSuccessPopup, setShowSuccessPopup] = useState(false)
     const [showRestoreModal, setShowRestoreModal] = useState(false)
+    const [deleteConfirmation, setDeleteConfirmation] = useState({ isOpen: false, logId: null })
 
     if (!isOpen) return null;
 
@@ -41,8 +42,39 @@ export default function PortfolioModal({
         }
     }
 
+    const requestDeleteLog = (logId, e) => {
+        e.stopPropagation(); // Prevent accordion toggle
+        setDeleteConfirmation({ isOpen: true, logId });
+    }
+
+    const confirmDeleteLog = async () => {
+        if (!deleteConfirmation.logId) return;
+
+        try {
+            const { error } = await supabase
+                .from('portfolio_logs')
+                .delete()
+                .eq('id', deleteConfirmation.logId);
+
+            if (error) throw error;
+
+            setPortfolioHistory(prev => prev.filter(log => log.id !== deleteConfirmation.logId));
+            setDeleteConfirmation({ isOpen: false, logId: null });
+        } catch (error) {
+            console.error('Error deleting log:', error);
+            alert('Kayıt silinirken bir hata oluştu.');
+        }
+    }
+
     // Helper for price calculation
     const getPrice = (key, rawPrices) => {
+        // Special calculation for 22 Ayar Gram (0.916 * Has Altın)
+        if (key === 'gram22') {
+            const hasAltinRaw = rawPrices?.['gram-has-altin']?.['Alış'] || "0";
+            const hasAltinVal = parseFloat(String(hasAltinRaw).replace(/\./g, '').replace(',', '.')) || 0;
+            return hasAltinVal * 0.916;
+        }
+
         let priceKey = '';
         switch (key) {
             case 'gram': priceKey = 'gram-altin'; break;
@@ -52,7 +84,7 @@ export default function PortfolioModal({
             case 'cumhuriyet': priceKey = 'cumhuriyet-altini'; break;
             case 'ethereum': priceKey = 'ethereum'; break;
         }
-        let rawPrice = rawPrices?.[priceKey]?.Satış || "0";
+        let rawPrice = rawPrices?.[priceKey]?.Alış || "0";
         rawPrice = String(rawPrice).replace(/\./g, '').replace(',', '.');
         return parseFloat(rawPrice) || 0;
     }
@@ -141,6 +173,13 @@ export default function PortfolioModal({
                                                 <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg">
                                                     {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(log.total_value)}
                                                 </p>
+                                                <button
+                                                    onClick={(e) => requestDeleteLog(log.id, e)}
+                                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
+                                                    title="Kaydı sil"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
                                                 <span className={`text-gray-400 transition-transform ${expandedLogId === log.id ? 'rotate-180' : ''}`}>
                                                     <ChevronDown size={16} />
                                                 </span>
@@ -156,7 +195,8 @@ export default function PortfolioModal({
                                                         if (qty <= 0 || key === 'custom') return null;
                                                         let label = key;
                                                         switch (key) {
-                                                            case 'gram': label = 'Gram'; break;
+                                                            case 'gram': label = 'Gram Altın (24 Ayar)'; break;
+                                                            case 'gram22': label = '22 Ayar Gram'; break;
                                                             case 'ceyrek': label = 'Çeyrek'; break;
                                                             case 'yarim': label = 'Yarım'; break;
                                                             case 'tam': label = 'Tam'; break;
@@ -239,7 +279,8 @@ export default function PortfolioModal({
                             {/* Input List */}
                             <div className="space-y-4">
                                 {[
-                                    { id: 'gram', label: 'Gram Altın', code: 'gram-altin' },
+                                    { id: 'gram', label: 'Gram Altın (24 Ayar)', code: 'gram-altin' },
+                                    { id: 'gram22', label: '22 Ayar Gram', code: 'calculated' },
                                     { id: 'ceyrek', label: 'Çeyrek Altın', code: 'ceyrek-altin' },
                                     { id: 'yarim', label: 'Yarım Altın', code: 'yarim-altin' },
                                     { id: 'tam', label: 'Tam Altın', code: 'tam-altin' },
@@ -465,12 +506,50 @@ export default function PortfolioModal({
                                 </button>
                                 <button
                                     onClick={() => {
-                                        setPortfolio(prev => ({ ...prev, items: portfolio.lastItems }));
+                                        setPortfolio(prev => ({
+                                            ...prev,
+                                            items: {
+                                                gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, custom: [],
+                                                ...portfolio.lastItems
+                                            }
+                                        }));
                                         setShowRestoreModal(false);
                                     }}
                                     className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
                                 >
                                     Yükle
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {/* Delete Confirmation Modal */}
+                {deleteConfirmation.isOpen && (
+                    <div className="absolute inset-0 flex items-center justify-center z-50 p-4">
+                        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-all" onClick={() => setDeleteConfirmation({ isOpen: false, logId: null })}></div>
+                        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[340px] rounded-[32px] p-6 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+                            <div className="text-center mb-6">
+                                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Trash2 size={32} className="text-red-500" />
+                                </div>
+                                <h4 className="text-xl font-black text-gray-800 dark:text-white mb-2">Kaydı Sil?</h4>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Bu geçmiş kaydı silmek üzeresiniz. Bu işlem geri alınamaz.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setDeleteConfirmation({ isOpen: false, logId: null })}
+                                    className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-3 rounded-xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+                                >
+                                    Vazgeç
+                                </button>
+                                <button
+                                    onClick={confirmDeleteLog}
+                                    className="flex-1 bg-gradient-to-r from-red-500 to-pink-600 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+                                >
+                                    Sil
                                 </button>
                             </div>
                         </div>

@@ -8,36 +8,37 @@ export function useGoldPrices() {
     const fetchGoldPrices = async () => {
         setGoldFetchError(false)
         try {
-            // Trying GenelPara API (Proxy) & CoinGecko for ETH
+            // Using stable Legacy API (today.json)
             const [resGold, resEth] = await Promise.all([
-                fetch('/api/truncgil/today.json').catch(e => null),
+                fetch(`/api/truncgil/today.json?_=${new Date().getTime()}`, {
+                    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                }).catch(e => null),
                 fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=try').catch(e => null)
             ])
 
             if (resGold && resGold.ok) {
-                const goldData = await resGold.json()
+                const data = await resGold.json()
+                const updateDate = data.Update_Date || new Date();
 
-                // Merge Ethereum Data if available
+
+                // Merge Ethereum
                 if (resEth && resEth.ok) {
                     try {
                         const ethData = await resEth.json()
-                        if (ethData.ethereum && ethData.ethereum.try) {
-                            const ethPrice = ethData.ethereum.try
-                            // Format like Truncgil: "123.456,78"
-                            const formattedPrice = ethPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                            goldData['ethereum'] = {
-                                "Satış": formattedPrice,
-                                "Tür": "Kripto",
-                                "Alış": formattedPrice
+                        const ethPrice = ethData?.ethereum?.try;
+                        if (ethPrice) {
+                            const ethFormatted = ethPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            data['ethereum'] = {
+                                "Alış": ethFormatted,
+                                "Satış": ethFormatted,
+                                "Tür": "Kripto"
                             }
                         }
-                    } catch (e) {
-                        console.warn("ETH parse error", e)
-                    }
+                    } catch (e) { console.warn(e) }
                 }
 
-                setGoldPrices(goldData)
-                setLastUpdateTime(new Date())
+                setGoldPrices(data)
+                setLastUpdateTime(new Date()) // User requested local system time
                 return
             }
             throw new Error('API Error')

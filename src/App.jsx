@@ -64,6 +64,7 @@ function App() {
     lastUpdated: null,
     items: {
       gram: 0,
+      gram22: 0,
       ceyrek: 0,
       yarim: 0,
       tam: 0,
@@ -554,7 +555,7 @@ function App() {
       // 1. Reset input values
       setPortfolio(prev => ({
         ...prev,
-        items: { gram: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, custom: [] }
+        items: { gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, custom: [] }
       }))
 
       // 2. Fetch last log for comparison
