@@ -1,16 +1,18 @@
-﻿import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { toCamelCase, toSnakeCase } from './lib/dataTransformers'
 import { useGoldPrices } from './hooks/useGoldPrices'
 import PortfolioModal from './components/Modals/PortfolioModal'
 import MoneyTipModal from './components/Modals/MoneyTipModal'
-import FeedbackModal from './components/Modals/FeedbackModal'
-import WelcomeScreen from './components/WelcomeScreen' // NEW
-import NeedsList from './components/NeedsList' // NEW
+import FeedbackModal from './components/Modals/FeedbackModal' // NEW
 import { moneyTips } from './data/moneyTips'
 import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle } from 'lucide-react'
 
+import WelcomeScreen from './components/WelcomeScreen'
+import NeedsList from './components/NeedsList'
+
 function App() {
+  const [currentView, setCurrentView] = useState('welcome')
   const [data, setData] = useState({ users: [], accounts: [], transactions: [] })
 
   // Active Data Helpers (Soft Delete Logic: status !== 0)
@@ -27,17 +29,6 @@ function App() {
 
   const [showFutureDebtsModal, setShowFutureDebtsModal] = useState(false)
   const [selectedMonthDetail, setSelectedMonthDetail] = useState(null) // { monthKey, selectedUserId }
-
-  // Ref for scroll management
-  const futureModalContentRef = useRef(null)
-
-  // Scroll to top when switching views in Future Modal
-  useEffect(() => {
-    if (futureModalContentRef.current) {
-      futureModalContentRef.current.scrollTop = 0
-    }
-  }, [selectedMonthDetail])
-
   const [showCardsModal, setShowCardsModal] = useState(false)
 
   // Card Management State
@@ -129,15 +120,6 @@ function App() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
 
-  /* Warning Modal */
-  const [showWarningModal, setShowWarningModal] = useState(false)
-  const [warningMessage, setWarningMessage] = useState('')
-
-  /* Confirmation Modal */
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [confirmMessage, setConfirmMessage] = useState('')
-  const [pendingDelete, setPendingDelete] = useState(null) // { id, type }
-
   /* Money Tip Logic */
   const [showTipModal, setShowTipModal] = useState(false)
   const [currentTip, setCurrentTip] = useState(null)
@@ -162,6 +144,8 @@ function App() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('theme') === 'dark'
   })
+
+  const toggleTheme = () => setDarkMode(prev => !prev)
 
   // Theme Sync Effect
   useEffect(() => {
@@ -362,58 +346,30 @@ function App() {
   }
 
   const handleDeleteTransaction = (id) => {
-    setConfirmMessage('Bu işlemi silmek istediğinize emin misiniz?')
-    setPendingDelete({ id, type: 'transaction' })
-    setShowConfirmModal(true)
-  }
-
-  const handleConfirmAction = () => {
-    if (!pendingDelete) return
-
-    if (pendingDelete.type === 'transaction') {
+    if (window.confirm('Bu işlemi silmek istediğinize emin misiniz?')) {
       setData(prev => ({
         ...prev,
-        transactions: prev.transactions.map(t => t.id === pendingDelete.id ? { ...t, status: 0 } : t)
+        transactions: prev.transactions.map(t => t.id === id ? { ...t, status: 0 } : t)
       }))
-    } else if (pendingDelete.type === 'card') {
-      setData(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === pendingDelete.id ? { ...a, status: 0 } : a) }))
-    } else if (pendingDelete.type === 'user') {
-      setData(prev => ({ ...prev, users: prev.users.map(u => u.id === pendingDelete.id ? { ...u, status: 0 } : u) }))
     }
-
-    setShowConfirmModal(false)
-    setPendingDelete(null)
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
 
     if (!amount) {
-      if (!amount) {
-        setWarningMessage("Lütfen bir tutar giriniz.")
-        setShowWarningModal(true)
-        setTransactionStep(1)
-        return
-      }
+      alert("Lütfen bir tutar giriniz.")
       setTransactionStep(1)
       return
     }
 
     if (!description) {
-      if (!description) {
-        setWarningMessage("Lütfen bir açıklama giriniz.")
-        setShowWarningModal(true)
-        return
-      }
+      alert("Lütfen bir açıklama giriniz.")
       return
     }
 
     if (!newAccount) {
-      if (!newAccount) {
-        setWarningMessage("Lütfen bir hesap/kart seçiniz.")
-        setShowWarningModal(true)
-        return
-      }
+      alert("Lütfen bir hesap/kart seçiniz.")
       return
     }
 
@@ -441,11 +397,7 @@ function App() {
     // Let's trust parseFloat(amount.replace(',', '.')) but add the preview.
     const amountVal = parseFloat(safeAmount); // Use the processed safeAmount
     if (isNaN(amountVal) || amountVal <= 0) {
-      if (isNaN(amountVal) || amountVal <= 0) {
-        setWarningMessage("Geçerli bir tutar giriniz.")
-        setShowWarningModal(true)
-        return;
-      }
+      alert("Geçerli bir tutar giriniz.");
       return;
     }
 
@@ -532,9 +484,9 @@ function App() {
   }
 
   const handleDeleteCard = (cardId) => {
-    setConfirmMessage('Bu kartı silmek istediğinize emin misiniz?')
-    setPendingDelete({ id: cardId, type: 'card' })
-    setShowConfirmModal(true)
+    if (window.confirm('Bu kartı silmek istediğinize emin misiniz?')) {
+      setData(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === cardId ? { ...a, status: 0 } : a) }))
+    }
   }
 
   const handleAddUser = () => {
@@ -555,13 +507,13 @@ function App() {
 
   const handleDeleteUser = (userId) => {
     if (activeUsers.length <= 1) {
-      setWarningMessage('En az bir kullanıcı kalmalıdır.')
-      setShowWarningModal(true)
+      alert('En az bir kullanıcı kalmalıdır.')
       return
     }
-    setConfirmMessage('Bu kişiyi silmek istediğinize emin misiniz?')
-    setPendingDelete({ id: userId, type: 'user' })
-    setShowConfirmModal(true)
+    if (window.confirm('Bu kişiyi silmek istediğinize emin misiniz?')) {
+      setData(prev => ({ ...prev, users: prev.users.map(u => u.id === userId ? { ...u, status: 0 } : u) }))
+      // Cleanup associated limits? optional
+    }
   }
 
   const handleResetAllData = async () => {
@@ -649,15 +601,30 @@ function App() {
     }
   }
 
-  /* Navigation / Routing State */
-  const [currentView, setCurrentView] = useState('welcome'); // 'welcome', 'economy', 'needs'
-
+  // Render Welcome Screen
   if (currentView === 'welcome') {
-    return <WelcomeScreen onNavigate={setCurrentView} />;
+    return (
+      <WelcomeScreen
+        onNavigate={setCurrentView}
+        darkMode={darkMode}
+        toggleTheme={toggleTheme} // Pass theme props
+      />
+    );
   }
 
+  // Render Needs List
   if (currentView === 'needs') {
-    return <NeedsList onBack={() => setCurrentView('welcome')} isSupabaseConfigured={isSupabaseConfigured} />;
+    // Lazy load NeedsList only when needed, or just import it at top? 
+    // For now let's assume NeedsList import is needed or we can dynamic import.
+    // Better to standard import at top. But I can't edit top in this chunk.
+    // I already imported NeedsList in Step 393? No, I created the file.
+    // I need to add import NeedsList too.
+    return (
+      <NeedsList
+        onBack={() => setCurrentView('welcome')}
+        isSupabaseConfigured={isSupabaseConfigured}
+      />
+    )
   }
 
   return (
@@ -667,22 +634,22 @@ function App() {
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-300/30 dark:bg-purple-900/20 rounded-full blur-[100px] animate-fade-in"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-300/30 dark:bg-indigo-900/20 rounded-full blur-[100px] animate-fade-in delay-100"></div>
 
-      {/* Back to Menu Button (Absolute Top Left) */}
-      <button
-        onClick={() => setCurrentView('welcome')}
-        className="fixed top-4 left-4 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-2 rounded-full shadow-sm border border-white/20 dark:border-slate-800 text-gray-500 hover:text-indigo-600 dark:text-gray-400 text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2 pr-4"
-      >
-        <div className="w-8 h-8 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
-          <ArrowLeft size={16} />
-        </div>
-        MENÜ
-      </button>
-
       <div className="w-full max-w-[480px] bg-[#F8FAFC] dark:bg-slate-900 h-screen sm:h-[850px] sm:rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col sm:border-[8px] sm:border-white dark:sm:border-slate-800 ring-1 ring-black/5 z-10 transition-colors duration-300">
 
         <div className="relative z-10 flex-1 flex flex-col overflow-y-auto custom-scrollbar">
 
-          <header className="px-8 pt-[calc(5rem+var(--safe-area-inset-top))] pb-6 transition-colors duration-300">
+          <header className="px-8 pt-[calc(3rem+var(--safe-area-inset-top))] pb-6 transition-colors duration-300">
+            {/* Back Button - Top Left */}
+            <div className="flex items-center justify-start mb-4">
+              <button
+                onClick={() => setCurrentView('welcome')}
+                className="w-10 h-10 bg-white dark:bg-slate-800 shadow-sm rounded-xl flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-all active:scale-95"
+                title="Giriş Ekranına Dön"
+              >
+                <ArrowLeft size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
             <div>
               <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
                 <span>{new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}</span>
@@ -701,30 +668,8 @@ function App() {
               </p>
             </div>
 
-            {/* Action Buttons - Centered between date and greeting */}
-            <div className="flex items-center justify-center gap-3 my-4">
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className="w-11 h-11 bg-gradient-to-br from-white to-gray-50 dark:from-slate-800 dark:to-slate-900 shadow-lg rounded-2xl flex items-center justify-center border border-gray-200 dark:border-slate-700 text-gray-600 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 transition-all hover:scale-110 active:scale-95 hover:shadow-xl"
-                title={darkMode ? 'Aydınlık Tema' : 'Karanlık Tema'}
-              >
-                {darkMode ? <Sun size={20} strokeWidth={2.5} /> : <Moon size={20} strokeWidth={2.5} />}
-              </button>
 
-              <button
-                onClick={handleShowTip}
-                className="w-11 h-11 bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/30 dark:to-yellow-900/20 shadow-lg rounded-2xl flex items-center justify-center border border-yellow-200 dark:border-yellow-800 text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300 transition-all hover:scale-110 active:scale-95 hover:shadow-xl group relative"
-                title="Günün Finans İpucu"
-              >
-                <Lightbulb size={20} strokeWidth={2.5} className="group-hover:fill-yellow-500 dark:group-hover:fill-yellow-400 transition-all" />
-                {!showTipModal && (
-                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
-                  </span>
-                )}
-              </button>
-            </div>
+
 
             <div>
               <h1 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors text-center">Merhaba, <span className="text-indigo-600 dark:text-indigo-400">Hoş Geldin!</span></h1>
@@ -1226,7 +1171,7 @@ function App() {
                 </div>
               </div>
 
-              <div ref={futureModalContentRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
                 {!selectedMonthDetail ? (
                   // Month List View
                   <>
@@ -1362,16 +1307,6 @@ function App() {
                               <div className="flex items-center gap-2 text-xs text-gray-400">
                                 <span>{new Date(t.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                 {t.type === 'taksitli' && <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full font-bold">Taksitli</span>}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteTransaction(t.id);
-                                  }}
-                                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 opacity-60 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all ml-2"
-                                  title="İşlemi Sil"
-                                >
-                                  <Trash2 size={16} strokeWidth={2} />
-                                </button>
                               </div>
                             </div>
                           )
@@ -1761,63 +1696,6 @@ function App() {
                 Sıfırla
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="absolute inset-0 z-[80] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowConfirmModal(false)}></div>
-          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
-            <div className="text-center mb-6">
-              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                <Trash2 size={40} className="text-red-500" strokeWidth={2.5} />
-              </div>
-              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Onaylayın</h3>
-              <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
-                {confirmMessage}
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowConfirmModal(false)}
-                className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
-              >
-                Vazgeç
-              </button>
-              <button
-                onClick={handleConfirmAction}
-                className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
-              >
-                Sil
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Warning Modal */}      {showWarningModal && (
-        <div className="absolute inset-0 z-[70] flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowWarningModal(false)}></div>
-          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
-            <div className="text-center mb-6">
-              <div className="w-20 h-20 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-                <AlertTriangle size={40} className="text-orange-500" strokeWidth={2.5} />
-              </div>
-              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Dikkat!</h3>
-              <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
-                {warningMessage}
-              </p>
-            </div>
-
-            <button
-              onClick={() => setShowWarningModal(false)}
-              className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
-            >
-              Tamam
-            </button>
           </div>
         </div>
       )}
