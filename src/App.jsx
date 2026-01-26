@@ -4,7 +4,9 @@ import { toCamelCase, toSnakeCase } from './lib/dataTransformers'
 import { useGoldPrices } from './hooks/useGoldPrices'
 import PortfolioModal from './components/Modals/PortfolioModal'
 import MoneyTipModal from './components/Modals/MoneyTipModal'
-import FeedbackModal from './components/Modals/FeedbackModal' // NEW
+import FeedbackModal from './components/Modals/FeedbackModal'
+import WelcomeScreen from './components/WelcomeScreen' // NEW
+import NeedsList from './components/NeedsList' // NEW
 import { moneyTips } from './data/moneyTips'
 import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle } from 'lucide-react'
 
@@ -647,6 +649,17 @@ function App() {
     }
   }
 
+  /* Navigation / Routing State */
+  const [currentView, setCurrentView] = useState('welcome'); // 'welcome', 'economy', 'needs'
+
+  if (currentView === 'welcome') {
+    return <WelcomeScreen onNavigate={setCurrentView} />;
+  }
+
+  if (currentView === 'needs') {
+    return <NeedsList onBack={() => setCurrentView('welcome')} isSupabaseConfigured={isSupabaseConfigured} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#F2F4F8] dark:bg-slate-950 transition-colors duration-300 flex items-center justify-center p-0 sm:p-8 font-sans relative overflow-hidden">
 
@@ -654,11 +667,22 @@ function App() {
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-300/30 dark:bg-purple-900/20 rounded-full blur-[100px] animate-fade-in"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-300/30 dark:bg-indigo-900/20 rounded-full blur-[100px] animate-fade-in delay-100"></div>
 
+      {/* Back to Menu Button (Absolute Top Left) */}
+      <button
+        onClick={() => setCurrentView('welcome')}
+        className="fixed top-4 left-4 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md p-2 rounded-full shadow-sm border border-white/20 dark:border-slate-800 text-gray-500 hover:text-indigo-600 dark:text-gray-400 text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-2 pr-4"
+      >
+        <div className="w-8 h-8 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
+          <ArrowLeft size={16} />
+        </div>
+        MENÜ
+      </button>
+
       <div className="w-full max-w-[480px] bg-[#F8FAFC] dark:bg-slate-900 h-screen sm:h-[850px] sm:rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col sm:border-[8px] sm:border-white dark:sm:border-slate-800 ring-1 ring-black/5 z-10 transition-colors duration-300">
 
         <div className="relative z-10 flex-1 flex flex-col overflow-y-auto custom-scrollbar">
 
-          <header className="px-8 pt-[calc(3rem+var(--safe-area-inset-top))] pb-6 transition-colors duration-300">
+          <header className="px-8 pt-[calc(5rem+var(--safe-area-inset-top))] pb-6 transition-colors duration-300">
             <div>
               <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
                 <span>{new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}</span>
