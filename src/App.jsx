@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { toCamelCase, toSnakeCase } from './lib/dataTransformers'
 import { useGoldPrices } from './hooks/useGoldPrices'
@@ -25,6 +25,17 @@ function App() {
 
   const [showFutureDebtsModal, setShowFutureDebtsModal] = useState(false)
   const [selectedMonthDetail, setSelectedMonthDetail] = useState(null) // { monthKey, selectedUserId }
+
+  // Ref for scroll management
+  const futureModalContentRef = useRef(null)
+
+  // Scroll to top when switching views in Future Modal
+  useEffect(() => {
+    if (futureModalContentRef.current) {
+      futureModalContentRef.current.scrollTop = 0
+    }
+  }, [selectedMonthDetail])
+
   const [showCardsModal, setShowCardsModal] = useState(false)
 
   // Card Management State
@@ -115,6 +126,15 @@ function App() {
   /* Success Modal */
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+
+  /* Warning Modal */
+  const [showWarningModal, setShowWarningModal] = useState(false)
+  const [warningMessage, setWarningMessage] = useState('')
+
+  /* Confirmation Modal */
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmMessage, setConfirmMessage] = useState('')
+  const [pendingDelete, setPendingDelete] = useState(null) // { id, type }
 
   /* Money Tip Logic */
   const [showTipModal, setShowTipModal] = useState(false)
@@ -340,30 +360,58 @@ function App() {
   }
 
   const handleDeleteTransaction = (id) => {
-    if (window.confirm('Bu işlemi silmek istediğinize emin misiniz?')) {
+    setConfirmMessage('Bu işlemi silmek istediğinize emin misiniz?')
+    setPendingDelete({ id, type: 'transaction' })
+    setShowConfirmModal(true)
+  }
+
+  const handleConfirmAction = () => {
+    if (!pendingDelete) return
+
+    if (pendingDelete.type === 'transaction') {
       setData(prev => ({
         ...prev,
-        transactions: prev.transactions.map(t => t.id === id ? { ...t, status: 0 } : t)
+        transactions: prev.transactions.map(t => t.id === pendingDelete.id ? { ...t, status: 0 } : t)
       }))
+    } else if (pendingDelete.type === 'card') {
+      setData(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === pendingDelete.id ? { ...a, status: 0 } : a) }))
+    } else if (pendingDelete.type === 'user') {
+      setData(prev => ({ ...prev, users: prev.users.map(u => u.id === pendingDelete.id ? { ...u, status: 0 } : u) }))
     }
+
+    setShowConfirmModal(false)
+    setPendingDelete(null)
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
 
     if (!amount) {
-      alert("Lütfen bir tutar giriniz.")
+      if (!amount) {
+        setWarningMessage("Lütfen bir tutar giriniz.")
+        setShowWarningModal(true)
+        setTransactionStep(1)
+        return
+      }
       setTransactionStep(1)
       return
     }
 
     if (!description) {
-      alert("Lütfen bir açıklama giriniz.")
+      if (!description) {
+        setWarningMessage("Lütfen bir açıklama giriniz.")
+        setShowWarningModal(true)
+        return
+      }
       return
     }
 
     if (!newAccount) {
-      alert("Lütfen bir hesap/kart seçiniz.")
+      if (!newAccount) {
+        setWarningMessage("Lütfen bir hesap/kart seçiniz.")
+        setShowWarningModal(true)
+        return
+      }
       return
     }
 
@@ -391,7 +439,11 @@ function App() {
     // Let's trust parseFloat(amount.replace(',', '.')) but add the preview.
     const amountVal = parseFloat(safeAmount); // Use the processed safeAmount
     if (isNaN(amountVal) || amountVal <= 0) {
-      alert("Geçerli bir tutar giriniz.");
+      if (isNaN(amountVal) || amountVal <= 0) {
+        setWarningMessage("Geçerli bir tutar giriniz.")
+        setShowWarningModal(true)
+        return;
+      }
       return;
     }
 
@@ -478,9 +530,9 @@ function App() {
   }
 
   const handleDeleteCard = (cardId) => {
-    if (window.confirm('Bu kartı silmek istediğinize emin misiniz?')) {
-      setData(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === cardId ? { ...a, status: 0 } : a) }))
-    }
+    setConfirmMessage('Bu kartı silmek istediğinize emin misiniz?')
+    setPendingDelete({ id: cardId, type: 'card' })
+    setShowConfirmModal(true)
   }
 
   const handleAddUser = () => {
@@ -501,13 +553,13 @@ function App() {
 
   const handleDeleteUser = (userId) => {
     if (activeUsers.length <= 1) {
-      alert('En az bir kullanıcı kalmalıdır.')
+      setWarningMessage('En az bir kullanıcı kalmalıdır.')
+      setShowWarningModal(true)
       return
     }
-    if (window.confirm('Bu kişiyi silmek istediğinize emin misiniz?')) {
-      setData(prev => ({ ...prev, users: prev.users.map(u => u.id === userId ? { ...u, status: 0 } : u) }))
-      // Cleanup associated limits? optional
-    }
+    setConfirmMessage('Bu kişiyi silmek istediğinize emin misiniz?')
+    setPendingDelete({ id: userId, type: 'user' })
+    setShowConfirmModal(true)
   }
 
   const handleResetAllData = async () => {
@@ -1150,7 +1202,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+              <div ref={futureModalContentRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
                 {!selectedMonthDetail ? (
                   // Month List View
                   <>
@@ -1286,6 +1338,16 @@ function App() {
                               <div className="flex items-center gap-2 text-xs text-gray-400">
                                 <span>{new Date(t.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                 {t.type === 'taksitli' && <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full font-bold">Taksitli</span>}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteTransaction(t.id);
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 opacity-60 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all ml-2"
+                                  title="İşlemi Sil"
+                                >
+                                  <Trash2 size={16} strokeWidth={2} />
+                                </button>
                               </div>
                             </div>
                           )
@@ -1675,6 +1737,63 @@ function App() {
                 Sıfırla
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="absolute inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowConfirmModal(false)}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <Trash2 size={40} className="text-red-500" strokeWidth={2.5} />
+              </div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Onaylayın</h3>
+              <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                {confirmMessage}
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={handleConfirmAction}
+                className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+              >
+                Sil
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning Modal */}      {showWarningModal && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowWarningModal(false)}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <AlertTriangle size={40} className="text-orange-500" strokeWidth={2.5} />
+              </div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Dikkat!</h3>
+              <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                {warningMessage}
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowWarningModal(false)}
+              className="w-full bg-gradient-to-r from-orange-500 to-yellow-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+            >
+              Tamam
+            </button>
           </div>
         </div>
       )}
