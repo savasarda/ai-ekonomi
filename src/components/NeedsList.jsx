@@ -20,16 +20,106 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
     const [needs, setNeeds] = useState([]);
     const [newItem, setNewItem] = useState('');
     const [suggestions, setSuggestions] = useState(commonItems); // Show all by default
+    const [isLoading, setIsLoading] = useState(false);
+    const listRef = useRef(null);
 
-    // ...
+    // Fetch Needs
+    const fetchNeeds = async () => {
+        if (!isSupabaseConfigured) {
+            // Local fallback
+            const saved = localStorage.getItem('needs_list');
+            if (saved) setNeeds(JSON.parse(saved));
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('needs')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            if (data) setNeeds(data);
+        } catch (error) {
+            console.error('Error fetching needs:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchNeeds();
+
+        // Subscription
+        if (isSupabaseConfigured) {
+            const sub = supabase
+                .channel('public:needs')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'needs' }, fetchNeeds)
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(sub);
+            };
+        }
+    }, [isSupabaseConfigured]);
+
+    const handleAddItem = async (text) => {
+        if (!text.trim()) return;
+
+        const newItemObj = {
+            id: Date.now().toString(), // temp id
+            text: text.trim(),
+            completed: false,
+            created_at: new Date().toISOString()
+        };
+
+        if (isSupabaseConfigured) {
+            try {
+                // Remove id for supabase auto-gen if strictly using uuid, but if text/int, maybe ok. 
+                // Let's rely on DB default for ID if possible, or generate UUID. 
+                // For simplicity in mixed mode, let's use the object structure but don't send ID if it's auto-inc/uuid.
+                // Assuming 'needs' table exists. If not, I should create it.
+                await supabase.from('needs').insert([{ text: newItemObj.text, completed: false }]);
+            } catch (e) {
+                console.error("Error adding need:", e);
+                // Optimistic update handled by fetch or explicitly here
+            }
+        } else {
+            const updated = [newItemObj, ...needs];
+            setNeeds(updated);
+            localStorage.setItem('needs_list', JSON.stringify(updated));
+        }
+
+        setNewItem('');
+        setSuggestions(commonItems);
+    };
+
+    const handleToggle = async (id, currentStatus) => {
+        if (isSupabaseConfigured) {
+            await supabase.from('needs').update({ completed: !currentStatus }).eq('id', id);
+        } else {
+            const updated = needs.map(n => n.id === id ? { ...n, completed: !n.completed } : n);
+            setNeeds(updated);
+            localStorage.setItem('needs_list', JSON.stringify(updated));
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (isSupabaseConfigured) {
+            await supabase.from('needs').delete().eq('id', id);
+        } else {
+            const updated = needs.filter(n => n.id !== id);
+            setNeeds(updated);
+            localStorage.setItem('needs_list', JSON.stringify(updated));
+        }
+    };
 
     // Smart Suggestions Logic
     const handleInput = (e) => {
         const val = e.target.value;
         setNewItem(val);
 
-        // Filter suggestions based on input, or show all if empty
-        // Always include items not already in the list
         const filtered = commonItems.filter(i =>
             i.name.toLowerCase().includes(val.toLowerCase()) &&
             !needs.some(n => n.text.toLowerCase() === i.name.toLowerCase() && !n.completed)
