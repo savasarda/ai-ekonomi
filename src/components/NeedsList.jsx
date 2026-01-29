@@ -35,7 +35,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
         setIsLoading(true);
         try {
             const { data, error } = await supabase
-                .from('needs')
+                .from('needs_list')
                 .select('*')
                 .order('created_at', { ascending: false });
 
@@ -54,8 +54,8 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
         // Subscription
         if (isSupabaseConfigured) {
             const sub = supabase
-                .channel('public:needs')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'needs' }, fetchNeeds)
+                .channel('public:needs_list')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'needs_list' }, fetchNeeds)
                 .subscribe();
 
             return () => {
@@ -67,50 +67,84 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
     const handleAddItem = async (text) => {
         if (!text.trim()) return;
 
+        const tempId = Date.now().toString();
         const newItemObj = {
-            id: Date.now().toString(), // temp id
+            id: tempId, // temp id
             text: text.trim(),
             completed: false,
             created_at: new Date().toISOString()
         };
 
-        if (isSupabaseConfigured) {
-            try {
-                // Remove id for supabase auto-gen if strictly using uuid, but if text/int, maybe ok. 
-                // Let's rely on DB default for ID if possible, or generate UUID. 
-                // For simplicity in mixed mode, let's use the object structure but don't send ID if it's auto-inc/uuid.
-                // Assuming 'needs' table exists. If not, I should create it.
-                await supabase.from('needs').insert([{ text: newItemObj.text, completed: false }]);
-            } catch (e) {
-                console.error("Error adding need:", e);
-                // Optimistic update handled by fetch or explicitly here
-            }
-        } else {
-            const updated = [newItemObj, ...needs];
-            setNeeds(updated);
-            localStorage.setItem('needs_list', JSON.stringify(updated));
-        }
-
+        // Optimistic Update
+        const updatedNeeds = [newItemObj, ...needs];
+        setNeeds(updatedNeeds);
         setNewItem('');
         setSuggestions(commonItems);
+
+        if (isSupabaseConfigured) {
+            try {
+                // Insert and return the record to get the real UUID
+                const { data, error } = await supabase
+                    .from('needs_list')
+                    .insert([{ text: newItemObj.text, completed: false }])
+                    .select()
+                    .single();
+
+                if (error) {
+                    setNeeds(needs); // Revert
+                    throw error;
+                }
+
+                // Update the local item with the REAL UUID from DB
+                if (data) {
+                    setNeeds(prev => prev.map(item => item.id === tempId ? data : item));
+                }
+            } catch (e) {
+                console.error("Error adding need:", e);
+                setNeeds(needs); // Revert
+                alert("Hata (Kaydetme): " + (e.message || "Bilinmeyen hata") + "\n\nVeritabanında 'needs_list' tablosu eksik olabilir.");
+            }
+        } else {
+            localStorage.setItem('needs_list', JSON.stringify(updatedNeeds));
+        }
     };
 
     const handleToggle = async (id, currentStatus) => {
+        // Optimistic
+        const originalNeeds = [...needs];
+        const updated = needs.map(n => n.id === id ? { ...n, completed: !currentStatus } : n);
+        setNeeds(updated);
+
         if (isSupabaseConfigured) {
-            await supabase.from('needs').update({ completed: !currentStatus }).eq('id', id);
+            try {
+                const { error } = await supabase.from('needs_list').update({ completed: !currentStatus }).eq('id', id);
+                if (error) throw error;
+            } catch (e) {
+                console.error("Error toggling:", e);
+                setNeeds(originalNeeds); // Revert
+                alert("Hata: " + e.message);
+            }
         } else {
-            const updated = needs.map(n => n.id === id ? { ...n, completed: !n.completed } : n);
-            setNeeds(updated);
             localStorage.setItem('needs_list', JSON.stringify(updated));
         }
     };
 
     const handleDelete = async (id) => {
+        // Optimistic
+        const originalNeeds = [...needs];
+        const updated = needs.filter(n => n.id !== id);
+        setNeeds(updated);
+
         if (isSupabaseConfigured) {
-            await supabase.from('needs').delete().eq('id', id);
+            try {
+                const { error } = await supabase.from('needs_list').delete().eq('id', id);
+                if (error) throw error;
+            } catch (e) {
+                console.error("Error deleting:", e);
+                setNeeds(originalNeeds); // Revert
+                alert("Hata: " + e.message);
+            }
         } else {
-            const updated = needs.filter(n => n.id !== id);
-            setNeeds(updated);
             localStorage.setItem('needs_list', JSON.stringify(updated));
         }
     };
@@ -172,8 +206,13 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
                             {suggestions.map(s => (
                                 <button
                                     key={s.name}
-                                    onClick={() => handleAddItem(s.name)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 rounded-full text-xs font-bold whitespace-nowrap active:scale-95 transition-transform"
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleAddItem(s.name);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400 rounded-full text-xs font-bold whitespace-nowrap active:scale-95 transition-transform cursor-pointer relative z-30"
                                 >
                                     <span>{s.icon}</span>
                                     <span>{s.name}</span>
