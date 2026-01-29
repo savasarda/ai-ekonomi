@@ -6,7 +6,7 @@ import PortfolioModal from './components/Modals/PortfolioModal'
 import MoneyTipModal from './components/Modals/MoneyTipModal'
 import FeedbackModal from './components/Modals/FeedbackModal' // NEW
 import { moneyTips } from './data/moneyTips'
-import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle } from 'lucide-react'
 
 import WelcomeScreen from './components/WelcomeScreen'
 import NeedsList from './components/NeedsList'
@@ -57,6 +57,10 @@ function App() {
 
   // Notification State
   const [showNotification, setShowNotification] = useState(false)
+
+  // Transaction Delete Confirmation State
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [transactionToDelete, setTransactionToDelete] = useState(null)
 
   // Toggled Section States
   const [showExtractModal, setShowExtractModal] = useState(false)
@@ -346,11 +350,18 @@ function App() {
   }
 
   const handleDeleteTransaction = (id) => {
-    if (window.confirm('Bu işlemi silmek istediğinize emin misiniz?')) {
+    setTransactionToDelete(id)
+    setShowDeleteConfirmModal(true)
+  }
+
+  const confirmDeleteTransaction = () => {
+    if (transactionToDelete) {
       setData(prev => ({
         ...prev,
-        transactions: prev.transactions.map(t => t.id === id ? { ...t, status: 0 } : t)
+        transactions: prev.transactions.map(t => t.id === transactionToDelete ? { ...t, status: 0 } : t)
       }))
+      setTransactionToDelete(null)
+      setShowDeleteConfirmModal(false)
     }
   }
 
@@ -954,19 +965,19 @@ function App() {
 
       {
         showAddModal && (
-          <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); }}></div>
+          <div className="absolute inset-0 z-[70] flex items-end sm:items-center justify-center pointer-events-none">
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }}></div>
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[90vh] sm:h-auto rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
 
               <div className="flex justify-between items-center mb-8">
                 <div>
-                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Yeni İşlem</h3>
+                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{editingTransaction ? 'İşlemi Düzenle' : 'Yeni İşlem'}</h3>
                   <p className="text-sm text-gray-500 font-medium">
                     {transactionStep === 1 ? 'Tutarı girin' : 'Detayları belirleyin'}
                   </p>
                 </div>
-                <button onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+                <button onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
               </div>
 
               <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-1">
@@ -1304,9 +1315,25 @@ function App() {
                                   {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(t.amount)}
                                 </p>
                               </div>
-                              <div className="flex items-center gap-2 text-xs text-gray-400">
-                                <span>{new Date(t.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                {t.type === 'taksitli' && <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full font-bold">Taksitli</span>}
+                              <div className="flex items-center justify-between mt-2">
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                  <span>{new Date(t.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                  {t.type === 'taksitli' && <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full font-bold">Taksitli</span>}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleEditTransaction(t)}
+                                    className="p-2 rounded-xl bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteTransaction(t.id)}
+                                    className="p-2 rounded-xl bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           )
@@ -1694,6 +1721,39 @@ function App() {
                 className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
               >
                 Sıfırla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Transaction Delete */}
+      {showDeleteConfirmModal && (
+        <div className="absolute inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowDeleteConfirmModal(false)}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={40} className="text-red-500" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">İşlemi Sil?</h3>
+              <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                Bu işlemi silmek istediğinize emin misiniz?
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirmModal(false)}
+                className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={confirmDeleteTransaction}
+                className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+              >
+                Sil
               </button>
             </div>
           </div>
