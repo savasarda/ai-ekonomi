@@ -1,19 +1,25 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { toCamelCase, toSnakeCase } from './lib/dataTransformers'
 import { useGoldPrices } from './hooks/useGoldPrices'
 import PortfolioModal from './components/Modals/PortfolioModal'
 import MoneyTipModal from './components/Modals/MoneyTipModal'
-import FeedbackModal from './components/Modals/FeedbackModal' // NEW
+import FeedbackModal from './components/Modals/FeedbackModal'
+import ReminderModal from './components/Modals/ReminderModal'
+
 import { moneyTips } from './data/moneyTips'
-import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react'
 
 import WelcomeScreen from './components/WelcomeScreen'
 import NeedsList from './components/NeedsList'
+import EventsCalendar from './components/EventsCalendar'
 
 function App() {
   const [currentView, setCurrentView] = useState('welcome')
   const [data, setData] = useState({ users: [], accounts: [], transactions: [] })
+
+  // Events State
+  const [events, setEvents] = useState([])
 
   // Active Data Helpers (Soft Delete Logic: status !== 0)
   const activeUsers = data.users ? data.users.filter(u => u.status != 0) : []
@@ -166,54 +172,79 @@ function App() {
   // Supabase Sync Logic
   const isSupabaseConfigured = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
 
-  useEffect(() => {
+  // Pull to Refresh State
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [pullStartY, setPullStartY] = useState(0)
+  const [pullMoveY, setPullMoveY] = useState(0)
+
+  const scrollContainerRef = useRef(null)
+
+  // Reminder State
+  // Reminder State
+  const [showReminderModal, setShowReminderModal] = useState(false)
+  const [upcomingEvents, setUpcomingEvents] = useState([])
+
+  const fetchInitialData = useCallback(async () => {
     if (!isSupabaseConfigured) return
 
-    const fetchInitialData = async () => {
-      try {
-        const { data: users } = await supabase.from('users').select('*')
-        const { data: accounts } = await supabase.from('accounts').select('*')
-        const { data: transactions } = await supabase.from('transactions').select('*')
-        const { data: userLimitsData } = await supabase.from('user_limits').select('*')
-        const { data: portfolioData } = await supabase.from('portfolios').select('*')
+    try {
+      const { data: users } = await supabase.from('users').select('*')
+      const { data: accounts } = await supabase.from('accounts').select('*')
+      const { data: transactions } = await supabase.from('transactions').select('*')
+      const { data: userLimitsData } = await supabase.from('user_limits').select('*')
+      const { data: portfolioData } = await supabase.from('portfolios').select('*')
 
-        if (users && accounts && transactions) {
-          // Transform snake_case from DB to camelCase for App
-          setData({
-            users: toCamelCase(users),
-            accounts: toCamelCase(accounts),
-            transactions: toCamelCase(transactions)
-          })
-        }
-
-        if (userLimitsData) {
-          const limitsObj = {}
-          userLimitsData.forEach(l => {
-            limitsObj[l.user_id] = l.limit_amount
-          })
-          setUserLimits(limitsObj)
-        }
-
-        if (portfolioData && portfolioData.length > 0) {
-          // Assuming single user portfolio for now or merging
-          // Simplest: take the latest or first row
-          try {
-            const p = portfolioData[0];
-            if (p) {
-              setPortfolio({
-                lastTotal: p.last_total,
-                lastUpdated: p.last_updated,
-                items: typeof p.items === 'string' ? JSON.parse(p.items) : p.items
-              });
-            }
-          } catch (e) { console.error("Portfolio parse error", e) }
-        }
-      } catch (error) {
-        console.error('Error fetching from Supabase:', error)
+      if (users && accounts && transactions) {
+        // Transform snake_case from DB to camelCase for App
+        setData({
+          users: toCamelCase(users),
+          accounts: toCamelCase(accounts),
+          transactions: toCamelCase(transactions)
+        })
       }
-    }
 
+      const { data: eventsData, error: eventsError } = await supabase.from('events').select('*')
+      if (eventsData) {
+        setEvents(eventsData.map(e => ({
+          id: e.id,
+          date: e.date,
+          title: e.title,
+          description: e.description,
+          time: e.time
+        })))
+
+
+      }
+
+      if (userLimitsData) {
+        const limitsObj = {}
+        userLimitsData.forEach(l => {
+          limitsObj[l.user_id] = l.limit_amount
+        })
+        setUserLimits(limitsObj)
+      }
+
+      if (portfolioData && portfolioData.length > 0) {
+        try {
+          const p = portfolioData[0];
+          if (p) {
+            setPortfolio({
+              lastTotal: p.last_total,
+              lastUpdated: p.last_updated,
+              items: typeof p.items === 'string' ? JSON.parse(p.items) : p.items
+            });
+          }
+        } catch (e) { console.error("Portfolio parse error", e) }
+      }
+    } catch (error) {
+      console.error('Error fetching from Supabase:', error)
+    }
+  }, [isSupabaseConfigured])
+
+  useEffect(() => {
     fetchInitialData()
+
+    if (!isSupabaseConfigured) return
 
     // Real-time subscriptions
     const transactionSubscription = supabase
@@ -224,7 +255,47 @@ function App() {
     return () => {
       supabase.removeChannel(transactionSubscription)
     }
-  }, [isSupabaseConfigured])
+  }, [isSupabaseConfigured, fetchInitialData])
+
+
+  const handleTouchStart = (e) => {
+    // Only enable pull to refresh if we are at the top of the scroll container
+    if (scrollContainerRef.current && scrollContainerRef.current.scrollTop === 0) {
+      setPullStartY(e.touches[0].clientY)
+    } else {
+      setPullStartY(0)
+    }
+  }
+
+  const handleTouchMove = (e) => {
+    if (!pullStartY) return
+
+    const currentY = e.touches[0].clientY
+    const diff = currentY - pullStartY
+
+    // Only allow pulling down and limit the visual pull distance
+    if (diff > 0 && diff < 200) {
+      // Check if we are still at top (user might have scrolled down then up without lifting finger, simplified check)
+      if (scrollContainerRef.current && scrollContainerRef.current.scrollTop === 0) {
+        setPullMoveY(diff)
+      }
+    }
+  }
+
+  const handleTouchEnd = async () => {
+    if (pullMoveY > 100) { // Threshold to trigger refresh
+      setIsRefreshing(true)
+      setPullMoveY(100) // Snap to loading position
+      await fetchInitialData()
+      setTimeout(() => {
+        setIsRefreshing(false)
+        setPullMoveY(0)
+      }, 500)
+    } else {
+      setPullMoveY(0) // Snap back if threshold not met
+    }
+    setPullStartY(0)
+  }
 
   // Function to save to Supabase
   const syncToSupabase = async (newData, newLimits) => {
@@ -260,6 +331,58 @@ function App() {
       console.error('Error syncing portfolio:', error)
     }
   }
+
+  // Sync Events handled via direct actions
+  /*
+  useEffect(() => {
+    // Logic moved to direct handlers
+  }, [events])
+  */
+
+  const handleAddEvent = async (newEvent) => {
+    setEvents(prev => [...prev, newEvent])
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('events').insert({
+          id: newEvent.id,
+          date: newEvent.date,
+          title: newEvent.title,
+          description: newEvent.description,
+          time: newEvent.time
+        })
+      } catch (e) {
+        console.error("Event add error", e)
+        alert("Etkinlik kaydedilirken hata oluştu: " + e.message + "\n\nDetay: " + JSON.stringify(e))
+      }
+    }
+  }
+
+  const handleDeleteEvent = async (eventId) => {
+    setEvents(prev => prev.filter(e => e.id !== eventId))
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('events').delete().eq('id', eventId)
+      } catch (e) { console.error("Event delete error", e) }
+    }
+  }
+
+  const handleUpdateEvent = async (updatedEvent) => {
+    setEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e))
+
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.from('events').update({
+          date: updatedEvent.date,
+          title: updatedEvent.title,
+          description: updatedEvent.description,
+          time: updatedEvent.time
+        }).eq('id', updatedEvent.id)
+      } catch (e) { console.error("Event update error", e) }
+    }
+  }
+
 
   // Update data sync effect - Supabase only
   useEffect(() => {
@@ -612,34 +735,128 @@ function App() {
     }
   }
 
+  const handleCheckReminders = async () => {
+    try {
+      console.log("Kontrol başlatılıyor...");
+
+      let currentEvents = events || [];
+
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase.from('events').select('*');
+          if (error) throw error;
+          if (data) {
+            currentEvents = data.map(e => ({ ...e }));
+          }
+        } catch (err) {
+          console.error("Manual fetch error:", err);
+          alert("Veri çekme hatası (Supabase): " + err.message);
+        }
+      }
+
+      // Helper for YYYY-MM-DD
+      const getYYYYMMDD = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      const today = new Date();
+      const datesToCheck = [];
+
+      // Collect next 30 days
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        datesToCheck.push(getYYYYMMDD(d));
+      }
+
+      if (!Array.isArray(currentEvents)) {
+        throw new Error("Etkinlik listesi hatalı.");
+      }
+
+      const upcoming = currentEvents.filter(e => {
+        // Robust matching: slice first 10 chars (YYYY-MM-DD)
+        const cleanDate = e.date ? e.date.slice(0, 10) : '';
+        return datesToCheck.includes(cleanDate);
+      });
+
+      if (upcoming.length > 0) {
+        setUpcomingEvents(upcoming.sort((a, b) => a.date.localeCompare(b.date)));
+        setShowReminderModal(true);
+      } else {
+        alert(`Önümüzdeki 30 gün için etkinlik bulunamadı.\n(Toplam Kayıt: ${currentEvents.length})`);
+      }
+    } catch (criticalError) {
+      alert("KRİTİK HATA: " + criticalError.message);
+      console.error(criticalError);
+    }
+  }
+
+
   // Render Welcome Screen
   if (currentView === 'welcome') {
     return (
-      <WelcomeScreen
-        onNavigate={setCurrentView}
-        darkMode={darkMode}
-        toggleTheme={toggleTheme} // Pass theme props
-      />
+      <>
+        <WelcomeScreen
+          onNavigate={setCurrentView}
+          darkMode={darkMode}
+          toggleTheme={toggleTheme}
+          onCheckReminders={handleCheckReminders}
+        />
+        {showReminderModal && (
+          <ReminderModal
+            events={upcomingEvents}
+            onClose={() => setShowReminderModal(false)}
+          />
+        )}
+      </>
     );
   }
 
   // Render Needs List
   if (currentView === 'needs') {
-    // Lazy load NeedsList only when needed, or just import it at top? 
-    // For now let's assume NeedsList import is needed or we can dynamic import.
-    // Better to standard import at top. But I can't edit top in this chunk.
-    // I already imported NeedsList in Step 393? No, I created the file.
-    // I need to add import NeedsList too.
     return (
-      <NeedsList
-        onBack={() => setCurrentView('welcome')}
-        isSupabaseConfigured={isSupabaseConfigured}
-      />
+      <>
+        <NeedsList
+          onBack={() => setCurrentView('welcome')}
+          isSupabaseConfigured={isSupabaseConfigured}
+        />
+        {showReminderModal && (
+          <ReminderModal
+            events={upcomingEvents}
+            onClose={() => setShowReminderModal(false)}
+          />
+        )}
+      </>
+    )
+  }
+
+  // Render Events Calendar
+  if (currentView === 'events') {
+    return (
+      <>
+        <EventsCalendar
+          onBack={() => setCurrentView('welcome')}
+          events={events}
+          onAddEvent={handleAddEvent}
+          onDeleteEvent={handleDeleteEvent}
+          onUpdateEvent={handleUpdateEvent}
+        />
+        {showReminderModal && (
+          <ReminderModal
+            events={upcomingEvents}
+            onClose={() => setShowReminderModal(false)}
+          />
+        )}
+      </>
     )
   }
 
   return (
     <div className="min-h-screen bg-[#F2F4F8] dark:bg-slate-950 transition-colors duration-300 flex items-center justify-center p-0 sm:p-8 font-sans relative overflow-hidden">
+
 
       {/* Background Blobs */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-300/30 dark:bg-purple-900/20 rounded-full blur-[100px] animate-fade-in"></div>
@@ -647,7 +864,38 @@ function App() {
 
       <div className="w-full max-w-[480px] bg-[#F8FAFC] dark:bg-slate-900 h-screen sm:h-[850px] sm:rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col sm:border-[8px] sm:border-white dark:sm:border-slate-800 ring-1 ring-black/5 z-10 transition-colors duration-300">
 
-        <div className="relative z-10 flex-1 flex flex-col overflow-y-auto custom-scrollbar">
+        {/* Pull to Refresh Indicator */}
+        <div
+          className="absolute w-full flex items-center justify-center pointer-events-none z-50 transition-all duration-300 ease-out"
+          style={{
+            height: isRefreshing ? '60px' : `${Math.min(pullMoveY, 100)}px`,
+            opacity: pullMoveY > 0 || isRefreshing ? 1 : 0,
+            top: isRefreshing ? '20px' : '0px'
+          }}
+        >
+          {isRefreshing ? (
+            <div className="bg-white dark:bg-slate-800 rounded-full p-2 shadow-lg border border-gray-100 dark:border-slate-700 animate-spin">
+              <Loader2 size={24} className="text-indigo-600 dark:text-indigo-400" />
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-800 rounded-full p-2 shadow-lg border border-gray-100 dark:border-slate-700" style={{ transform: `rotate(${pullMoveY * 2}deg)` }}>
+              <ArrowRight size={24} className="text-indigo-600 dark:text-indigo-400 rotate-90" />
+            </div>
+          )}
+        </div>
+
+        <div
+          ref={scrollContainerRef}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className="relative z-10 flex-1 flex flex-col overflow-y-auto custom-scrollbar"
+          style={{
+            transform: isRefreshing ? 'translateY(60px)' : (pullMoveY > 0 ? `translateY(${Math.min(pullMoveY * 0.4, 80)}px)` : 'translateY(0)'),
+            transition: isRefreshing ? 'transform 0.3s ease-out' : 'transform 0.1s linear',
+            overscrollBehaviorY: 'none'
+          }}
+        >
 
           <header className="px-8 pt-[calc(3rem+var(--safe-area-inset-top))] pb-6 transition-colors duration-300">
             {/* Back Button - Top Left */}
@@ -724,7 +972,14 @@ function App() {
 
 
                 return (
-                  <div key={user.id} className="bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
+                  <div
+                    key={user.id}
+                    onClick={() => {
+                      setShowFutureDebtsModal(true)
+                      setSelectedMonthDetail({ monthKey: currentMonth, selectedUserId: user.id })
+                    }}
+                    className="bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
+                  >
 
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-indigo-200 ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
@@ -1286,6 +1541,35 @@ function App() {
                       })}
                     </div>
 
+                    {/* Quick Add Button */}
+                    <div className="mb-4">
+                      <button
+                        onClick={() => {
+                          const userId = selectedMonthDetail.selectedUserId
+                          setNewUser(userId)
+                          handleUserChange(userId)
+
+                          // Set date: if current month, today; else 1st of that month
+                          const now = new Date()
+                          const currentMonthStr = now.toISOString().slice(0, 7)
+                          if (selectedMonthDetail.monthKey === currentMonthStr) {
+                            setDate(now.toISOString().split('T')[0])
+                          } else {
+                            setDate(selectedMonthDetail.monthKey + '-01')
+                          }
+
+                          setTransactionStep(1)
+                          setAmount('')
+                          setEditingTransaction(null)
+                          setShowAddModal(true)
+                        }}
+                        className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl p-4 text-white shadow-lg shadow-indigo-200 dark:shadow-none hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
+                      >
+                        <Plus size={20} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform duration-300" />
+                        <span className="font-bold">Harcama Yap</span>
+                      </button>
+                    </div>
+
                     {/* Transaction List */}
                     <div className="space-y-3">
                       {(() => {
@@ -1789,10 +2073,16 @@ function App() {
           </div>
         </div>
       )}
+
+
+      {showReminderModal && (
+        <ReminderModal
+          events={upcomingEvents}
+          onClose={() => setShowReminderModal(false)}
+        />
+      )}
     </div >
   )
 }
 
 export default App
-
-

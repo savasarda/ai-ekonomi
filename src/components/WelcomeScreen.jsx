@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Wallet, ShoppingCart, ArrowRight, Lightbulb, RefreshCw, Sun, Moon, Sparkles } from 'lucide-react';
+import { Wallet, ShoppingCart, Lightbulb, Sun, Moon, Sparkles, Calendar as CalendarIcon, ChevronRight, Bell } from 'lucide-react';
 
 const triviaList = [
     { text: "Dünyadaki tüm altınlar eritilse, sadece 21 metrelik bir küp oluşturur. (Olimpik bir havuzdan bile küçük!)", source: "Altın Gerçeği" },
@@ -24,7 +25,7 @@ const financialTips = [
     "Acil durum fonu oluştur. Kenarda en az 3 aylık giderin kadar nakit bulundur."
 ];
 
-const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme }) => {
+const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders }) => {
     const [currentTrivia, setCurrentTrivia] = useState(triviaList[Math.floor(Math.random() * triviaList.length)]);
     const [currentTip] = useState(financialTips[Math.floor(Math.random() * financialTips.length)]);
     const [isAnimating, setIsAnimating] = useState(false);
@@ -69,7 +70,7 @@ const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme }) => {
                             </div>
                         </div>
 
-                        <div className={`transition-opacity duration-300 ${isAnimating ? 'opacity-0' : 'opacity-100'}`}>
+                        <div className={`transition - opacity duration - 300 ${isAnimating ? 'opacity-0' : 'opacity-100'} `}>
                             <p className="text-base font-medium text-slate-800 dark:text-white leading-relaxed">
                                 "{currentTrivia.text}"
                             </p>
@@ -106,7 +107,7 @@ const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme }) => {
                     <p className="text-gray-400 dark:text-gray-600 text-xs font-bold uppercase tracking-widest">Menü</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 pb-4">
                     <button
                         onClick={() => onNavigate('economy')}
                         className="group bg-white dark:bg-slate-900 p-4 rounded-[28px] shadow-xl shadow-indigo-100 dark:shadow-slate-900/30 border border-white/50 dark:border-slate-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex flex-col items-center text-center py-6"
@@ -125,6 +126,35 @@ const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme }) => {
                             <ShoppingCart size={24} strokeWidth={2} />
                         </div>
                         <h2 className="text-base font-bold text-gray-800 dark:text-white leading-tight">İhtiyaçlar</h2>
+                    </button>
+
+                    <button
+                        onClick={() => onNavigate('events')}
+                        className="col-span-2 group bg-white dark:bg-slate-900 p-4 rounded-[28px] shadow-xl shadow-orange-100 dark:shadow-slate-900/30 border border-white/50 dark:border-slate-800 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 flex items-center justify-center gap-4 py-5 relative"
+                    >
+                        <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center text-orange-600 dark:text-orange-400 group-hover:scale-110 transition-transform duration-300 shrink-0">
+                            <CalendarIcon size={24} strokeWidth={2} />
+                        </div>
+                        <div className="text-left">
+                            <h2 className="text-base font-bold text-gray-800 dark:text-white leading-tight">Etkinlikler</h2>
+                            <p className="text-xs text-gray-400 font-medium">Takvim ve planlar</p>
+                        </div>
+
+                        {/* Reminder Bell Button */}
+                        <div
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onCheckReminders();
+                            }}
+                            className="w-12 h-12 ml-auto bg-orange-50 dark:bg-orange-900/20 rounded-2xl flex items-center justify-center text-orange-500 hover:bg-orange-100 dark:hover:bg-orange-900/40 hover:scale-110 active:scale-90 transition-all cursor-pointer border border-orange-100/50 dark:border-orange-800/30"
+                            title="Hatırlatıcıları Kontrol Et"
+                        >
+                            <Bell size={22} className="animate-pulse" />
+                        </div>
+
+                        <div className="w-10 h-10 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-gray-400 group-hover:text-orange-600 group-hover:bg-orange-50 dark:group-hover:bg-slate-700 transition-all">
+                            <ChevronRight size={20} />
+                        </div>
                     </button>
                 </div>
 
