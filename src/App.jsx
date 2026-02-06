@@ -180,15 +180,25 @@ function App() {
   const scrollContainerRef = useRef(null)
   const futureDebtsListRef = useRef(null)
   const currentMonthRef = useRef(null)
+  const futureDebtsScrollTimeoutRef = useRef(null)
 
   // Auto-scroll to current month in Future Debts Modal
   useEffect(() => {
     if (showFutureDebtsModal && !selectedMonthDetail) {
-      setTimeout(() => {
-        if (currentMonthRef.current) {
+      if (futureDebtsScrollTimeoutRef.current) {
+        clearTimeout(futureDebtsScrollTimeoutRef.current)
+      }
+
+      futureDebtsScrollTimeoutRef.current = setTimeout(() => {
+        if (showFutureDebtsModal && !selectedMonthDetail && currentMonthRef.current) {
           currentMonthRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
       }, 300)
+    }
+    return () => {
+      if (futureDebtsScrollTimeoutRef.current) {
+        clearTimeout(futureDebtsScrollTimeoutRef.current)
+      }
     }
   }, [showFutureDebtsModal, selectedMonthDetail])
 
