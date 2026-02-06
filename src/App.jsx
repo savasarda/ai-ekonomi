@@ -8,7 +8,7 @@ import FeedbackModal from './components/Modals/FeedbackModal'
 import ReminderModal from './components/Modals/ReminderModal'
 
 import { moneyTips } from './data/moneyTips'
-import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react'
+import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer } from 'lucide-react'
 
 import WelcomeScreen from './components/WelcomeScreen'
 import NeedsList from './components/NeedsList'
@@ -178,6 +178,19 @@ function App() {
   const [pullMoveY, setPullMoveY] = useState(0)
 
   const scrollContainerRef = useRef(null)
+  const futureDebtsListRef = useRef(null)
+  const currentMonthRef = useRef(null)
+
+  // Auto-scroll to current month in Future Debts Modal
+  useEffect(() => {
+    if (showFutureDebtsModal && !selectedMonthDetail) {
+      setTimeout(() => {
+        if (currentMonthRef.current) {
+          currentMonthRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 300)
+    }
+  }, [showFutureDebtsModal, selectedMonthDetail])
 
   // Reminder State
   // Reminder State
@@ -429,9 +442,11 @@ function App() {
   const getMonthlyBreakdown = () => {
     const groups = {}
     activeTransactions.forEach(t => {
-      const monthKey = t.date.slice(0, 7)
-      if (!groups[monthKey]) groups[monthKey] = 0
-      groups[monthKey] += t.amount
+      if (t.status === 1) {
+        const monthKey = t.date.slice(0, 7)
+        if (!groups[monthKey]) groups[monthKey] = 0
+        groups[monthKey] += t.amount
+      }
     })
     return Object.entries(groups)
       .map(([date, total]) => ({ date, total }))
@@ -487,6 +502,46 @@ function App() {
       setShowDeleteConfirmModal(false)
     }
   }
+
+  const handleShareWhatsApp = () => {
+    const filteredTransactions = activeTransactions
+      .filter(t => {
+        const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
+        const isMevcutAy = t.date.startsWith(currentMonth);
+        const isStatus1 = t.status === 1;
+        return matchesUser && isMevcutAy && isStatus1;
+      })
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (filteredTransactions.length === 0) {
+      alert("Paylaşılacak işlem bulunamadı.");
+      return;
+    }
+
+    const monthLabel = new Date(currentMonth + '-01').toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+    const userLabel = extractFilterUser ? activeUsers.find(u => u.id === extractFilterUser)?.name : 'Tümü';
+    const totalAmount = filteredTransactions.reduce((acc, curr) => acc + curr.amount, 0);
+
+    let message = `*AIEkonomi - İşlem Ekstresi*\n`;
+    message += `📅 Dönem: ${monthLabel}\n`;
+    message += `👤 Kişi: ${userLabel}\n`;
+    message += `--------------------------------\n\n`;
+
+    filteredTransactions.forEach(t => {
+      const date = new Date(t.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+      const amount = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount);
+      const acc = activeAccounts.find(a => a.id === t.accountId)?.name || 'Bilinmiyor';
+      message += `▫️ *${date}* | ${amount}\n`;
+      message += `   ${t.description} (${acc})\n\n`;
+    });
+
+    message += `--------------------------------\n`;
+    message += `💰 *TOPLAM: ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalAmount)}*`;
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -1437,7 +1492,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+              <div ref={futureDebtsListRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
                 {!selectedMonthDetail ? (
                   // Month List View
                   <>
@@ -1454,44 +1509,51 @@ function App() {
                         return (
                           <div
                             key={item.date}
+                            ref={isCurrent ? currentMonthRef : null}
                             onClick={() => setSelectedMonthDetail({ monthKey: item.date, selectedUserId: activeUsers[0]?.id })}
-                            className="bg-white dark:bg-slate-800 p-6 rounded-[32px] border border-gray-100 dark:border-slate-700 shadow-[0_4px_20px_rgba(0,0,0,0.02)] relative overflow-hidden group hover:scale-[1.01] transition-transform cursor-pointer"
+                            className={`p-6 rounded-[32px] border relative overflow-hidden group transition-all duration-300 cursor-pointer ${isCurrent
+                              ? 'bg-indigo-600 text-white border-transparent shadow-2xl z-10'
+                              : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:scale-[1.01]'
+                              }`}
                           >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-indigo-100/50 dark:group-hover:bg-indigo-900/30 transition-colors"></div>
+                            {isCurrent && (
+                              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
+                            )}
+                            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl transition-colors ${isCurrent ? 'bg-white/10' : 'bg-indigo-50/50 dark:bg-indigo-900/20 group-hover:bg-indigo-100/50 dark:group-hover:bg-indigo-900/30'}`}></div>
 
-                            <div className="flex justify-between items-center mb-4 relative z-10">
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-900 dark:text-white font-bold text-lg transition-colors">{monthName}</span>
-                                {isCurrent && <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full">BU AY</span>}
-                                {isFuture && <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full">GELECEK</span>}
+                            <div className="flex flex-col items-center gap-2 mb-4 relative z-10 text-center">
+                              <div className="flex flex-wrap shadow-sm justify-center items-center gap-2">
+                                <span className={`font-bold text-xl transition-colors ${isCurrent ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{monthName}</span>
+                                {isCurrent && <span className="text-[10px] font-bold px-2 py-0.5 bg-white/20 text-white rounded-full backdrop-blur-md">BU AY</span>}
+                                {isFuture && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isCurrent ? 'bg-white/10 text-white' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'}`}>GELECEK</span>}
                               </div>
-                              <span className={`text-lg font-black tracking-tight ${isOverLimit ? 'text-red-500' : 'text-indigo-600 dark:text-indigo-400 transition-colors'}`}>
+                              <span className={`text-2xl font-black tracking-tight ${isOverLimit ? 'text-red-400' : (isCurrent ? 'text-indigo-200' : 'text-indigo-600 dark:text-indigo-400')}`}>
                                 {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.total)}
                               </span>
                             </div>
 
-                            <div className="h-2.5 bg-gray-100 dark:bg-slate-900 rounded-full overflow-hidden mb-5 relative z-10">
+                            <div className={`h-2.5 rounded-full overflow-hidden mb-5 relative z-10 ${isCurrent ? 'bg-white/10' : 'bg-gray-100 dark:bg-slate-900'}`}>
                               <div
-                                className={`h-full rounded-full transition-all duration-1000 ${isOverLimit ? 'bg-red-400' : 'bg-gradient-to-r from-indigo-400 to-purple-400'}`}
+                                className={`h-full rounded-full transition-all duration-1000 ${isOverLimit ? 'bg-red-400' : (isCurrent ? 'bg-white' : 'bg-gradient-to-r from-indigo-400 to-purple-400')}`}
                                 style={{ width: `${Math.min((item.total / totalLimit) * 100, 100)}%` }}
                               ></div>
                             </div>
 
-                            <div className="flex gap-3 relative z-10">
+                            <div className="flex flex-wrap gap-3 justify-center relative z-10">
                               {activeUsers.map(u => {
                                 const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
                                 const userMonthTotal = activeTransactions
-                                  .filter(t => t.date.startsWith(item.date) && userAccs.includes(t.accountId))
+                                  .filter(t => t.status === 1 && t.date.startsWith(item.date) && userAccs.includes(t.accountId))
                                   .reduce((acc, curr) => acc + curr.amount, 0);
 
                                 if (userMonthTotal === 0) return null;
 
                                 return (
-                                  <div key={u.id} className="flex items-center gap-2 bg-gray-50/80 dark:bg-slate-900/80 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-gray-100 dark:border-slate-700 transition-colors">
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${u.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
+                                  <div key={u.id} className={`flex items-center gap-2 backdrop-blur-sm px-3 py-1.5 rounded-xl border transition-colors ${isCurrent ? 'bg-white/10 border-white/10' : 'bg-gray-50/80 dark:bg-slate-900/80 border-gray-100 dark:border-slate-700'}`}>
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${u.id === 'u1' ? (isCurrent ? 'bg-white/20' : 'bg-indigo-500') : (isCurrent ? 'bg-white/20' : 'bg-pink-500')}`}>
                                       {u.name.charAt(0)}
                                     </div>
-                                    <span className="text-xs font-bold text-gray-600 dark:text-gray-300 transition-colors">
+                                    <span className={`text-xs font-bold transition-colors ${isCurrent ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}>
                                       {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userMonthTotal)}
                                     </span>
                                   </div>
@@ -1521,21 +1583,30 @@ function App() {
                   // Transaction Detail View
                   <>
                     {/* Person Filter Tabs */}
-                    <div className="flex gap-2 mb-6 sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl pb-4 z-10">
+                    <div className="flex gap-2 mb-6 sticky top-0 z-10 pt-2 pb-2">
                       {activeUsers.map(u => {
                         const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
                         const userMonthTotal = activeTransactions
-                          .filter(t => t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
+                          .filter(t => t.status === 1 && t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
                           .reduce((acc, curr) => acc + curr.amount, 0);
+
+                        const isSelected = selectedMonthDetail.selectedUserId === u.id;
 
                         return (
                           <button
                             key={u.id}
                             onClick={() => setSelectedMonthDetail({ ...selectedMonthDetail, selectedUserId: u.id })}
-                            className={`flex-1 py-3 px-4 rounded-2xl text-sm font-bold transition-all ${selectedMonthDetail.selectedUserId === u.id ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 shadow-md' : 'bg-gray-50 dark:bg-slate-800 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                            className={`flex-1 py-3 px-4 rounded-[24px] text-sm font-bold transition-all duration-300 border ${isSelected
+                              ? 'bg-indigo-600 text-white border-transparent shadow-lg shadow-indigo-200 dark:shadow-none translate-y-[-2px]'
+                              : 'bg-white/50 dark:bg-slate-800/50 text-gray-500 border-gray-100 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800'
+                              }`}
                           >
-                            <div>{u.name}</div>
-                            <div className="text-xs mt-1">{new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userMonthTotal)}</div>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="text-[11px] uppercase tracking-wider opacity-80">{u.name}</span>
+                              <span className={`text-sm ${isSelected ? 'text-white' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                                {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userMonthTotal)}
+                              </span>
+                            </div>
                           </button>
                         )
                       })}
@@ -1575,7 +1646,7 @@ function App() {
                       {(() => {
                         const userAccs = activeAccounts.filter(a => a.userId === selectedMonthDetail.selectedUserId).map(a => a.id);
                         const transactions = activeTransactions
-                          .filter(t => t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
+                          .filter(t => t.status === 1 && t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
                           .sort((a, b) => b.date.localeCompare(a.date));
 
                         if (transactions.length === 0) {
@@ -1848,46 +1919,102 @@ function App() {
         showExtractModal && (
           <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowExtractModal(false)}></div>
-            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[85vh] sm:h-auto rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
-              <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
+            <div id="print-area" className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[85vh] sm:h-auto rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+              <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden no-print"></div>
 
-              <div className="flex justify-between items-center mb-8">
+              {/* Print Only Header */}
+              <div className="print-header hidden mb-10 border-b-2 border-indigo-900 pb-6">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h1 className="text-3xl font-black text-indigo-900">AIEkonomi</h1>
+                    <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">Finansal İşlem Ekstresi</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-gray-800">{new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                    <p className="text-xs text-gray-500 capitalize">{new Date(currentMonth + '-01').toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })} Dönemi</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center mb-8 no-print">
                 <div>
                   <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Ekstre</h3>
                   <p className="text-sm text-gray-500 font-medium">Tüm işlemleriniz</p>
                 </div>
-                <button onClick={() => setShowExtractModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleShareWhatsApp}
+                    className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                    title="WhatsApp ile Paylaş"
+                  >
+                    <Share2 size={18} />
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                    title="Yazdır"
+                  >
+                    <Printer size={18} />
+                  </button>
+                  <button onClick={() => setShowExtractModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+                </div>
               </div>
 
               {/* Filter by User */}
-              <div className="bg-gray-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl flex mb-6 backdrop-blur-md transition-colors">
+              <div className="bg-gray-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl flex mb-6 backdrop-blur-md transition-colors no-print">
                 <button
                   onClick={() => setExtractFilterUser(null)}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${extractFilterUser === null ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400 scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                  className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 ${extractFilterUser === null ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400 scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                 >
-                  Tümü
+                  <div className="flex flex-col items-center">
+                    <span>Tümü</span>
+                    <span className={`text-[10px] mt-0.5 ${extractFilterUser === null ? 'text-indigo-500' : 'text-gray-400'}`}>
+                      {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(
+                        activeTransactions
+                          .filter(t => t.status === 1 && t.date.startsWith(currentMonth))
+                          .reduce((acc, curr) => acc + curr.amount, 0)
+                      )}
+                    </span>
+                  </div>
                 </button>
-                {activeUsers.map(u => (
-                  <button
-                    key={u.id}
-                    onClick={() => setExtractFilterUser(u.id)}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${extractFilterUser === u.id ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400 scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
-                  >
-                    {u.name}
-                  </button>
-                ))}
+                {activeUsers.map(u => {
+                  const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
+                  const userTotal = activeTransactions
+                    .filter(t => t.status === 1 && t.date.startsWith(currentMonth) && userAccs.includes(t.accountId))
+                    .reduce((acc, curr) => acc + curr.amount, 0);
+
+                  return (
+                    <button
+                      key={u.id}
+                      onClick={() => setExtractFilterUser(u.id)}
+                      className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 ${extractFilterUser === u.id ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400 scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                    >
+                      <div className="flex flex-col items-center">
+                        <span>{u.name}</span>
+                        <span className={`text-[10px] mt-0.5 ${extractFilterUser === u.id ? 'text-indigo-500' : 'text-gray-400'}`}>
+                          {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userTotal)}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
 
               {/* Transactions List */}
               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
                 {activeTransactions
-                  .filter(t => extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser)
+                  .filter(t => {
+                    const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
+                    const isMevcutAy = t.date.startsWith(currentMonth);
+                    const isStatus1 = t.status === 1;
+                    return matchesUser && isMevcutAy && isStatus1;
+                  })
                   .sort((a, b) => new Date(b.date) - new Date(a.date))
                   .map(t => {
                     const account = activeAccounts.find(a => a.id === t.accountId)
                     const user = activeUsers.find(u => u.id === account?.userId)
                     return (
-                      <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:scale-[1.01] transition-transform">
+                      <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:scale-[1.01] transition-transform print-transaction">
                         <div className="flex justify-between items-start mb-2">
                           <div>
                             <p className="font-bold text-gray-800 dark:text-white text-sm">{t.description || 'İşlem'}</p>
@@ -1901,13 +2028,38 @@ function App() {
                       </div>
                     )
                   })}
-                {activeTransactions.filter(t => extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser).length === 0 && (
-                  <div className="text-center py-20 text-gray-400">
-                    <div className="text-6xl mb-4 opacity-50">📄</div>
-                    <p className="font-bold">Henüz işlem yok</p>
-                    <p className="text-sm mt-1">Yeni işlem eklemek için + butonunu kullanın</p>
-                  </div>
-                )}
+                {activeTransactions.filter(t => {
+                  const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
+                  const isMevcutAy = t.date.startsWith(currentMonth);
+                  const isStatus1 = t.status === 1;
+                  return matchesUser && isMevcutAy && isStatus1;
+                }).length === 0 && (
+                    <div className="text-center py-20 text-gray-400">
+                      <div className="text-6xl mb-4 opacity-50">📄</div>
+                      <p className="font-bold">Henüz işlem yok</p>
+                      <p className="text-sm mt-1">Yeni işlem eklemek için + butonunu kullanın</p>
+                    </div>
+                  )}
+
+                {activeTransactions.filter(t => {
+                  const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
+                  const isMevcutAy = t.date.startsWith(currentMonth);
+                  const isStatus1 = t.status === 1;
+                  return matchesUser && isMevcutAy && isStatus1;
+                }).length > 0 && (
+                    <div className="print-total hidden mt-6 pt-6 border-t font-black text-xl text-indigo-900 text-right">
+                      TOPLAM: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(
+                        activeTransactions
+                          .filter(t => {
+                            const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
+                            const isMevcutAy = t.date.startsWith(currentMonth);
+                            const isStatus1 = t.status === 1;
+                            return matchesUser && isMevcutAy && isStatus1;
+                          })
+                          .reduce((acc, curr) => acc + curr.amount, 0)
+                      )}
+                    </div>
+                  )}
               </div>
             </div>
           </div>
