@@ -1484,9 +1484,9 @@ function App() {
 
       {
         showFutureDebtsModal && (
-          <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowFutureDebtsModal(false); setSelectedMonthDetail(null); }}></div>
-            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[85vh] sm:h-auto rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[85svh] sm:h-auto rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
 
               <div className="flex justify-between items-start mb-8">
