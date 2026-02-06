@@ -13,6 +13,7 @@ import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2,
 import WelcomeScreen from './components/WelcomeScreen'
 import NeedsList from './components/NeedsList'
 import EventsCalendar from './components/EventsCalendar'
+import RequestsList from './components/RequestsList'
 
 function App() {
   const [currentView, setCurrentView] = useState('welcome')
@@ -89,7 +90,7 @@ function App() {
   const { goldPrices, goldFetchError, fetchGoldPrices, lastUpdateTime } = useGoldPrices()
 
   // Menu Reordering State
-  const defaultMenuOrder = ['portfolio', 'limit', 'future', 'cards', 'users', 'extract', 'feedback', 'reset']
+  const defaultMenuOrder = ['portfolio', 'limit', 'future', 'cards', 'users', 'extract', 'feedback', 'requests', 'reset']
   const [menuOrder, setMenuOrder] = useState(() => {
     const saved = localStorage.getItem('menuOrder')
     if (saved) {
@@ -104,6 +105,14 @@ function App() {
           finalOrder.splice(resetIndex, 0, 'feedback')
         } else {
           finalOrder.push('feedback')
+        }
+      }
+      if (!finalOrder.includes('requests')) {
+        const resetIndex = finalOrder.indexOf('reset')
+        if (resetIndex !== -1) {
+          finalOrder.splice(resetIndex, 0, 'requests')
+        } else {
+          finalOrder.push('requests')
         }
       }
       return finalOrder
@@ -125,6 +134,8 @@ function App() {
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [passwordInput, setPasswordInput] = useState('')
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false)
+  const [showRequestsPasswordModal, setShowRequestsPasswordModal] = useState(false)
+  const [requestsPasswordInput, setRequestsPasswordInput] = useState('')
 
   /* Success Modal */
   const [showSuccessModal, setShowSuccessModal] = useState(false)
@@ -732,6 +743,18 @@ function App() {
     setShowResetConfirmModal(true)
   }
 
+  const handleRequestsPasswordSubmit = () => {
+    if (requestsPasswordInput !== '5898') {
+      alert('Yanlış şifre! İşlem iptal edildi.')
+      setRequestsPasswordInput('')
+      return
+    }
+
+    setShowRequestsPasswordModal(false)
+    setRequestsPasswordInput('')
+    setCurrentView('requests')
+  }
+
   const handleConfirmReset = async () => {
     setShowResetConfirmModal(false)
 
@@ -908,6 +931,23 @@ function App() {
           onAddEvent={handleAddEvent}
           onDeleteEvent={handleDeleteEvent}
           onUpdateEvent={handleUpdateEvent}
+        />
+        {showReminderModal && (
+          <ReminderModal
+            events={upcomingEvents}
+            onClose={() => setShowReminderModal(false)}
+          />
+        )}
+      </>
+    )
+  }
+
+  if (currentView === 'requests') {
+    return (
+      <>
+        <RequestsList
+          onBack={() => setCurrentView('welcome')}
+          isSupabaseConfigured={isSupabaseConfigured}
         />
         {showReminderModal && (
           <ReminderModal
@@ -1156,6 +1196,10 @@ function App() {
                       case 'feedback':
                         setShowFeedbackModal(true)
                         break;
+                      case 'requests':
+                        setRequestsPasswordInput('')
+                        setShowRequestsPasswordModal(true)
+                        break;
                     }
                   }
                 }
@@ -1167,7 +1211,8 @@ function App() {
                   case 'future': label = 'Dönemler'; IconComponent = Calendar; break;
                   case 'cards': label = 'Kartlar'; IconComponent = CreditCard; break;
                   case 'users': label = 'Kişiler'; IconComponent = Users; break;
-                  case 'feedback': label = 'İstekler'; IconComponent = MessageSquare; break;
+                  case 'feedback': label = 'Geri Bildirim'; IconComponent = MessageSquare; break;
+                  case 'requests': label = 'İstekleri Görüntüle'; IconComponent = MessageSquare; break;
                   case 'reset': label = 'Sıfırla'; IconComponent = Trash2; colorClass = 'bg-red-50 dark:bg-red-900/20 text-red-500/80 dark:text-red-400'; borderColorClass = 'border-red-100 dark:border-red-900/30'; break;
                   case 'extract': label = 'Ekstre'; IconComponent = Receipt; break;
                   case 'portfolio': label = 'Portföyüm'; IconComponent = Wallet; colorClass = 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400'; borderColorClass = 'border-yellow-100 dark:border-yellow-900/30'; break;
@@ -2128,6 +2173,47 @@ function App() {
               </button>
               <button
                 onClick={handlePasswordSubmit}
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+              >
+                Devam
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Modal for Requests */}
+      {showRequestsPasswordModal && (
+        <div className="absolute inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowRequestsPasswordModal(false)}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[340px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Lock size={32} className="text-indigo-500" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-2">Şifre Gerekli</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">İstekleri görüntülemek için şifre giriniz</p>
+            </div>
+
+            <input
+              type="password"
+              value={requestsPasswordInput}
+              onChange={(e) => setRequestsPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleRequestsPasswordSubmit()}
+              placeholder="Şifre"
+              className="w-full px-6 py-4 rounded-2xl bg-gray-100 dark:bg-slate-800 border-2 border-transparent focus:border-indigo-500 outline-none text-center text-2xl font-bold tracking-widest transition-all mb-6"
+              autoFocus
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRequestsPasswordModal(false)}
+                className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleRequestsPasswordSubmit}
                 className="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
               >
                 Devam
