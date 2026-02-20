@@ -1427,8 +1427,8 @@ function App() {
 
                         {isInstallment && (
                           <div className="mt-6 animate-slide-up">
-                            <div className="grid grid-cols-4 gap-3 mb-6">
-                              {[2, 3, 6, 12].map(count => (
+                            <div className="grid grid-cols-5 gap-2 mb-6">
+                              {[2, 3, 6, 9, 12].map(count => (
                                 <button
                                   key={count}
                                   type="button"
@@ -1677,7 +1677,7 @@ function App() {
                                   <p className="text-xs text-gray-400 mt-1">{account?.name}</p>
                                 </div>
                                 <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg ml-3">
-                                  {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(t.amount)}
+                                  {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
                                 </p>
                               </div>
                               <div className="flex items-center justify-between mt-2">

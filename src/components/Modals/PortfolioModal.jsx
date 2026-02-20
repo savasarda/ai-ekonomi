@@ -94,7 +94,7 @@ export default function PortfolioModal({
             if (key === 'custom') return acc;
             const qty = items?.[key] || 0;
             return acc + (qty * getPrice(key, prices));
-        }, 0) + (items.custom || []).reduce((acc, i) => acc + (parseFloat(i.qty) * parseFloat(i.price)), 0);
+        }, 0) + (items.custom || []).reduce((acc, i) => acc + (parseFloat(i.value) || 0), 0);
     }
 
     return (
@@ -211,6 +211,22 @@ export default function PortfolioModal({
                                                         )
                                                     })}
                                                 </div>
+
+                                                {log.items?.custom && log.items.custom.length > 0 && (
+                                                    <div className="mt-2 text-sm">
+                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">Diğer Varlıklar</p>
+                                                        <div className="space-y-2">
+                                                            {log.items.custom.map((c, i) => (
+                                                                <div key={i} className="flex justify-between bg-gray-50 dark:bg-slate-900 px-3 py-2 rounded-lg">
+                                                                    <span className="text-gray-500 dark:text-gray-400">{c.name}</span>
+                                                                    <span className="font-bold text-gray-800 dark:text-white">
+                                                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(parseFloat(c.value) || ((parseFloat(c.qty) || 0) * (parseFloat(c.price) || 0)))}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                             </div>
                                         )}
@@ -354,12 +370,10 @@ export default function PortfolioModal({
                                     <h4 className="font-bold text-gray-800 dark:text-white">Diğer Varlıklar</h4>
                                     <button
                                         onClick={() => {
-                                            const name = prompt("Varlık Adı (Örn: Ethereum, ASELSAN):");
+                                            const name = prompt("Varlık Adı (Örn: Arabam, Nakit):");
                                             if (!name) return;
-                                            const qty = prompt(`${name} Adedi:`);
-                                            if (!qty) return;
-                                            const price = prompt(`${name} Birim Fiyatı (TL):`);
-                                            if (!price) return;
+                                            const totalValue = prompt(`${name} Toplam Değeri (TL):`);
+                                            if (!totalValue) return;
 
                                             setPortfolio(prev => ({
                                                 ...prev,
@@ -367,7 +381,7 @@ export default function PortfolioModal({
                                                     ...prev.items,
                                                     custom: [
                                                         ...(prev.items.custom || []),
-                                                        { id: Date.now(), name, qty: parseFloat(qty), price: parseFloat(price) }
+                                                        { id: Date.now(), name, value: parseFloat(totalValue) }
                                                     ]
                                                 }
                                             }))
@@ -383,16 +397,30 @@ export default function PortfolioModal({
                                         <div key={item.id} className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-gray-100 dark:border-slate-700 flex items-center justify-between shadow-sm relative group">
                                             <div>
                                                 <p className="font-bold text-gray-800 dark:text-white">{item.name}</p>
-                                                <div className="flex items-center gap-2 text-xs text-gray-400 font-bold">
-                                                    <span>{item.qty} adet</span>
-                                                    <span>x</span>
-                                                    <span>{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.price)}</span>
-                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <p className="font-black text-gray-800 dark:text-white">
-                                                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.qty * item.price)}
-                                                </p>
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={item.value || (item.qty * item.price) || ''}
+                                                            onChange={(e) => {
+                                                                setPortfolio(prev => ({
+                                                                    ...prev,
+                                                                    items: {
+                                                                        ...prev.items,
+                                                                        custom: prev.items.custom.map(c => c.id === item.id ? { ...c, value: e.target.value } : c)
+                                                                    }
+                                                                }))
+                                                            }}
+                                                            placeholder="TL Değeri"
+                                                            className="w-32 text-center font-black text-lg text-gray-800 dark:text-white bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl py-1 px-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
+                                                        />
+                                                        <span className="font-bold text-gray-400">₺</span>
+                                                    </div>
+                                                </div>
+
                                                 <button
                                                     onClick={() => {
                                                         if (!confirm('Silinsin mi?')) return;
@@ -404,7 +432,7 @@ export default function PortfolioModal({
                                                             }
                                                         }))
                                                     }}
-                                                    className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity px-2"
+                                                    className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 opacity-0 group-hover:opacity-100 transition-all ml-1"
                                                 ><X size={16} /></button>
                                             </div>
                                         </div>
