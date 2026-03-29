@@ -428,6 +428,7 @@ export default function PortfolioView({
                                                 {editingItem === item.id ? (
                                                     <input 
                                                         type="number" step="0.01" value={tempValue} autoFocus
+                                                        inputMode="decimal"
                                                         onChange={(e) => setTempValue(e.target.value)}
                                                         onBlur={() => {
                                                             setPortfolio(prev => ({ ...prev, items: { ...prev.items, [item.id]: Math.max(0, parseFloat(tempValue) || 0) } }));
@@ -598,6 +599,7 @@ export default function PortfolioView({
                                 <input 
                                     type="number"
                                     step="0.01"
+                                    inputMode="decimal"
                                     value={newManualPrice}
                                     onChange={(e) => setNewManualPrice(e.target.value)}
                                     className="w-full pl-10 pr-6 py-5 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 font-black text-2xl text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -661,6 +663,7 @@ export default function PortfolioView({
                                     <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₺</span>
                                     <input 
                                         type="number"
+                                        inputMode="decimal"
                                         value={newCustomValue}
                                         onChange={(e) => setNewCustomValue(e.target.value)}
                                         placeholder="0.00"
