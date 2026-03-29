@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { toCamelCase, toSnakeCase } from './lib/dataTransformers'
 import { useGoldPrices } from './hooks/useGoldPrices'
@@ -13,6 +13,7 @@ import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2,
 import WelcomeScreen from './components/WelcomeScreen'
 import NeedsList from './components/NeedsList'
 import EventsCalendar from './components/EventsCalendar'
+import PortfolioView from './components/PortfolioView'
 
 function App() {
   const [currentView, setCurrentView] = useState('welcome')
@@ -76,15 +77,8 @@ function App() {
   const [portfolio, setPortfolio] = useState({
     lastTotal: 0,
     lastUpdated: null,
-    items: {
-      gram: 0,
-      gram22: 0,
-      ceyrek: 0,
-      yarim: 0,
-      tam: 0,
-      cumhuriyet: 0,
-      ethereum: 0
-    }
+    items: { gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, custom: [] },
+    customPrices: {}
   })
   const { goldPrices, goldFetchError, fetchGoldPrices, lastUpdateTime } = useGoldPrices()
 
@@ -251,10 +245,12 @@ function App() {
         try {
           const p = portfolioData[0];
           if (p) {
+            const items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || {});
             setPortfolio({
               lastTotal: p.last_total,
               lastUpdated: p.last_updated,
-              items: typeof p.items === 'string' ? JSON.parse(p.items) : p.items
+              items: items,
+              customPrices: items.customPrices || {}
             });
           }
         } catch (e) { console.error("Portfolio parse error", e) }
@@ -757,13 +753,7 @@ function App() {
   const handleOpenPortfolio = async () => {
     console.log("handleOpenPortfolio called");
     try {
-      // 1. Reset input values
-      setPortfolio(prev => ({
-        ...prev,
-        items: { gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, custom: [] }
-      }))
-
-      // 2. Fetch last log for comparison
+      // 1. Fetch last log for comparison (optional but helpful for 'lastTotal' sync)
       if (isSupabaseConfigured) {
         console.log("Fetching last portfolio log...");
         const { data: logs, error } = await supabase
@@ -774,7 +764,6 @@ function App() {
 
         if (error) {
           console.error("Supabase error fetching logs:", error);
-          // Don't block UI on error, just warn
         }
 
         if (logs && logs.length > 0) {
@@ -795,8 +784,8 @@ function App() {
       console.error("CRITICAL Error in handleOpenPortfolio:", e);
       alert("Portföy açılırken bir hata oluştu: " + e.message);
     } finally {
-      console.log("Opening portfolio modal...");
-      setShowPortfolioModal(true)
+      console.log("Navigating to portfolio view...");
+      setCurrentView('portfolio')
     }
   }
 
@@ -908,6 +897,30 @@ function App() {
           onAddEvent={handleAddEvent}
           onDeleteEvent={handleDeleteEvent}
           onUpdateEvent={handleUpdateEvent}
+        />
+        {showReminderModal && (
+          <ReminderModal
+            events={upcomingEvents}
+            onClose={() => setShowReminderModal(false)}
+          />
+        )}
+      </>
+    )
+  }
+
+  // Render Portfolio View
+  if (currentView === 'portfolio') {
+    return (
+      <>
+        <PortfolioView
+          onBack={() => setCurrentView('economy')}
+          portfolio={portfolio}
+          setPortfolio={setPortfolio}
+          goldPrices={goldPrices}
+          goldFetchError={goldFetchError}
+          fetchGoldPrices={fetchGoldPrices}
+          lastUpdateTime={lastUpdateTime}
+          isSupabaseConfigured={isSupabaseConfigured}
         />
         {showReminderModal && (
           <ReminderModal

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Wallet, ShoppingCart, Lightbulb, Sun, Moon, Sparkles, Calendar as CalendarIcon, ChevronRight, Bell } from 'lucide-react';
+import { Wallet, ShoppingCart, Lightbulb, Sun, Moon, Sparkles, Calendar as CalendarIcon, ChevronRight, Bell, Coins } from 'lucide-react';
 
 const triviaList = [
     { text: "Dünyadaki tüm altınlar eritilse, sadece 21 metrelik bir küp oluşturur. (Olimpik bir havuzdan bile küçük!)", source: "Altın Gerçeği" },
