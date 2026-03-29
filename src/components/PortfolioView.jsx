@@ -497,42 +497,43 @@ export default function PortfolioView({
                         </div>
                     </div>
                 )}
+
+                {/* Save Action - Integrated at the bottom of the list */}
+                {!showHistory && (
+                    <div className="mt-12 flex justify-center pb-12 animate-fade-in">
+                        <button 
+                            onClick={() => {
+                                if (isSupabaseConfigured) {
+                                    const itemsWithPrices = { ...portfolio.items, customPrices: portfolio.customPrices };
+                                    
+                                    supabase.from('portfolio_logs').insert([
+                                        { items: itemsWithPrices, total_value: currentTotal }
+                                    ]).then(({ error }) => {
+                                        if (error) console.error("Log error", error);
+                                    });
+
+                                    // Also update the main portfolio state in DB
+                                    supabase.from('portfolios').update({
+                                        items: itemsWithPrices,
+                                        last_total: currentTotal,
+                                        last_updated: new Date().toISOString()
+                                    }).eq('id', 'p1').then(({ error }) => {
+                                        if (error) console.error("Update error", error);
+                                    });
+                                }
+                                setPortfolio(prev => ({ ...prev, lastTotal: currentTotal, lastUpdated: new Date().toISOString() }));
+                                setShowSuccessPopup(true);
+                                setTimeout(() => setShowSuccessPopup(false), 2500);
+                            }}
+                            className="w-full max-w-[240px] bg-slate-900 dark:bg-white text-white dark:text-slate-900 h-14 rounded-full font-black text-sm shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-white/10 dark:border-slate-800"
+                        >
+                            <Sparkles size={16} className="text-yellow-400 fill-current" />
+                            DURUMU KAYDET
+                        </button>
+                    </div>
+                )}
             </main>
             
-            {/* Action Bar */}
-            {!showHistory && (
-                <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#F2F4F8] dark:from-slate-950 via-[#F2F4F8]/95 dark:via-slate-950/95 to-transparent z-20">
-                    <button 
-                        onClick={() => {
-                            if (isSupabaseConfigured) {
-                                const itemsWithPrices = { ...portfolio.items, customPrices: portfolio.customPrices };
-                                
-                                supabase.from('portfolio_logs').insert([
-                                    { items: itemsWithPrices, total_value: currentTotal }
-                                ]).then(({ error }) => {
-                                    if (error) console.error("Log error", error);
-                                });
-
-                                // Also update the main portfolio state in DB
-                                supabase.from('portfolios').update({
-                                    items: itemsWithPrices,
-                                    last_total: currentTotal,
-                                    last_updated: new Date().toISOString()
-                                }).eq('id', 'p1').then(({ error }) => {
-                                    if (error) console.error("Update error", error);
-                                });
-                            }
-                            setPortfolio(prev => ({ ...prev, lastTotal: currentTotal, lastUpdated: new Date().toISOString() }));
-                            setShowSuccessPopup(true);
-                            setTimeout(() => setShowSuccessPopup(false), 2500);
-                        }}
-                        className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 h-16 rounded-3xl font-black text-lg shadow-xl shadow-indigo-200 dark:shadow-none active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-                    >
-                        <Sparkles size={20} className="fill-current text-yellow-400" />
-                        DURUMU KAYDET
-                    </button>
-                </div>
-            )}
 
             {/* Modals & Popups */}
             {showRestoreModal && (
