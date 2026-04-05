@@ -987,29 +987,18 @@ function App() {
               </button>
             </div>
 
-            <div>
-              <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-2">
-                <span>{new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}</span>
-                <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                <span className="text-indigo-500">{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() - new Date().getDate()} gün kaldı</span>
-                <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                <span className={`inline-flex items-center gap-1 ${isSupabaseConfigured ? 'text-green-500' : 'text-orange-500'}`}>
+            <div className="flex items-center justify-between">
+              <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                <span className={`inline-flex items-center gap-1.5 ${isSupabaseConfigured ? 'text-green-500' : 'text-orange-500'}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? 'bg-green-500' : 'bg-orange-500'} animate-pulse`}></span>
-                  {isSupabaseConfigured ? 'Bulut Senk.' : 'Yerel Kayıt'}
+                  {isSupabaseConfigured ? 'SENKRONİZE' : 'YEREL'}
                 </span>
-                <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                <span className={`inline-flex items-center gap-1 ${goldFetchError ? 'text-red-500' : (goldPrices ? 'text-yellow-600 dark:text-yellow-500' : 'text-gray-400')}`}>
+                <span className="w-1 h-1 bg-gray-300 dark:bg-slate-700 rounded-full"></span>
+                <span className={`inline-flex items-center gap-1.5 ${goldFetchError ? 'text-red-500' : (goldPrices ? 'text-yellow-600 dark:text-yellow-500' : 'text-gray-400')}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${goldFetchError ? 'bg-red-500' : (goldPrices ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400')} `}></span>
-                  {goldFetchError ? 'Altın: Hata' : (goldPrices ? 'Altın: Aktif' : 'Altın: Bekleniyor')}
+                  {goldFetchError ? 'KUR HATASI' : (goldPrices ? 'CANLI KUR' : 'BEKLENİYOR')}
                 </span>
               </p>
-            </div>
-
-
-
-
-            <div>
-              <h1 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors text-center">Merhaba, <span className="text-indigo-600 dark:text-indigo-400">Hoş Geldin!</span></h1>
             </div>
 
           </header>

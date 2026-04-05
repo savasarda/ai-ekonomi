@@ -1,19 +1,10 @@
 
 import React, { useState } from 'react';
-import { Wallet, ShoppingCart, Lightbulb, Sun, Moon, Sparkles, Calendar as CalendarIcon, ChevronRight, Bell, Coins } from 'lucide-react';
-
-const triviaList = [
-    { text: "Dünyadaki tüm altınlar eritilse, sadece 21 metrelik bir küp oluşturur. (Olimpik bir havuzdan bile küçük!)", source: "Altın Gerçeği" },
-    { text: "İlk kredi kartı 1950'de, Frank McNamara cüzdanını unuttuğu bir akşam yemeği sonrası 'Diners Club' olarak icat edildi.", source: "Finans Tarihi" },
-    { text: "Bal, bakteri barındırmadığı için asla bozulmayan tek besindir. Mısır piramitlerinde 3000 yıllık yenebilir bal bulunmuştur.", source: "Genel Kültür" },
-    { text: "Monopoly oyununda basılan para miktarı, her yıl ABD Darphanesi'nin bastığı gerçek paradan daha fazladır.", source: "Oyun Dünyası" },
-    { text: "Google'ın orijinal adı 'Backrub' (Sırt Masajı) idi. Neyse ki değiştirdiler!", source: "Teknoloji" },
-    { text: "Bir karınca kendi ağırlığının 50 katını kaldırabilir. Bu, bir insanın bir kamyonu kaldırmasına eşdeğerdir.", source: "Doğa" },
-    { text: "Ketçap 1830'larda ilaç olarak satılıyordu. (İshal tedavisinde kullanılırdı!)", source: "Tarih" },
-    { text: "Zürafaların ses telleri yoktur. İletişim kurmak için titreşimleri kullanırlar.", source: "Hayvanlar Alemi" },
-    { text: "Amazon'un logosundaki ok A'dan Z'ye gider, bu da 'her şeyi satıyoruz' mesajını verir.", source: "Markalar" },
-    { text: "Kredi kartı numaranızdaki rakamlar rastgele değildir. İlk rakam kartın türünü (Visa 4, Mastercard 5) belirler.", source: "Finans" }
-];
+import { 
+    Wallet, ShoppingCart, Lightbulb, Sun, Moon, 
+    Sparkles, Calendar as CalendarIcon, ChevronRight, 
+    Bell, ArrowRight, User
+} from 'lucide-react';
 
 const financialTips = [
     "Harcamadan önce kendine şu soruyu sor: 'Buna gerçekten ihtiyacım var mı yoksa sadece istiyor muyum?'",
@@ -26,138 +17,125 @@ const financialTips = [
 ];
 
 const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders }) => {
-    const [currentTrivia, setCurrentTrivia] = useState(triviaList[Math.floor(Math.random() * triviaList.length)]);
     const [currentTip] = useState(financialTips[Math.floor(Math.random() * financialTips.length)]);
-    const [isAnimating, setIsAnimating] = useState(false);
-
-    const changeTrivia = () => {
-        setIsAnimating(true);
-        setTimeout(() => {
-            let newTrivia;
-            do {
-                newTrivia = triviaList[Math.floor(Math.random() * triviaList.length)];
-            } while (newTrivia.text === currentTrivia.text);
-
-            setCurrentTrivia(newTrivia);
-            setIsAnimating(false);
-        }, 300);
-    };
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     return (
-        <div className="h-screen fixed inset-0 bg-[#F2F4F8] dark:bg-slate-950 flex items-center justify-center p-4 font-sans relative overflow-hidden transition-colors duration-300">
+        <div className="h-screen fixed inset-0 bg-[#F8FAFC] dark:bg-slate-950 flex items-center justify-center p-4 font-sans relative overflow-hidden transition-colors duration-300">
 
-            {/* Background Blobs */}
-            <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-yellow-300/30 dark:bg-yellow-900/20 rounded-full blur-[100px] animate-fade-in"></div>
-            <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-teal-300/30 dark:bg-teal-900/20 rounded-full blur-[100px] animate-fade-in delay-100"></div>
+            {/* Background Blobs for Premium Feel */}
+            <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-300/20 dark:bg-indigo-900/10 rounded-full blur-[120px] animate-pulse"></div>
+            <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-300/20 dark:bg-amber-900/10 rounded-full blur-[120px] animate-pulse delay-700"></div>
 
-            <div className="w-full max-w-md md:max-w-[760px] relative z-10 flex flex-col gap-3">
-
-                {/* 1. Trivia Card (Full Width) */}
-                <div
-                    onClick={changeTrivia}
-                    className="bg-white dark:bg-slate-900 rounded-[28px] p-5 shadow-xl shadow-yellow-100 dark:shadow-yellow-900/10 border border-white/50 dark:border-slate-800 relative overflow-hidden cursor-pointer group active:scale-[0.98] transition-all duration-300 min-h-[140px] flex flex-col justify-center"
-                >
-                    <div className="absolute top-0 right-0 w-20 h-20 bg-yellow-100 dark:bg-yellow-900/20 rounded-full -mr-6 -mt-6 transition-transform group-hover:scale-150 duration-500"></div>
-
-                    <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-500 text-xs font-bold uppercase tracking-wider">
-                                <Lightbulb size={16} className="fill-current" />
-                                <span>Biliyor muydunuz?</span>
-                            </div>
-                            <div className="text-[10px] text-gray-400 font-medium bg-gray-100 dark:bg-slate-800 px-2 py-1 rounded-full">
-                                {currentTrivia.source}
-                            </div>
-                        </div>
-
-                        <div className={`transition - opacity duration - 300 ${isAnimating ? 'opacity-0' : 'opacity-100'} `}>
-                            <p className="text-base font-medium text-slate-800 dark:text-white leading-relaxed">
-                                "{currentTrivia.text}"
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2. Row: Tip + Theme Toggle */}
-                <div className="flex gap-3">
-
-                    {/* Financial Tip (Left - Flexible) */}
-                    <div className="flex-1 bg-emerald-50 dark:bg-emerald-900/10 rounded-[24px] p-4 border border-emerald-100 dark:border-emerald-900/20 relative overflow-hidden flex flex-col justify-center">
-                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wider mb-2">
-                            <Sparkles size={12} className="fill-current" />
+            <div className="w-full max-w-md md:max-w-[760px] relative z-10 flex flex-col h-full pt-24 pb-8 overflow-y-auto custom-scrollbar">
+                
+                {/* 1. Top Header Area: Tip + Theme Toggle */}
+                <div className="flex gap-3 mb-10 items-start">
+                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-[28px] p-5 shadow-xl shadow-slate-200/50 dark:shadow-none border border-white dark:border-slate-800 relative overflow-hidden">
+                        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-2">
+                            <Sparkles size={14} className="fill-current" />
                             <span>Günün İpucu</span>
                         </div>
-                        <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-100 leading-tight">
-                            {currentTip}
+                        <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-snug italic">
+                            "{currentTip}"
                         </p>
                     </div>
 
-                    {/* Theme Toggle (Right - Fixed Square) */}
                     <button
                         onClick={toggleTheme}
-                        className="w-[88px] shrink-0 bg-white dark:bg-slate-900 rounded-[24px] border border-white/50 dark:border-slate-800 shadow-lg flex flex-col items-center justify-center gap-2 hover:scale-105 active:scale-95 transition-all text-slate-600 dark:text-slate-300"
+                        className="w-16 h-16 shrink-0 bg-white dark:bg-slate-900 rounded-[24px] border border-white dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
                     >
-                        {darkMode ? <Sun size={24} className="text-yellow-400 fill-current animate-spin-slow" /> : <Moon size={24} className="text-indigo-500 fill-current" />}
-                        <span className="text-[10px] font-bold uppercase">{darkMode ? 'Aydınlık' : 'Karanlık'}</span>
+                        {darkMode ? <Sun size={28} className="text-yellow-400 fill-current" /> : <Moon size={28} className="text-indigo-600 fill-current" />}
                     </button>
-
                 </div>
 
-                <div className="text-center mt-1 mb-1">
-                    <p className="text-gray-400 dark:text-gray-600 text-xs font-bold uppercase tracking-widest">Menü</p>
+                {/* 2. Welcome Greeting & Date */}
+                <div className="text-center mb-12 animate-slide-up">
+                    <div className="inline-flex items-center gap-3 px-6 py-2.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-full text-indigo-600 dark:text-indigo-400 text-lg md:text-xl font-black tracking-tight mb-4 border border-indigo-100 dark:border-indigo-800/50 shadow-sm">
+                        <CalendarIcon size={12} />
+                        {formattedDate}
+                    </div>
+                    <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-2">
+                        Merhaba, <span className="text-indigo-600 dark:text-indigo-400">Hoş Geldin!</span>
+                    </h1>
+                    <p className="text-gray-400 dark:text-gray-500 font-medium">Finansal asistanın bugün senin için hazır.</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pb-4">
+                {/* 3. Main Action Menu (Horizontal Wide Buttons) */}
+                <div className="flex flex-col gap-4">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4 mb-1">Hızlı Menü</p>
+                    
+                    {/* Ekonomi */}
                     <button
                         onClick={() => onNavigate('economy')}
-                        className="group bg-white dark:bg-slate-900 p-4 rounded-[28px] shadow-xl shadow-indigo-100 dark:shadow-slate-900/30 border border-white/50 dark:border-slate-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex flex-col items-center text-center py-6"
+                        className="group bg-white dark:bg-slate-900 p-6 rounded-[32px] shadow-xl shadow-indigo-100/50 dark:shadow-none border border-white dark:border-slate-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center gap-5"
                     >
-                        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center mb-3 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform duration-300">
-                            <Wallet size={24} strokeWidth={2} />
+                        <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/40 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-inner group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
+                            <Wallet size={28} />
                         </div>
-                        <h2 className="text-base font-bold text-gray-800 dark:text-white leading-tight">Ekonomi</h2>
+                        <div className="text-left flex-1">
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white leading-tight">Ekonomi</h2>
+                            <p className="text-xs text-slate-400 font-medium italic">Gelir, gider ve birikim takibi</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                            <ArrowRight size={24} />
+                        </div>
                     </button>
 
+                    {/* İhtiyaçlar */}
                     <button
                         onClick={() => onNavigate('needs')}
-                        className="group bg-white dark:bg-slate-900 p-4 rounded-[28px] shadow-xl shadow-pink-100 dark:shadow-slate-900/30 border border-white/50 dark:border-slate-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex flex-col items-center text-center py-6"
+                        className="group bg-white dark:bg-slate-900 p-6 rounded-[32px] shadow-xl shadow-pink-100/50 dark:shadow-none border border-white dark:border-slate-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center gap-5"
                     >
-                        <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-2xl flex items-center justify-center mb-3 text-pink-600 dark:text-pink-400 group-hover:scale-110 transition-transform duration-300">
-                            <ShoppingCart size={24} strokeWidth={2} />
+                        <div className="w-14 h-14 bg-pink-100 dark:bg-pink-900/40 rounded-2xl flex items-center justify-center text-pink-600 dark:text-pink-400 shadow-inner group-hover:bg-pink-600 group-hover:text-white transition-all duration-500">
+                            <ShoppingCart size={28} />
                         </div>
-                        <h2 className="text-base font-bold text-gray-800 dark:text-white leading-tight">İhtiyaçlar</h2>
+                        <div className="text-left flex-1">
+                            <h2 className="text-xl font-bold text-slate-800 dark:text-white leading-tight">İhtiyaçlar</h2>
+                            <p className="text-xs text-slate-400 font-medium italic">Alışveriş ve gereksinim listesi</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-300 group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors">
+                            <ArrowRight size={24} />
+                        </div>
                     </button>
 
-                    <button
-                        onClick={() => onNavigate('events')}
-                        className="col-span-2 group bg-white dark:bg-slate-900 p-4 rounded-[28px] shadow-xl shadow-orange-100 dark:shadow-slate-900/30 border border-white/50 dark:border-slate-800 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 flex items-center justify-center gap-4 py-5 relative"
-                    >
-                        <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center text-orange-600 dark:text-orange-400 group-hover:scale-110 transition-transform duration-300 shrink-0">
-                            <CalendarIcon size={24} strokeWidth={2} />
-                        </div>
-                        <div className="text-left">
-                            <h2 className="text-base font-bold text-gray-800 dark:text-white leading-tight">Etkinlikler</h2>
-                            <p className="text-xs text-gray-400 font-medium">Takvim ve planlar</p>
-                        </div>
-
-                        {/* Reminder Bell Button */}
-                        <div
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onCheckReminders();
-                            }}
-                            className="w-12 h-12 ml-auto bg-orange-50 dark:bg-orange-900/20 rounded-2xl flex items-center justify-center text-orange-500 hover:bg-orange-100 dark:hover:bg-orange-900/40 hover:scale-110 active:scale-90 transition-all cursor-pointer border border-orange-100/50 dark:border-orange-800/30"
-                            title="Hatırlatıcıları Kontrol Et"
+                    {/* Etkinlikler */}
+                    <div className="relative group">
+                        <button
+                            onClick={() => onNavigate('events')}
+                            className="w-full bg-white dark:bg-slate-900 p-6 rounded-[32px] shadow-xl shadow-orange-100/50 dark:shadow-none border border-white dark:border-slate-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center gap-5"
                         >
-                            <Bell size={22} className="animate-pulse" />
-                        </div>
-
-                        <div className="w-10 h-10 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center text-gray-400 group-hover:text-orange-600 group-hover:bg-orange-50 dark:group-hover:bg-slate-700 transition-all">
-                            <ChevronRight size={20} />
-                        </div>
-                    </button>
+                            <div className="w-14 h-14 bg-orange-100 dark:bg-orange-900/40 rounded-2xl flex items-center justify-center text-orange-600 dark:text-orange-400 shadow-inner group-hover:bg-orange-600 group-hover:text-white transition-all duration-500">
+                                <CalendarIcon size={28} />
+                            </div>
+                            <div className="text-left flex-1">
+                                <h2 className="text-xl font-bold text-slate-800 dark:text-white leading-tight">Etkinlikler</h2>
+                                <p className="text-xs text-slate-400 font-medium italic">Takvim, planlar ve hatırlatıcılar</p>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                {/* Separated Bell Button for Quick Access */}
+                                <div 
+                                    onClick={(e) => { e.stopPropagation(); onCheckReminders(); }}
+                                    className="w-12 h-12 bg-orange-50 dark:bg-orange-900/20 rounded-2xl flex items-center justify-center text-orange-500 hover:bg-orange-600 hover:text-white transition-all duration-300 border border-orange-100/50 dark:border-orange-800/30"
+                                >
+                                    <Bell size={20} className="animate-pulse" />
+                                </div>
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center text-slate-300 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+                                    <ArrowRight size={24} />
+                                </div>
+                            </div>
+                        </button>
+                    </div>
                 </div>
 
+                {/* Footer simple version */}
+                <div className="mt-auto pt-8 flex items-center justify-center opacity-30 gap-6">
+                    <div className="h-px bg-slate-300 dark:bg-slate-700 flex-1"></div>
+                    <Sparkles size={16} className="text-indigo-400" />
+                    <div className="h-px bg-slate-300 dark:bg-slate-700 flex-1"></div>
+                </div>
             </div>
         </div>
     );
