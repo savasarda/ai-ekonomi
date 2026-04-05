@@ -242,10 +242,11 @@ export default function FeedbackModal({ isOpen, onClose }) {
                         )}
                         <form onSubmit={handlePasswordSubmit} className="w-full">
                             <input
-                                type="password"
+                                type="number"
                                 inputMode="numeric"
-                                pattern="[0-9]*"
-                                className={`w-full bg-gray-50 dark:bg-slate-800 border ${passwordError ? 'border-red-400 dark:border-red-500/50 focus:ring-red-500/10' : 'focus:border-indigo-500 dark:border-slate-700 focus:ring-indigo-500/10'} rounded-xl p-4 text-center font-black tracking-[0.5em] text-lg text-gray-800 dark:text-white placeholder-gray-300 dark:placeholder-slate-600 focus:ring-4 mb-4 outline-none transition-all`}
+                                pattern="\d*"
+                                className={`w-full bg-gray-50 dark:bg-slate-800 border ${passwordError ? 'border-red-400 dark:border-red-500/50 focus:ring-red-500/10' : 'focus:border-indigo-500 dark:border-slate-700 focus:ring-indigo-500/10'} rounded-xl p-4 text-center font-black tracking-[0.5em] text-lg text-gray-800 dark:text-white placeholder-gray-300 dark:placeholder-slate-600 focus:ring-4 mb-4 outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+                                style={{ WebkitTextSecurity: 'disc' }}
                                 placeholder="••••"
                                 value={passwordVal}
                                 onChange={(e) => {

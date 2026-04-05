@@ -50,7 +50,7 @@ const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders }) 
             <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-yellow-300/30 dark:bg-yellow-900/20 rounded-full blur-[100px] animate-fade-in"></div>
             <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-teal-300/30 dark:bg-teal-900/20 rounded-full blur-[100px] animate-fade-in delay-100"></div>
 
-            <div className="w-full max-w-md relative z-10 flex flex-col gap-3">
+            <div className="w-full max-w-md md:max-w-[760px] relative z-10 flex flex-col gap-3">
 
                 {/* 1. Trivia Card (Full Width) */}
                 <div

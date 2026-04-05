@@ -121,7 +121,12 @@ export default function PortfolioView({
     const isProfit = dayDiff >= 0;
 
     return (
-        <div className="min-h-screen bg-[#F2F4F8] dark:bg-slate-950 transition-colors duration-300 flex flex-col font-sans relative overflow-hidden">
+        <div className="min-h-screen bg-[#F2F4F8] dark:bg-slate-950 transition-colors duration-300 flex items-center justify-center p-0 md:p-8 font-sans relative overflow-hidden">
+            {/* Background Blobs */}
+            <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-300/30 dark:bg-purple-900/20 rounded-full blur-[100px] animate-fade-in"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-300/30 dark:bg-indigo-900/20 rounded-full blur-[100px] animate-fade-in delay-100"></div>
+
+            <div className="w-full max-w-[480px] md:max-w-[760px] bg-[#F8FAFC] dark:bg-slate-900 h-screen md:h-[92vh] md:max-h-[1000px] md:rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col md:border-[8px] md:border-white dark:md:border-slate-800 ring-1 ring-black/5 z-10 transition-colors duration-300">
             
             {/* Background Decor */}
             <div className="absolute top-[-5%] left-[-10%] w-[400px] h-[400px] bg-yellow-400/10 dark:bg-yellow-900/10 rounded-full blur-[80px]"></div>
@@ -757,6 +762,7 @@ export default function PortfolioView({
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 }
