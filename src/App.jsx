@@ -975,32 +975,44 @@ function App() {
           }}
         >
 
-          <header className="px-8 pt-[calc(3rem+var(--safe-area-inset-top))] pb-6 transition-colors duration-300">
-            {/* Back Button - Top Left */}
-            <div className="flex items-center justify-start mb-4">
-              <button
-                onClick={() => setCurrentView('welcome')}
-                className="w-10 h-10 bg-white dark:bg-slate-800 shadow-sm rounded-xl flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-all active:scale-95"
-                title="Giriş Ekranına Dön"
-              >
-                <ArrowLeft size={20} strokeWidth={2.5} />
-              </button>
-            </div>
-
+          <header className="px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-3 transition-colors duration-300">
+            {/* Header: Back Button, Status Indicators & Days Left */}
             <div className="flex items-center justify-between">
-              <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 ${isSupabaseConfigured ? 'text-green-500' : 'text-orange-500'}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? 'bg-green-500' : 'bg-orange-500'} animate-pulse`}></span>
-                  {isSupabaseConfigured ? 'SENKRONİZE' : 'YEREL'}
-                </span>
-                <span className="w-1 h-1 bg-gray-300 dark:bg-slate-700 rounded-full"></span>
-                <span className={`inline-flex items-center gap-1.5 ${goldFetchError ? 'text-red-500' : (goldPrices ? 'text-yellow-600 dark:text-yellow-500' : 'text-gray-400')}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${goldFetchError ? 'bg-red-500' : (goldPrices ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400')} `}></span>
-                  {goldFetchError ? 'KUR HATASI' : (goldPrices ? 'CANLI KUR' : 'BEKLENİYOR')}
-                </span>
-              </p>
-            </div>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentView('welcome')}
+                  className="w-10 h-10 shrink-0 bg-white dark:bg-slate-800 shadow-sm rounded-xl flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-all active:scale-95"
+                  title="Giriş Ekranına Dön"
+                >
+                  <ArrowLeft size={20} strokeWidth={2.5} />
+                </button>
 
+                <div className="flex items-center gap-2 text-gray-400 text-[9px] sm:text-[10px] font-black uppercase tracking-widest ml-1 md:ml-0">
+                  <span className={`inline-flex items-center gap-1 sm:gap-1.5 ${isSupabaseConfigured ? 'text-green-500' : 'text-orange-500'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? 'bg-green-500' : 'bg-orange-500'} ${isSupabaseConfigured ? 'animate-pulse' : ''}`}></span>
+                    {isSupabaseConfigured ? 'SENKRONİZE' : 'YEREL'}
+                  </span>
+                  <span className="w-1 h-1 bg-gray-300 dark:bg-slate-700 rounded-full"></span>
+                  <span className={`inline-flex items-center gap-1 sm:gap-1.5 ${goldFetchError ? 'text-red-500' : (goldPrices ? 'text-yellow-600 dark:text-yellow-500' : 'text-gray-400')}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${goldFetchError ? 'bg-red-500' : (goldPrices ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400')} `}></span>
+                    {goldFetchError ? 'KUR HATASI' : (goldPrices ? 'CANLI KUR' : 'BEKLENİYOR')}
+                  </span>
+                </div>
+              </div>
+
+              {(() => {
+                const now = new Date();
+                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                const daysLeft = lastDay.getDate() - now.getDate();
+                return (
+                  <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm">
+                    <span className="text-[8px] font-black uppercase opacity-80 mb-0.5 tracking-wider">Ay Sonuna</span>
+                    <span className="text-xs font-black leading-none">{daysLeft === 0 ? "Bugün Son" : `${daysLeft} Gün Kaldı`}</span>
+                  </div>
+                );
+              })()}
+            </div>
           </header>
 
           <div className="mx-6 mb-6">

@@ -134,35 +134,52 @@ export default function PortfolioView({
 
             {/* Header */}
             <header className="px-6 pt-12 pb-6 sticky top-0 z-30 bg-[#F2F4F8]/80 dark:bg-slate-950/80 backdrop-blur-md">
-                <div className="flex items-center justify-between mb-2">
-                    <button 
-                        onClick={onBack}
-                        className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-center text-gray-500 active:scale-90 transition-transform"
-                    >
-                        <ArrowLeft size={20} strokeWidth={2.5} />
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <button 
-                            onClick={async () => {
-                                setIsRefreshing(true);
-                                await fetchGoldPrices();
-                                setTimeout(() => setIsRefreshing(false), 500);
-                            }}
-                            className={`w-10 h-10 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-center text-yellow-600 ${isRefreshing ? 'animate-spin' : ''}`}
-                        >
-                            <RefreshCw size={18} />
-                        </button>
-                        <button 
-                            onClick={() => setShowHistory(!showHistory)}
-                            className={`px-4 h-10 rounded-xl shadow-sm border flex items-center gap-2 font-bold text-xs transition-all ${showHistory ? 'bg-indigo-600 text-white border-transparent' : 'bg-white dark:bg-slate-900 text-gray-500 border-gray-100 dark:border-slate-800'}`}
-                        >
-                            {showHistory ? <List size={16} /> : <BarChart3 size={16} />}
-                            {showHistory ? 'Düzenle' : 'Geçmiş'}
-                        </button>
-                    </div>
-                </div>
-                <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Portföyüm</h1>
-                <p className="text-sm text-gray-400 font-medium">Varlıklarını yönet ve kazancını takip et</p>
+                {(() => {
+                    const today = new Date();
+                    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    const daysLeftInMonth = lastDayOfMonth.getDate() - today.getDate();
+                    return (
+                        <>
+                            <div className="flex items-center justify-between mb-2">
+                                <button 
+                                    onClick={onBack}
+                                    className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-center text-gray-500 active:scale-90 transition-transform"
+                                >
+                                    <ArrowLeft size={20} strokeWidth={2.5} />
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        onClick={async () => {
+                                            setIsRefreshing(true);
+                                            await fetchGoldPrices();
+                                            setTimeout(() => setIsRefreshing(false), 500);
+                                        }}
+                                        className={`w-10 h-10 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-center text-yellow-600 ${isRefreshing ? 'animate-spin' : ''}`}
+                                    >
+                                        <RefreshCw size={18} />
+                                    </button>
+                                    <button 
+                                        onClick={() => setShowHistory(!showHistory)}
+                                        className={`px-4 h-10 rounded-xl shadow-sm border flex items-center gap-2 font-bold text-xs transition-all ${showHistory ? 'bg-indigo-600 text-white border-transparent' : 'bg-white dark:bg-slate-900 text-gray-500 border-gray-100 dark:border-slate-800'}`}
+                                    >
+                                        {showHistory ? <List size={16} /> : <BarChart3 size={16} />}
+                                        {showHistory ? 'Düzenle' : 'Geçmiş'}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex items-start justify-between mt-2">
+                                <div>
+                                    <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Portföyüm</h1>
+                                    <p className="text-sm text-gray-400 font-medium">Varlıklarını yönet ve kazancını takip et</p>
+                                </div>
+                                <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-center justify-center shadow-sm shrink-0">
+                                    <span className="text-[9px] font-black uppercase opacity-80 tracking-wider mb-0.5">Ay Sonuna</span>
+                                    <span className="text-sm font-black leading-none">{daysLeftInMonth === 0 ? "Son Gün" : `${daysLeftInMonth} Gün`}</span>
+                                </div>
+                            </div>
+                        </>
+                    );
+                })()}
             </header>
 
             <main className="flex-1 overflow-y-auto px-6 pb-24 relative z-10 custom-scrollbar">
