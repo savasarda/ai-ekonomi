@@ -95,6 +95,8 @@ export default function PortfolioView({
             case 'tam': priceKey = 'tam-altin'; break;
             case 'cumhuriyet': priceKey = 'cumhuriyet-altini'; break;
             case 'ethereum': priceKey = 'ethereum'; break;
+            case 'usd': priceKey = 'USD'; break;
+            case 'eur': priceKey = 'EUR'; break;
         }
         let rawPrice = rawPrices?.[priceKey]?.Alış || "0";
         rawPrice = String(rawPrice).replace(/\./g, '').replace(',', '.');
@@ -234,7 +236,9 @@ export default function PortfolioView({
                                                             yarim: 'Yarım',
                                                             tam: 'Tam',
                                                             cumhuriyet: 'Ata Altın',
-                                                            ethereum: 'Ethereum'
+                                                            ethereum: 'Ethereum',
+                                                            usd: 'Dolar (USD)',
+                                                            eur: 'Euro (EUR)'
                                                         };
                                                         
                                                         const prevQty = prevLog?.items?.[key] || 0;
@@ -356,7 +360,7 @@ export default function PortfolioView({
                         {/* Core Inputs Section */}
                         <div className="space-y-4">
                             <div className="flex items-center justify-between px-2">
-                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">ALTIN VARLIKLARIM</h3>
+                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">DÖVİZ & ALTIN VARLIKLARIM</h3>
                                 <Coins size={14} className="text-gray-400" />
                             </div>
 
@@ -368,6 +372,8 @@ export default function PortfolioView({
                                     { id: 'yarim', label: 'Yarım Altın', icon: '🌕' },
                                     { id: 'tam', label: 'Tam Altın', icon: '🌞' },
                                     { id: 'cumhuriyet', label: 'Ata Altın', icon: '🏛️' },
+                                    { id: 'usd', label: 'Amerikan Doları', icon: '💵' },
+                                    { id: 'eur', label: 'Euro', icon: '💶' },
                                     { id: 'ethereum', label: 'Ethereum', icon: '🔹' },
                                 ].map(item => {
                                     const price = getPrice(item.id, goldPrices);
@@ -476,6 +482,7 @@ export default function PortfolioView({
                                         <div className="flex items-center gap-3">
                                             <input 
                                                 type="number" value={item.value} 
+                                                inputMode="decimal"
                                                 onChange={(e) => {
                                                     setPortfolio(prev => ({
                                                         ...prev, items: { ...prev.items, custom: prev.items.custom.map(c => c.id === item.id ? { ...c, value: e.target.value } : c) }
@@ -554,7 +561,7 @@ export default function PortfolioView({
                                     const items = portfolio.lastItems || {};
                                     setPortfolio(prev => ({ 
                                         ...prev, 
-                                        items: { gram:0, gram22:0, ceyrek:0, yarim:0, tam:0, cumhuriyet:0, ethereum:0, custom:[], ...items },
+                                        items: { gram:0, gram22:0, ceyrek:0, yarim:0, tam:0, cumhuriyet:0, ethereum:0, usd:0, eur:0, custom:[], ...items },
                                         customPrices: items.customPrices || {}
                                     }));
                                     setShowRestoreModal(false);

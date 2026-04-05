@@ -22,6 +22,9 @@ export default function PortfolioModal({
     const [showSuccessPopup, setShowSuccessPopup] = useState(false)
     const [showRestoreModal, setShowRestoreModal] = useState(false)
     const [deleteConfirmation, setDeleteConfirmation] = useState({ isOpen: false, logId: null })
+    const [addCustomModal, setAddCustomModal] = useState(false)
+    const [newCustomName, setNewCustomName] = useState('')
+    const [newCustomValue, setNewCustomValue] = useState('')
 
     if (!isOpen) return null;
 
@@ -83,6 +86,8 @@ export default function PortfolioModal({
             case 'tam': priceKey = 'tam-altin'; break;
             case 'cumhuriyet': priceKey = 'cumhuriyet-altini'; break;
             case 'ethereum': priceKey = 'ethereum'; break;
+            case 'usd': priceKey = 'USD'; break;
+            case 'eur': priceKey = 'EUR'; break;
         }
         let rawPrice = rawPrices?.[priceKey]?.Alış || "0";
         rawPrice = String(rawPrice).replace(/\./g, '').replace(',', '.');
@@ -106,7 +111,7 @@ export default function PortfolioModal({
                 <div className="px-8 pt-8 pb-4 bg-white dark:bg-slate-900 sticky top-0 z-20 rounded-t-[40px]">
                     <div className="flex justify-between items-center mb-3">
                         <div>
-                            <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Altın Portföyüm</h3>
+                            <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Portföyüm</h3>
                             <p className="text-sm text-gray-400 font-medium">Anlık değer takibi</p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -202,6 +207,8 @@ export default function PortfolioModal({
                                                             case 'tam': label = 'Tam'; break;
                                                             case 'cumhuriyet': label = 'Cumhuriyet'; break;
                                                             case 'ethereum': label = 'Ethereum'; break;
+                                                            case 'usd': label = 'Dolar (USD)'; break;
+                                                            case 'eur': label = 'Euro (EUR)'; break;
                                                         }
                                                         return (
                                                             <div key={key} className="flex justify-between bg-gray-50 dark:bg-slate-900 px-3 py-2 rounded-lg">
@@ -301,6 +308,8 @@ export default function PortfolioModal({
                                     { id: 'yarim', label: 'Yarım Altın', code: 'yarim-altin' },
                                     { id: 'tam', label: 'Tam Altın', code: 'tam-altin' },
                                     { id: 'cumhuriyet', label: 'Cumhuriyet Altını', code: 'cumhuriyet-altini' },
+                                    { id: 'usd', label: 'Amerikan Doları', code: 'USD' },
+                                    { id: 'eur', label: 'Euro', code: 'EUR' },
                                     { id: 'ethereum', label: 'Ethereum', code: 'ethereum' },
                                 ].map(item => {
                                     const price = getPrice(item.id, goldPrices);
@@ -322,6 +331,7 @@ export default function PortfolioModal({
                                                         <input
                                                             type="number"
                                                             step="0.01"
+                                                            inputMode="decimal"
                                                             value={tempValue}
                                                             onChange={(e) => setTempValue(e.target.value)}
                                                             onBlur={() => {
@@ -369,23 +379,7 @@ export default function PortfolioModal({
                                 <div className="flex justify-between items-center mb-4">
                                     <h4 className="font-bold text-gray-800 dark:text-white">Diğer Varlıklar</h4>
                                     <button
-                                        onClick={() => {
-                                            const name = prompt("Varlık Adı (Örn: Arabam, Nakit):");
-                                            if (!name) return;
-                                            const totalValue = prompt(`${name} Toplam Değeri (TL):`);
-                                            if (!totalValue) return;
-
-                                            setPortfolio(prev => ({
-                                                ...prev,
-                                                items: {
-                                                    ...prev.items,
-                                                    custom: [
-                                                        ...(prev.items.custom || []),
-                                                        { id: Date.now(), name, value: parseFloat(totalValue) }
-                                                    ]
-                                                }
-                                            }))
-                                        }}
+                                        onClick={() => setAddCustomModal(true)}
                                         className="text-sm bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-3 py-1 rounded-lg font-bold hover:bg-indigo-200 transition-colors"
                                     >
                                         + Ekle
@@ -404,6 +398,7 @@ export default function PortfolioModal({
                                                         <input
                                                             type="number"
                                                             step="0.01"
+                                                            inputMode="decimal"
                                                             value={item.value || (item.qty * item.price) || ''}
                                                             onChange={(e) => {
                                                                 setPortfolio(prev => ({
@@ -537,7 +532,7 @@ export default function PortfolioModal({
                                         setPortfolio(prev => ({
                                             ...prev,
                                             items: {
-                                                gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, custom: [],
+                                                gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, usd: 0, eur: 0, custom: [],
                                                 ...portfolio.lastItems
                                             }
                                         }));
@@ -579,6 +574,70 @@ export default function PortfolioModal({
                                 >
                                     Sil
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Add Custom Asset Modal */}
+                {addCustomModal && (
+                    <div className="absolute inset-0 z-[100] flex items-center justify-center p-6">
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm shadow-2xl" onClick={() => setAddCustomModal(false)}></div>
+                        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[340px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+                            <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-[24px] flex items-center justify-center mx-auto mb-6 text-blue-500">
+                                <Plus size={32} />
+                            </div>
+                            <h4 className="text-xl font-black text-center text-gray-800 dark:text-white mb-1">Yeni Varlık Ekle</h4>
+                            <p className="text-xs text-center text-gray-400 font-bold uppercase tracking-wider mb-8">Diğer Yatırımlar</p>
+
+                            <div className="space-y-4 mb-8">
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1 block">VARLIK ADI</label>
+                                    <input 
+                                        type="text"
+                                        value={newCustomName}
+                                        onChange={(e) => setNewCustomName(e.target.value)}
+                                        placeholder="Örn: Gümüş, Arsa, Döviz..."
+                                        className="w-full px-5 py-4 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 font-bold text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1 block">TL DEĞERİ</label>
+                                    <div className="relative">
+                                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₺</span>
+                                        <input 
+                                            type="number"
+                                            inputMode="decimal"
+                                            value={newCustomValue}
+                                            onChange={(e) => setNewCustomValue(e.target.value)}
+                                            placeholder="0.00"
+                                            className="w-full pl-10 pr-5 py-4 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 font-black text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={() => { setAddCustomModal(false); setNewCustomName(''); setNewCustomValue(''); }} 
+                                    className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-800 text-gray-500 font-bold"
+                                >Vazgeç</button>
+                                <button 
+                                    onClick={() => {
+                                        if (!newCustomName || !newCustomValue) return;
+                                        setPortfolio(prev => ({
+                                            ...prev, 
+                                            items: { 
+                                                ...prev.items, 
+                                                custom: [...(prev.items.custom || []), { id: Date.now(), name: newCustomName, value: parseFloat(newCustomValue.toString().replace(',','.')) }] 
+                                            }
+                                        }));
+                                        setAddCustomModal(false);
+                                        setNewCustomName('');
+                                        setNewCustomValue('');
+                                    }}
+                                    className="flex-1 h-14 rounded-2xl bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-200 dark:shadow-none transition-all active:scale-95"
+                                >Ekle</button>
                             </div>
                         </div>
                     </div>

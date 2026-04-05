@@ -77,7 +77,7 @@ function App() {
   const [portfolio, setPortfolio] = useState({
     lastTotal: 0,
     lastUpdated: null,
-    items: { gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, custom: [] },
+    items: { gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, usd: 0, eur: 0, custom: [] },
     customPrices: {}
   })
   const { goldPrices, goldFetchError, fetchGoldPrices, lastUpdateTime } = useGoldPrices()
@@ -2124,6 +2124,7 @@ function App() {
 
             <input
               type="password"
+              inputMode="numeric"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
