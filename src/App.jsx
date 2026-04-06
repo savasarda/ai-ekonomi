@@ -1007,7 +1007,7 @@ function App() {
                 const daysLeft = lastDay.getDate() - now.getDate();
                 return (
                   <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm">
-                    <span className="text-[8px] font-black uppercase opacity-80 mb-0.5 tracking-wider">Ay Sonuna</span>
+                    <span className="text-[8px] font-black uppercase mb-0.5 tracking-wider">Ay Sonuna</span>
                     <span className="text-xs font-black leading-none">{daysLeft === 0 ? "Bugün Son" : `${daysLeft} Gün Kaldı`}</span>
                   </div>
                 );

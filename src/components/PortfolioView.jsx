@@ -135,9 +135,6 @@ export default function PortfolioView({
             {/* Header */}
             <header className="px-6 pt-12 pb-6 sticky top-0 z-30 bg-[#F2F4F8]/80 dark:bg-slate-950/80 backdrop-blur-md">
                 {(() => {
-                    const today = new Date();
-                    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-                    const daysLeftInMonth = lastDayOfMonth.getDate() - today.getDate();
                     return (
                         <>
                             <div className="flex items-center justify-between mb-2">
@@ -171,10 +168,6 @@ export default function PortfolioView({
                                 <div>
                                     <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Portföyüm</h1>
                                     <p className="text-sm text-gray-400 font-medium">Varlıklarını yönet ve kazancını takip et</p>
-                                </div>
-                                <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-center justify-center shadow-sm shrink-0">
-                                    <span className="text-[9px] font-black uppercase opacity-80 tracking-wider mb-0.5">Ay Sonuna</span>
-                                    <span className="text-sm font-black leading-none">{daysLeftInMonth === 0 ? "Son Gün" : `${daysLeftInMonth} Gün`}</span>
                                 </div>
                             </div>
                         </>
