@@ -25,7 +25,6 @@ export default function PortfolioView({
     const [editingItem, setEditingItem] = useState(null);
     const [tempValue, setTempValue] = useState('');
     const [showSuccessPopup, setShowSuccessPopup] = useState(false);
-    const [showRestoreModal, setShowRestoreModal] = useState(false);
     const [deleteConfirmation, setDeleteConfirmation] = useState({ isOpen: false, logId: null });
     const [priceOverrideModal, setPriceOverrideModal] = useState({ isOpen: false, itemId: null, label: '', currentPrice: 0 });
     const [deleteCustomModal, setDeleteCustomModal] = useState({ isOpen: false, item: null });
@@ -126,7 +125,7 @@ export default function PortfolioView({
             <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-300/30 dark:bg-purple-900/20 rounded-full blur-[100px] animate-fade-in"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-300/30 dark:bg-indigo-900/20 rounded-full blur-[100px] animate-fade-in delay-100"></div>
 
-            <div className="w-full max-w-[480px] md:max-w-[760px] bg-[#F8FAFC] dark:bg-slate-900 h-screen md:h-[92vh] md:max-h-[1000px] md:rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col md:border-[8px] md:border-white dark:md:border-slate-800 ring-1 ring-black/5 z-10 transition-colors duration-300">
+            <div className="w-full max-w-[480px] md:max-w-[760px] bg-[#F8FAFC] dark:bg-slate-950 h-screen md:h-[92vh] md:max-h-[1000px] md:rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col md:border-[8px] md:border-white dark:md:border-slate-800 ring-1 ring-black/5 z-10 transition-colors duration-300">
             
             {/* Background Decor */}
             <div className="absolute top-[-5%] left-[-10%] w-[400px] h-[400px] bg-yellow-400/10 dark:bg-yellow-900/10 rounded-full blur-[80px]"></div>
@@ -140,24 +139,14 @@ export default function PortfolioView({
                             <div className="flex items-center justify-between mb-2">
                                 <button 
                                     onClick={onBack}
-                                    className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-center text-gray-500 active:scale-90 transition-transform"
+                                    className="w-10 h-10 bg-white dark:bg-slate-950 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-center text-gray-500 active:scale-90 transition-transform"
                                 >
                                     <ArrowLeft size={20} strokeWidth={2.5} />
                                 </button>
                                 <div className="flex items-center gap-2">
                                     <button 
-                                        onClick={async () => {
-                                            setIsRefreshing(true);
-                                            await fetchGoldPrices();
-                                            setTimeout(() => setIsRefreshing(false), 500);
-                                        }}
-                                        className={`w-10 h-10 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-center text-yellow-600 ${isRefreshing ? 'animate-spin' : ''}`}
-                                    >
-                                        <RefreshCw size={18} />
-                                    </button>
-                                    <button 
                                         onClick={() => setShowHistory(!showHistory)}
-                                        className={`px-4 h-10 rounded-xl shadow-sm border flex items-center gap-2 font-bold text-xs transition-all ${showHistory ? 'bg-indigo-600 text-white border-transparent' : 'bg-white dark:bg-slate-900 text-gray-500 border-gray-100 dark:border-slate-800'}`}
+                                        className={`px-4 h-10 rounded-xl shadow-sm border flex items-center gap-2 font-bold text-xs transition-all ${showHistory ? 'bg-indigo-600 text-white border-transparent' : 'bg-white dark:bg-slate-950 text-gray-500 border-gray-100 dark:border-slate-800'}`}
                                     >
                                         {showHistory ? <List size={16} /> : <BarChart3 size={16} />}
                                         {showHistory ? 'Düzenle' : 'Geçmiş'}
@@ -181,7 +170,7 @@ export default function PortfolioView({
                     <div className="animate-fade-in space-y-4">
                         <div className="flex items-center justify-between px-2">
                             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">GÜNLÜK TAKİP</h3>
-                            <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">{portfolioHistory.length} Kayıt</span>
+                            <span className="text-[10px] text-gray-400 bg-gray-100 dark:bg-slate-950 px-2 py-0.5 rounded-full">{portfolioHistory.length} Kayıt</span>
                         </div>
                         
                         <div className="space-y-3">
@@ -192,7 +181,7 @@ export default function PortfolioView({
 
                                 return (
                                     <div key={log.id} 
-                                        className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-white/50 dark:border-slate-800 shadow-sm group cursor-pointer active:scale-[0.98] transition-all"
+                                        className="bg-white dark:bg-slate-950 rounded-3xl p-5 border border-white/50 dark:border-slate-800 shadow-sm group cursor-pointer active:scale-[0.98] transition-all"
                                         onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
                                     >
                                         <div className="flex justify-between items-center">
@@ -261,7 +250,7 @@ export default function PortfolioView({
                                                         const hasDiff = diff !== 0;
 
                                                         return (
-                                                            <div key={key} className="bg-gray-50 dark:bg-slate-800/50 p-3 rounded-2xl flex flex-col gap-1">
+                                                            <div key={key} className="bg-gray-50 dark:bg-slate-950/50 p-3 rounded-2xl flex flex-col gap-1">
                                                                 <div className="flex justify-between items-center">
                                                                     <span className="text-[10px] font-bold text-gray-400 uppercase">{labels[key] || key}</span>
                                                                     <span className="text-sm font-black text-slate-700 dark:text-slate-200">{qty % 1 === 0 ? qty : qty.toFixed(2)}</span>
@@ -286,7 +275,7 @@ export default function PortfolioView({
                                                     const hasDiff = diff !== 0;
 
                                                     return (
-                                                        <div key={i} className="bg-gray-50 dark:bg-slate-800/50 p-3 rounded-2xl flex justify-between items-center group/item">
+                                                        <div key={i} className="bg-gray-50 dark:bg-slate-950/50 p-3 rounded-2xl flex justify-between items-center group/item">
                                                             <div className="flex flex-col">
                                                                 <span className="text-[10px] font-bold text-gray-400 uppercase">{c.name}</span>
                                                                 {prevLog && hasDiff && (
@@ -308,8 +297,8 @@ export default function PortfolioView({
                                 )
                             })}
                             {portfolioHistory.length === 0 && (
-                                <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[40px] border border-dashed border-gray-200 dark:border-slate-800">
-                                    <div className="w-16 h-16 bg-gray-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
+                                <div className="text-center py-20 bg-white dark:bg-slate-950 rounded-[40px] border border-dashed border-gray-200 dark:border-slate-800">
+                                    <div className="w-16 h-16 bg-gray-50 dark:bg-slate-950 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
                                         <Clock size={32} />
                                     </div>
                                     <p className="text-gray-400 font-bold">Henüz geçmiş kayıt yok</p>
@@ -347,13 +336,18 @@ export default function PortfolioView({
                                 </div>
                                 
                                 <div 
-                                    onClick={() => portfolio.lastItems && setShowRestoreModal(true)}
+                                    onClick={() => {
+                                        setPortfolio(prev => ({
+                                            ...prev,
+                                            items: { gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, usd: 0, eur: 0, custom: [] }
+                                        }));
+                                    }}
                                     className="flex items-center gap-2 px-3 py-2 rounded-2xl backdrop-blur-sm border border-white/20 bg-white/10 cursor-pointer active:scale-95 transition-transform"
                                 >
-                                    <RotateCcw size={16} />
+                                    <Trash2 size={16} />
                                     <div className="flex flex-col text-left">
-                                        <span className="text-[8px] font-black uppercase opacity-60">SON KAYIT</span>
-                                        <span className="text-xs font-black">Yükle</span>
+                                        <span className="text-[8px] font-black uppercase opacity-60">VARLIKLARI</span>
+                                        <span className="text-xs font-black">Sıfırla</span>
                                     </div>
                                 </div>
                             </div>
@@ -361,7 +355,7 @@ export default function PortfolioView({
 
                         {/* Gold Price Ticker (Optional mini) */}
                         {lastUpdateTime && (
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 border border-gray-100 dark:border-slate-800 flex items-center justify-between px-5">
+                            <div className="bg-white dark:bg-slate-950 rounded-2xl p-3 border border-gray-100 dark:border-slate-800 flex items-center justify-between px-5">
                                 <div className="flex items-center gap-2">
                                     <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></div>
                                     <span className="text-[10px] font-bold text-gray-400">CANLI KURLAR AKTİF</span>
@@ -397,7 +391,7 @@ export default function PortfolioView({
                                     const isManual = portfolio.customPrices && portfolio.customPrices[item.id];
                                     
                                     return (
-                                        <div key={item.id} className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-white/50 dark:border-slate-800 flex items-center justify-between shadow-sm hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors group/row">
+                                        <div key={item.id} className="bg-white dark:bg-slate-950 p-4 rounded-3xl border border-white/50 dark:border-slate-800 flex items-center justify-between shadow-sm hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors group/row">
                                             <div className="flex items-center gap-4">
                                                 <div 
                                                     onClick={() => {
@@ -409,7 +403,7 @@ export default function PortfolioView({
                                                         });
                                                         setNewManualPrice(price.toString());
                                                     }}
-                                                    className={`text-2xl w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer transition-all hover:scale-110 active:scale-95 relative ${isManual ? 'bg-indigo-50 dark:bg-indigo-900/30 ring-2 ring-indigo-500/20' : 'bg-gray-50 dark:bg-slate-800'}`}
+                                                    className={`text-2xl w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer transition-all hover:scale-110 active:scale-95 relative ${isManual ? 'bg-indigo-50 dark:bg-indigo-900/30 ring-2 ring-indigo-500/20' : 'bg-gray-50 dark:bg-slate-950'}`}
                                                     title="Manuel Fiyat Gir"
                                                 >
                                                     {item.icon}
@@ -440,10 +434,10 @@ export default function PortfolioView({
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 p-1.5 rounded-2xl border border-gray-100 dark:border-slate-700">
+                                            <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-950 p-1.5 rounded-2xl border border-gray-100 dark:border-slate-700">
                                                 <button 
                                                     onClick={() => setPortfolio(prev => ({ ...prev, items: { ...prev.items, [item.id]: Math.max(0, qty - 1) } }))}
-                                                    className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl shadow-sm text-gray-400 hover:text-red-500 transition-colors"
+                                                    className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-950 rounded-xl shadow-sm text-gray-400 hover:text-red-500 transition-colors"
                                                 ><Minus size={16} /></button>
                                                 
                                                 {editingItem === item.id ? (
@@ -469,7 +463,7 @@ export default function PortfolioView({
 
                                                 <button 
                                                     onClick={() => setPortfolio(prev => ({ ...prev, items: { ...prev.items, [item.id]: qty + 1 } }))}
-                                                    className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl shadow-sm text-gray-400 hover:text-green-500 transition-colors"
+                                                    className="w-8 h-8 flex items-center justify-center bg-white dark:bg-slate-950 rounded-xl shadow-sm text-gray-400 hover:text-green-500 transition-colors"
                                                 ><Plus size={16} /></button>
                                             </div>
                                         </div>
@@ -492,7 +486,7 @@ export default function PortfolioView({
                             
                             <div className="space-y-3">
                                 {(portfolio.items?.custom || []).map(item => (
-                                    <div key={item.id} className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-white/50 dark:border-slate-800 flex items-center justify-between shadow-sm group">
+                                    <div key={item.id} className="bg-white dark:bg-slate-950 p-5 rounded-3xl border border-white/50 dark:border-slate-800 flex items-center justify-between shadow-sm group">
                                         <span className="font-bold text-slate-700 dark:text-slate-200">{item.name}</span>
                                         <div className="flex items-center gap-3">
                                             <input 
@@ -558,47 +552,18 @@ export default function PortfolioView({
             
 
             {/* Modals & Popups */}
-            {showRestoreModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowRestoreModal(false)}></div>
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800">
-                        <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-500">
-                            <RotateCcw size={32} />
-                        </div>
-                        <h4 className="text-xl font-black text-center text-slate-800 dark:text-white mb-2">Geri Yükle?</h4>
-                        <p className="text-xs text-center text-gray-400 font-medium mb-8 leading-relaxed">
-                            Son kaydedilen varlık listeniz mevcut listenin üzerine yazılacaktır.
-                        </p>
-                        <div className="flex gap-3">
-                            <button onClick={() => setShowRestoreModal(false)} className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-800 text-gray-500 font-bold">Vazgeç</button>
-                            <button 
-                                onClick={() => {
-                                    const items = portfolio.lastItems || {};
-                                    setPortfolio(prev => ({ 
-                                        ...prev, 
-                                        items: { gram:0, gram22:0, ceyrek:0, yarim:0, tam:0, cumhuriyet:0, ethereum:0, usd:0, eur:0, custom:[], ...items },
-                                        customPrices: items.customPrices || {}
-                                    }));
-                                    setShowRestoreModal(false);
-                                }}
-                                className="flex-1 h-14 rounded-2xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-200 dark:shadow-none"
-                            >Yükle</button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {deleteConfirmation.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDeleteConfirmation({ isOpen: false, logId: null })}></div>
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-[320px] rounded-[40px] p-8 relative z-10 animate-scale-up border border-white/50 dark:border-slate-800">
+                    <div className="bg-white dark:bg-slate-950 w-full max-w-[320px] rounded-[40px] p-8 relative z-10 animate-scale-up border border-white/50 dark:border-slate-800">
                         <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
                             <Trash2 size={32} />
                         </div>
                         <h4 className="text-xl font-black text-center text-slate-800 dark:text-white mb-2">Kaydı Sil?</h4>
                         <p className="text-xs text-center text-gray-400 mb-8">Bu tarihli portföy verisi kalıcı olarak silinecek.</p>
                         <div className="flex gap-3">
-                            <button onClick={() => setDeleteConfirmation({ isOpen: false, logId: null })} className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-800 text-gray-500 font-bold">Vazgeç</button>
+                            <button onClick={() => setDeleteConfirmation({ isOpen: false, logId: null })} className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-950 text-gray-500 font-bold">Vazgeç</button>
                             <button onClick={confirmDeleteLog} className="flex-1 h-14 rounded-2xl bg-red-500 text-white font-bold shadow-lg shadow-red-200 dark:shadow-none">Sil</button>
                         </div>
                     </div>
@@ -609,7 +574,7 @@ export default function PortfolioView({
             {priceOverrideModal.isOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm shadow-2xl" onClick={() => setPriceOverrideModal({ isOpen: false })}></div>
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-[340px] rounded-[40px] p-8 relative z-10 animate-scale-up border border-white/50 dark:border-slate-800 shadow-2xl">
+                    <div className="bg-white dark:bg-slate-950 w-full max-w-[340px] rounded-[40px] p-8 relative z-10 animate-scale-up border border-white/50 dark:border-slate-800 shadow-2xl">
                         <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/20 rounded-[24px] flex items-center justify-center mx-auto mb-6 text-indigo-600">
                             <Edit3 size={32} />
                         </div>
@@ -625,7 +590,7 @@ export default function PortfolioView({
                                     inputMode="decimal"
                                     value={newManualPrice}
                                     onChange={(e) => setNewManualPrice(e.target.value)}
-                                    className="w-full pl-10 pr-6 py-5 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 font-black text-2xl text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                    className="w-full pl-10 pr-6 py-5 bg-gray-50 dark:bg-slate-950 rounded-2xl border border-gray-100 dark:border-slate-700 font-black text-2xl text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500/20"
                                     placeholder="0.00"
                                     autoFocus
                                 />
@@ -638,7 +603,7 @@ export default function PortfolioView({
                         <div className="flex gap-3">
                             <button 
                                 onClick={() => setPriceOverrideModal({ isOpen: false })} 
-                                className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-800 text-gray-500 font-bold"
+                                className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-950 text-gray-500 font-bold"
                             >Vazgeç</button>
                             <button 
                                 onClick={() => {
@@ -662,7 +627,7 @@ export default function PortfolioView({
             {addCustomModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setAddCustomModal(false)}></div>
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-[340px] rounded-[40px] p-8 relative z-10 animate-scale-up border border-white/50 dark:border-slate-800 shadow-2xl">
+                    <div className="bg-white dark:bg-slate-950 w-full max-w-[340px] rounded-[40px] p-8 relative z-10 animate-scale-up border border-white/50 dark:border-slate-800 shadow-2xl">
                         <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-[24px] flex items-center justify-center mx-auto mb-6 text-blue-500">
                             <Package size={32} />
                         </div>
@@ -677,7 +642,7 @@ export default function PortfolioView({
                                     value={newCustomName}
                                     onChange={(e) => setNewCustomName(e.target.value)}
                                     placeholder="Örn: Gümüş, Arsa, Döviz..."
-                                    className="w-full px-5 py-4 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+                                    className="w-full px-5 py-4 bg-gray-50 dark:bg-slate-950 rounded-2xl border border-gray-100 dark:border-slate-700 font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
                                 />
                             </div>
                             <div>
@@ -690,7 +655,7 @@ export default function PortfolioView({
                                         value={newCustomValue}
                                         onChange={(e) => setNewCustomValue(e.target.value)}
                                         placeholder="0.00"
-                                        className="w-full pl-10 pr-5 py-4 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 font-black text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        className="w-full pl-10 pr-5 py-4 bg-gray-50 dark:bg-slate-950 rounded-2xl border border-gray-100 dark:border-slate-700 font-black text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/20"
                                     />
                                 </div>
                             </div>
@@ -699,7 +664,7 @@ export default function PortfolioView({
                         <div className="flex gap-3">
                             <button 
                                 onClick={() => { setAddCustomModal(false); setNewCustomName(''); setNewCustomValue(''); }} 
-                                className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-800 text-gray-500 font-bold"
+                                className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-950 text-gray-500 font-bold"
                             >Vazgeç</button>
                             <button 
                                 onClick={() => {
@@ -726,7 +691,7 @@ export default function PortfolioView({
             {deleteCustomModal.isOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setDeleteCustomModal({ isOpen: false, item: null })}></div>
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-[340px] rounded-[40px] p-8 relative z-10 animate-scale-up border border-white/50 dark:border-slate-800 shadow-2xl text-center">
+                    <div className="bg-white dark:bg-slate-950 w-full max-w-[340px] rounded-[40px] p-8 relative z-10 animate-scale-up border border-white/50 dark:border-slate-800 shadow-2xl text-center">
                         <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-[24px] flex items-center justify-center mx-auto mb-6 text-red-500">
                             <Trash2 size={32} />
                         </div>
@@ -739,7 +704,7 @@ export default function PortfolioView({
                         <div className="flex gap-3">
                             <button 
                                 onClick={() => setDeleteCustomModal({ isOpen: false, item: null })} 
-                                className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-800 text-gray-500 font-bold"
+                                className="flex-1 h-14 rounded-2xl bg-gray-50 dark:bg-slate-950 text-gray-500 font-bold"
                             >Vazgeç</button>
                             <button 
                                 onClick={() => {

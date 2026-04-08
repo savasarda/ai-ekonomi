@@ -23,7 +23,11 @@ body {
   min-height: -webkit-fill-available;
   background-color: #F2F4F8;
   overscroll-behavior-y: none;
-  /* Soft blue-gray background */
+  transition: background-color 0.3s ease;
+}
+
+.dark body {
+  background-color: #020617;
 }
 
 /* Custom Scrollbar for sleek look */

@@ -6,9 +6,10 @@ import PortfolioModal from './components/Modals/PortfolioModal'
 import MoneyTipModal from './components/Modals/MoneyTipModal'
 import FeedbackModal from './components/Modals/FeedbackModal'
 import ReminderModal from './components/Modals/ReminderModal'
+import SettingsModal from './components/Modals/SettingsModal'
 
 import { moneyTips } from './data/moneyTips'
-import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer } from 'lucide-react'
+import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer, Menu, ChevronDown, ChevronUp, Settings } from 'lucide-react'
 
 import WelcomeScreen from './components/WelcomeScreen'
 import NeedsList from './components/NeedsList'
@@ -74,36 +75,48 @@ function App() {
   const [showPortfolioModal, setShowPortfolioModal] = useState(false)
 
   // Portfolio State
-  const [portfolio, setPortfolio] = useState({
-    lastTotal: 0,
-    lastUpdated: null,
-    items: { gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, usd: 0, eur: 0, custom: [] },
-    customPrices: {}
+  const [portfolio, setPortfolio] = useState(() => {
+    const saved = localStorage.getItem('portfolio')
+    return saved ? JSON.parse(saved) : {
+      lastTotal: 0,
+      lastUpdated: null,
+      items: { gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, usd: 0, eur: 0, custom: [] },
+      customPrices: {}
+    }
   })
+
+  // Save portfolio to localStorage
+  useEffect(() => {
+    localStorage.setItem('portfolio', JSON.stringify(portfolio))
+  }, [portfolio])
   const { goldPrices, goldFetchError, fetchGoldPrices, lastUpdateTime } = useGoldPrices()
 
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+
+  // Reset Password Modal
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
+
   // Menu Reordering State
-  const defaultMenuOrder = ['portfolio', 'limit', 'future', 'cards', 'users', 'extract', 'feedback', 'reset']
+  const defaultMenuOrder = ['future', 'extract', 'settings']
   const [menuOrder, setMenuOrder] = useState(() => {
     const saved = localStorage.getItem('menuOrder')
     if (saved) {
       const parsed = JSON.parse(saved)
-      let finalOrder = [...parsed]
-      if (!finalOrder.includes('portfolio')) {
-        finalOrder = ['portfolio', ...finalOrder]
-      }
-      if (!finalOrder.includes('feedback')) {
-        const resetIndex = finalOrder.indexOf('reset')
-        if (resetIndex !== -1) {
-          finalOrder.splice(resetIndex, 0, 'feedback')
-        } else {
-          finalOrder.push('feedback')
-        }
-      }
+      let finalOrder = parsed.filter(item => !['feedback', 'portfolio', 'cards', 'users', 'reset', 'limit'].includes(item))
+      if (!finalOrder.includes('settings')) finalOrder.push('settings')
       return finalOrder
     }
     return defaultMenuOrder
   })
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false)
+
+  /* Success Modal */
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+
   const [reorderMode, setReorderMode] = useState(false)
   const [swapSource, setSwapSource] = useState(null)
 
@@ -112,17 +125,6 @@ function App() {
     localStorage.setItem('menuOrder', JSON.stringify(menuOrder))
   }, [menuOrder])
 
-  /* Feedback Logic */
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
-
-  /* Reset Password Modal */
-  const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [passwordInput, setPasswordInput] = useState('')
-  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false)
-
-  /* Success Modal */
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
 
   /* Money Tip Logic */
   const [showTipModal, setShowTipModal] = useState(false)
@@ -166,25 +168,29 @@ function App() {
   // Supabase Sync Logic
   const isSupabaseConfigured = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
 
-  // Pull to Refresh State
+  // Swipe and Pull Logic
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [pullStartY, setPullStartY] = useState(0)
   const [pullMoveY, setPullMoveY] = useState(0)
+  const [touchStartX, setTouchStartX] = useState(0)
+  const [touchEndX, setTouchEndX] = useState(0)
 
   const scrollContainerRef = useRef(null)
   const futureDebtsListRef = useRef(null)
   const currentMonthRef = useRef(null)
   const futureDebtsScrollTimeoutRef = useRef(null)
 
-  // Auto-scroll to current month in Future Debts Modal
+  // Auto-scroll to current month in Future Debts Modal and Budget Detail List
   useEffect(() => {
-    if (showFutureDebtsModal && !selectedMonthDetail) {
+    const isShowingList = (showFutureDebtsModal || (currentView === 'budgetDetail' && !selectedMonthDetail));
+    
+    if (isShowingList) {
       if (futureDebtsScrollTimeoutRef.current) {
         clearTimeout(futureDebtsScrollTimeoutRef.current)
       }
 
       futureDebtsScrollTimeoutRef.current = setTimeout(() => {
-        if (showFutureDebtsModal && !selectedMonthDetail && currentMonthRef.current) {
+        if (currentMonthRef.current) {
           currentMonthRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
       }, 300)
@@ -194,7 +200,7 @@ function App() {
         clearTimeout(futureDebtsScrollTimeoutRef.current)
       }
     }
-  }, [showFutureDebtsModal, selectedMonthDetail])
+  }, [showFutureDebtsModal, currentView, selectedMonthDetail])
 
   // Reminder State
   // Reminder State
@@ -278,6 +284,7 @@ function App() {
 
 
   const handleTouchStart = (e) => {
+    setTouchStartX(e.touches[0].clientX)
     // Only enable pull to refresh if we are at the top of the scroll container
     if (scrollContainerRef.current && scrollContainerRef.current.scrollTop === 0) {
       setPullStartY(e.touches[0].clientY)
@@ -287,6 +294,7 @@ function App() {
   }
 
   const handleTouchMove = (e) => {
+    setTouchEndX(e.touches[0].clientX)
     if (!pullStartY) return
 
     const currentY = e.touches[0].clientY
@@ -302,6 +310,21 @@ function App() {
   }
 
   const handleTouchEnd = async () => {
+    // Check for Left-to-Right swipe (Back)
+    if (touchStartX && touchEndX && (touchEndX - touchStartX > 120)) {
+        if (currentView === 'budgetDetail') {
+          setCurrentView('economy');
+          setSelectedMonthDetail(null);
+        } else if (currentView === 'portfolio') {
+          setCurrentView('economy');
+        } else {
+          setCurrentView('welcome');
+        }
+        setTouchStartX(0)
+        setTouchEndX(0)
+        return
+    }
+
     if (pullMoveY > 100) { // Threshold to trigger refresh
       setIsRefreshing(true)
       setPullMoveY(100) // Snap to loading position
@@ -314,6 +337,8 @@ function App() {
       setPullMoveY(0) // Snap back if threshold not met
     }
     setPullStartY(0)
+    setTouchStartX(0)
+    setTouchEndX(0)
   }
 
   // Function to save to Supabase
@@ -507,6 +532,20 @@ function App() {
       setTransactionToDelete(null)
       setShowDeleteConfirmModal(false)
     }
+  }
+
+  const handleDeleteTransaction_Manual = (id) => {
+    setData(prev => ({
+      ...prev,
+      transactions: prev.transactions.map(t => t.id === id ? { ...t, status: 0 } : t)
+    }))
+  }
+
+  const handleUpdateTransaction_Manual = (updated) => {
+    setData(prev => ({
+      ...prev,
+      transactions: prev.transactions.map(t => t.id === updated.id ? updated : t)
+    }))
   }
 
   const handleShareWhatsApp = () => {
@@ -768,10 +807,12 @@ function App() {
 
         if (logs && logs.length > 0) {
           console.log("Found log:", logs[0]);
+          const logItems = typeof logs[0].items === 'string' ? JSON.parse(logs[0].items) : logs[0].items;
           setPortfolio(prev => ({
             ...prev,
             lastTotal: logs[0].total_value,
-            lastItems: logs[0].items
+            lastItems: logItems,
+            items: logItems // Auto-load last saved record
           }))
         } else {
           console.log("No logs found.");
@@ -858,12 +899,39 @@ function App() {
           darkMode={darkMode}
           toggleTheme={toggleTheme}
           onCheckReminders={handleCheckReminders}
+          onShowFeedback={() => setShowFeedbackModal(true)}
         />
         {showReminderModal && (
           <ReminderModal
             events={upcomingEvents}
             onClose={() => setShowReminderModal(false)}
           />
+        )}
+        <FeedbackModal
+          isOpen={showFeedbackModal}
+          onClose={() => setShowFeedbackModal(false)}
+        />
+        {showSuccessModal && (
+          <div className="absolute inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowSuccessModal(false)}></div>
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                  <CheckCircle size={48} className="text-green-500" strokeWidth={2.5} />
+                </div>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Başarılı!</h3>
+                <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                  {successMessage}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="w-full bg-gradient-to-r from-green-600 to-green-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+              >
+                Tamam
+              </button>
+            </div>
+          </div>
         )}
       </>
     );
@@ -932,6 +1000,408 @@ function App() {
     )
   }
 
+  // Render Budget Detail View
+  if (currentView === 'budgetDetail') {
+    return (
+      <div 
+        className="fixed inset-0 bg-[#F2F4F8] dark:bg-slate-950 z-[100] flex flex-col animate-in slide-in-from-right duration-300"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <header className="px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-4 flex items-center justify-between bg-[#F2F4F8] dark:bg-slate-950 border-b border-gray-100 dark:border-slate-800 backdrop-blur-md sticky top-0 z-20 transition-colors">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                setCurrentView('economy');
+                setSelectedMonthDetail(null);
+              }}
+              className="w-10 h-10 bg-white dark:bg-slate-800 shadow-sm rounded-xl flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95"
+            >
+              <ArrowLeft size={20} strokeWidth={2.5} />
+            </button>
+            <div>
+              <h3 className="text-xl font-black text-gray-800 dark:text-white tracking-tight">
+                {selectedMonthDetail ? 'İşlem Detayları' : 'Dönem Özetleri'}
+              </h3>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                {selectedMonthDetail ? 'Kişi bazlı harcamalar' : 'Aylık harcama geçmişi'}
+              </p>
+            </div>
+          </div>
+
+        </header>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
+          {!selectedMonthDetail ? (
+            // Month List View
+            <>
+              {monthlyBreakdown
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .map(item => {
+                  const dateObj = new Date(item.date + '-01');
+                  const monthName = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+                  const totalLimit = Object.values(userLimits).reduce((a, b) => a + b, 0);
+                  const isOverLimit = item.total > totalLimit;
+                  const isFuture = item.date > currentMonth;
+                  const isCurrent = item.date === currentMonth;
+
+                  return (
+                    <div
+                      key={item.date}
+                      ref={isCurrent ? currentMonthRef : null}
+                      onClick={() => setSelectedMonthDetail({ monthKey: item.date, selectedUserId: activeUsers[0]?.id })}
+                      className={`p-6 rounded-[32px] border relative overflow-hidden group transition-all duration-300 cursor-pointer ${isCurrent
+                        ? 'bg-indigo-600 text-white border-transparent shadow-2xl z-10'
+                        : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:scale-[1.01]'
+                        }`}
+                    >
+                      {isCurrent && (
+                        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
+                      )}
+                      <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl transition-colors ${isCurrent ? 'bg-white/10' : 'bg-indigo-50/50 dark:bg-indigo-900/20 group-hover:bg-indigo-100/50 dark:group-hover:bg-indigo-900/30'}`}></div>
+
+                      <div className="flex flex-col items-center gap-2 mb-4 relative z-10 text-center">
+                        <div className="flex flex-wrap shadow-sm justify-center items-center gap-2">
+                          <span className={`font-bold text-xl transition-colors ${isCurrent ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{monthName}</span>
+                          {isCurrent && <span className="text-[10px] font-bold px-2 py-0.5 bg-white/20 text-white rounded-full backdrop-blur-md">BU AY</span>}
+                          {isFuture && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isCurrent ? 'bg-white/10 text-white' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'}`}>GELECEK</span>}
+                        </div>
+                        <span className={`text-2xl font-black tracking-tight ${isOverLimit ? 'text-red-400' : (isCurrent ? 'text-indigo-200' : 'text-indigo-600 dark:text-indigo-400')}`}>
+                          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.total)}
+                        </span>
+                      </div>
+
+                      <div className={`h-2.5 rounded-full overflow-hidden mb-5 relative z-10 ${isCurrent ? 'bg-white/10' : 'bg-gray-100 dark:bg-slate-900'}`}>
+                        <div
+                          className={`h-full rounded-full transition-all duration-1000 ${isOverLimit ? 'bg-red-400' : (isCurrent ? 'bg-white' : 'bg-gradient-to-r from-indigo-400 to-purple-400')}`}
+                          style={{ width: `${Math.min((item.total / totalLimit) * 100, 100)}%` }}
+                        ></div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3 justify-center relative z-10">
+                        {activeUsers.map(u => {
+                          const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
+                          const userMonthTotal = activeTransactions
+                            .filter(t => t.status === 1 && t.date.startsWith(item.date) && userAccs.includes(t.accountId))
+                            .reduce((acc, curr) => acc + curr.amount, 0);
+
+                          if (userMonthTotal === 0) return null;
+
+                          return (
+                            <div key={u.id} className={`flex items-center gap-2 backdrop-blur-sm px-3 py-1.5 rounded-xl border transition-colors ${isCurrent ? 'bg-white/10 border-white/10' : 'bg-gray-50/80 dark:bg-slate-900/80 border-gray-100 dark:border-slate-700'}`}>
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${u.id === 'u1' ? (isCurrent ? 'bg-white/20' : 'bg-indigo-500') : (isCurrent ? 'bg-white/20' : 'bg-pink-500')}`}>
+                                {u.name.charAt(0)}
+                              </div>
+                              <span className={`text-xs font-bold transition-colors ${isCurrent ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}>
+                                {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userMonthTotal)}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {isOverLimit && (
+                        <div className="mt-3 flex items-center gap-2 text-red-500 bg-red-50/50 dark:bg-red-900/20 p-2 rounded-xl backdrop-blur-sm relative z-10">
+                          <span className="text-lg">⚠️</span>
+                          <span className="text-xs font-bold">{isFuture ? 'Limit aşımı öngörülüyor!' : 'Limit aşıldı!'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              }
+              {monthlyBreakdown.length === 0 && (
+                <div className="text-center py-20 text-gray-400">
+                  <div className="text-6xl mb-4 opacity-50">📊</div>
+                  <p className="font-bold">Henüz işlem yok</p>
+                  <p className="text-sm mt-1">İşlem ekledikçe dönem özetleri burada görünecek</p>
+                </div>
+              )}
+            </>
+          ) : (
+            // Transaction Detail View
+            <>
+              {/* Person Filter Tabs */}
+              <div className="flex gap-2 mb-6 sticky top-0 z-10 pt-2 pb-2 bg-[#F2F4F8] dark:bg-slate-950 transition-colors">
+                {activeUsers.map(u => {
+                  const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
+                  const userMonthTotal = activeTransactions
+                    .filter(t => t.status === 1 && t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
+                    .reduce((acc, curr) => acc + curr.amount, 0);
+
+                  const isSelected = selectedMonthDetail.selectedUserId === u.id;
+
+                  return (
+                    <button
+                      key={u.id}
+                      onClick={() => setSelectedMonthDetail({ ...selectedMonthDetail, selectedUserId: u.id })}
+                      className={`flex-1 py-3 px-4 rounded-[24px] text-sm font-bold transition-all duration-300 border ${isSelected
+                        ? 'bg-indigo-600 text-white border-transparent shadow-lg shadow-indigo-200 dark:shadow-none translate-y-[-2px]'
+                        : 'bg-white/50 dark:bg-slate-800/50 text-gray-500 border-gray-100 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800'
+                        }`}
+                    >
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[11px] uppercase tracking-wider opacity-80">{u.name}</span>
+                        <span className={`text-sm ${isSelected ? 'text-white' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                          {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userMonthTotal)}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Quick Add Button */}
+              <div className="mb-4">
+                <button
+                  onClick={() => {
+                    const userId = selectedMonthDetail.selectedUserId
+                    setNewUser(userId)
+                    handleUserChange(userId)
+
+                    const now = new Date()
+                    const currentMonthStr = now.toISOString().slice(0, 7)
+                    if (selectedMonthDetail.monthKey === currentMonthStr) {
+                      setDate(now.toISOString().split('T')[0])
+                    } else {
+                      setDate(selectedMonthDetail.monthKey + '-01')
+                    }
+
+                    setTransactionStep(1)
+                    setAmount('')
+                    setEditingTransaction(null)
+                    setShowAddModal(true)
+                  }}
+                  className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl p-4 text-white shadow-lg shadow-indigo-200 dark:shadow-none hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
+                >
+                  <Plus size={20} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform duration-300" />
+                  <span className="font-bold">Harcama Yap</span>
+                </button>
+              </div>
+
+              {/* Transaction List */}
+              <div className="space-y-3">
+                {(() => {
+                  const userAccs = activeAccounts.filter(a => a.userId === selectedMonthDetail.selectedUserId).map(a => a.id);
+                  const transactions = activeTransactions
+                    .filter(t => t.status === 1 && t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
+                    .sort((a, b) => b.date.localeCompare(a.date));
+
+                  if (transactions.length === 0) {
+                    return (
+                      <div className="text-center py-10 text-gray-400">
+                        <p className="text-sm">Bu kişi için bu ayda işlem bulunamadı.</p>
+                      </div>
+                    )
+                  }
+
+                  return transactions.map(t => {
+                    const account = activeAccounts.find(a => a.id === t.accountId);
+                    return (
+                      <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <p className="font-bold text-gray-800 dark:text-white text-sm">{t.description}</p>
+                            <p className="text-xs text-gray-400 mt-1">{account?.name}</p>
+                          </div>
+                          <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg ml-3">
+                            {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <span>{new Date(t.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            {t.type === 'taksitli' && <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full font-bold">Taksitli</span>}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleEditTransaction(t)}
+                              className="p-2 rounded-xl bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTransaction(t.id)}
+                              className="p-2 rounded-xl bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </>
+          )}
+        </div>
+        
+        {showReminderModal && (
+          <ReminderModal
+            events={upcomingEvents}
+            onClose={() => setShowReminderModal(false)}
+          />
+        )}
+
+        {showAddModal && (
+          <div className="absolute inset-0 z-[110] flex items-end sm:items-center justify-center pointer-events-none">
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }}></div>
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[90vh] md:h-[85vh] md:max-h-[850px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+              <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{editingTransaction ? 'İşlemi Düzenle' : 'Yeni İşlem'}</h3>
+                  <p className="text-sm text-gray-500 font-medium">{transactionStep === 1 ? 'Tutarı girin' : 'Detayları belirleyin'}</p>
+                </div>
+                <button onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+              </div>
+              <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-1">
+                {transactionStep === 1 ? (
+                  <>
+                    <div className="flex-1 flex flex-col justify-center mb-8">
+                      <div className="relative">
+                        <span className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 text-4xl font-light">{'\u20BA'}</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          className="w-full pl-14 pr-6 py-8 text-6xl font-black text-gray-800 dark:text-white bg-white dark:bg-slate-800 shadow-inner rounded-[40px] border border-gray-100 dark:border-slate-700 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none text-center placeholder-gray-200 dark:placeholder-slate-700"
+                          placeholder="0"
+                          value={amount}
+                          onChange={e => setAmount(e.target.value)}
+                          autoFocus
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (amount) { e.target.blur(); setTransactionStep(2); } } }}
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-auto">
+                      <button
+                        type="button"
+                        onClick={(e) => { if (amount) { document.activeElement?.blur(); setTransactionStep(2); } }}
+                        className={`w-full py-5 rounded-[24px] font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2 group ${amount ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-gray-200 dark:shadow-slate-700 hover:bg-black dark:hover:bg-gray-200 active:scale-[0.98]' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed'}`}
+                        disabled={!amount}
+                      >
+                        <span>Devam Et</span>
+                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-6 animate-slide-up">
+                      <div className="flex items-center gap-2 mb-6" onClick={() => setTransactionStep(1)}>
+                        <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount || '0'))}</span>
+                        <span className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-lg font-bold cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">Düzenle</span>
+                      </div>
+                      <div className="mb-6">
+                        <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">Tarih</label>
+                        <input type="date" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500" value={date} onChange={e => setDate(e.target.value)} />
+                      </div>
+                      <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
+                        {activeUsers.map(u => (
+                          <button key={u.id} type="button" onClick={() => handleUserChange(u.id)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${newUser === u.id ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>{u.name}</button>
+                        ))}
+                      </div>
+                      <div className="space-y-6 mb-6">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">Hesap</label>
+                          <div className="relative">
+                            <select className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 appearance-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all cursor-pointer" value={newAccount} onChange={e => setNewAccount(e.target.value)}>
+                              {activeAccounts.filter(a => a.userId === newUser).map(acc => (
+                                <option key={acc.id} value={acc.id}>{acc.name}</option>
+                              ))}
+                            </select>
+                            <div className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-xs">▼</div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">Açıklama</label>
+                          <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-300 dark:placeholder-gray-600" placeholder="Örn: Market alışverişi" value={description} onChange={e => setDescription(e.target.value)} />
+                        </div>
+                      </div>
+                      <div className="mb-10">
+                        <div className={`flex items-center justify-between p-5 rounded-2xl border cursor-pointer transition-all duration-300 ${isInstallment ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'}`} onClick={() => setIsInstallment(!isInstallment)}>
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-colors ${isInstallment ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400' : 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400'}`}><Calendar size={20} /></div>
+                            <span className={`text-sm font-bold ${isInstallment ? 'text-indigo-900 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400'}`}>Taksitlendir</span>
+                          </div>
+                          <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${isInstallment ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                            <div className={`bg-white w-6 h-6 rounded-full shadow-sm transform transition-transform duration-300 ${isInstallment ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                          </div>
+                        </div>
+                        {isInstallment && (
+                          <div className="mt-6 animate-slide-up">
+                            <div className="grid grid-cols-5 gap-2 mb-6">
+                              {[2, 3, 6, 9, 12].map(count => (
+                                <button key={count} type="button" onClick={() => setInstallmentCount(count)} className={`p-3 rounded-xl text-sm font-bold border-2 transition-all ${installmentCount === count ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 shadow-sm scale-105' : 'border-transparent bg-gray-50 dark:bg-slate-800 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{count}x</button>
+                              ))}
+                            </div>
+                            {amount && !isNaN(parseFloat(amount.replace(',', '.'))) && (
+                              <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100/50 backdrop-blur-sm">
+                                <div className="flex justify-between items-center mb-1">
+                                  <span className="text-indigo-400 text-xs font-bold uppercase tracking-wide">Aylık Ödeme</span>
+                                  <span className="text-indigo-600 font-black text-xl tracking-tight">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')) / installmentCount)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-400 text-xs font-medium">Toplam Tutar</span>
+                                  <span className="text-gray-600 font-bold text-sm">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')))}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-auto pt-4 flex gap-3">
+                        <button type="button" onClick={() => setTransactionStep(1)} className="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 px-6 rounded-[24px] font-bold text-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"><ArrowLeft size={20} /></button>
+                        <button type="submit" className="flex-1 bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-5 rounded-[24px] font-bold text-lg shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2 group">
+                          <span>Kaydet</span>
+                          <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showDeleteConfirmModal && (
+          <div className="absolute inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowDeleteConfirmModal(false)}></div>
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 size={40} className="text-red-500" /></div>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">İşlemi Sil?</h3>
+                <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">Bu işlemi silmek istediğinize emin misiniz?</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setShowDeleteConfirmModal(false)} className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700">Vazgeç</button>
+                <button onClick={confirmDeleteTransaction} className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95">Sil</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showSuccessModal && (
+          <div className="absolute inset-0 z-[110] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowSuccessModal(false)}></div>
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+              <div className="text-center mb-6">
+                <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce"><CheckCircle size={48} className="text-green-500" strokeWidth={2.5} /></div>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Başarılı!</h3>
+                <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">{successMessage}</p>
+              </div>
+              <button onClick={() => setShowSuccessModal(false)} className="w-full bg-gradient-to-r from-green-600 to-green-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95">Tamam</button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-[#F2F4F8] dark:bg-slate-950 transition-colors duration-300 flex items-center justify-center p-0 sm:p-8 font-sans relative overflow-hidden">
 
@@ -975,30 +1445,39 @@ function App() {
           }}
         >
 
-          <header className="px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-3 transition-colors duration-300">
-            {/* Header: Back Button, Status Indicators & Days Left */}
+          <header className="px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-3 sticky top-0 z-20 bg-[#F2F4F8]/80 dark:bg-slate-900/80 backdrop-blur-md transition-colors duration-300">
+            {/* Header: Status Indicators & Days Left */}
             <div className="flex items-center justify-between">
               
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setCurrentView('welcome')}
-                  className="w-10 h-10 shrink-0 bg-white dark:bg-slate-800 shadow-sm rounded-xl flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 transition-all active:scale-95"
-                  title="Giriş Ekranına Dön"
+                  className="w-10 h-10 shrink-0 bg-white dark:bg-slate-800 shadow-sm rounded-xl flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95"
+                  title="Geri"
                 >
                   <ArrowLeft size={20} strokeWidth={2.5} />
                 </button>
 
-                <div className="flex items-center gap-2 text-gray-400 text-[9px] sm:text-[10px] font-black uppercase tracking-widest ml-1 md:ml-0">
-                  <span className={`inline-flex items-center gap-1 sm:gap-1.5 ${isSupabaseConfigured ? 'text-green-500' : 'text-orange-500'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConfigured ? 'bg-green-500' : 'bg-orange-500'} ${isSupabaseConfigured ? 'animate-pulse' : ''}`}></span>
-                    {isSupabaseConfigured ? 'SENKRONİZE' : 'YEREL'}
-                  </span>
-                  <span className="w-1 h-1 bg-gray-300 dark:bg-slate-700 rounded-full"></span>
-                  <span className={`inline-flex items-center gap-1 sm:gap-1.5 ${goldFetchError ? 'text-red-500' : (goldPrices ? 'text-yellow-600 dark:text-yellow-500' : 'text-gray-400')}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${goldFetchError ? 'bg-red-500' : (goldPrices ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400')} `}></span>
-                    {goldFetchError ? 'KUR HATASI' : (goldPrices ? 'CANLI KUR' : 'BEKLENİYOR')}
-                  </span>
-                </div>
+                <button
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className={`w-10 h-10 shrink-0 shadow-sm rounded-xl flex items-center justify-center border transition-all active:scale-95 ${isMenuOpen ? 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-200' : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'}`}
+                  title="Menü"
+                >
+                  <Menu size={20} strokeWidth={2.5} />
+                </button>
+
+                <button
+                  onClick={() => {
+                    setTransactionStep(1)
+                    setEditingTransaction(null)
+                    setAmount('')
+                    setShowAddModal(true)
+                  }}
+                  className="w-10 h-10 shrink-0 bg-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none rounded-xl flex items-center justify-center text-white hover:bg-indigo-700 transition-all active:scale-95"
+                  title="Harcama Ekle"
+                >
+                  <Plus size={20} strokeWidth={3} />
+                </button>
               </div>
 
               {(() => {
@@ -1007,36 +1486,101 @@ function App() {
                 const daysLeft = lastDay.getDate() - now.getDate();
                 return (
                   <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm">
-                    <span className="text-[8px] font-black uppercase mb-0.5 tracking-wider">Ay Sonuna</span>
-                    <span className="text-xs font-black leading-none">{daysLeft === 0 ? "Bugün Son" : `${daysLeft} Gün Kaldı`}</span>
+                    <span className="text-[8px] font-black uppercase mb-0.5 tracking-wider">Yeni Döneme</span>
+                    <span className="text-xs font-black leading-none">{daysLeft === 0 ? "Yarın Yeni Dönem" : `${daysLeft} Gün`}</span>
                   </div>
                 );
               })()}
             </div>
           </header>
 
-          <div className="mx-6 mb-6">
-            <button
-              onClick={() => {
-                setTransactionStep(1)
-                setEditingTransaction(null)
-                setAmount('')
-                setShowAddModal(true)
-              }}
-              className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 rounded-[28px] p-6 text-white shadow-xl shadow-indigo-200 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-between group"
-            >
-              <div className="flex flex-col items-start gap-1">
-                <span className="text-2xl font-black tracking-tight">Harcama Ekle</span>
-                <span className="text-indigo-100 text-xs font-medium">Hızlı işlem başlangıcı</span>
+          {/* Top Menu Grid */}
+          {isMenuOpen && (
+            <div className="mx-6 mb-6 p-6 bg-white dark:bg-slate-800 rounded-[32px] shadow-xl border border-white dark:border-slate-700 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="flex justify-between items-center mb-6 px-1">
+                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Hızlı İşlemler</h3>
+                <button
+                  onClick={() => {
+                    setReorderMode(!reorderMode)
+                    setSwapSource(null)
+                  }}
+                  className={`text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all ${reorderMode ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'}`}
+                >
+                  {reorderMode ? 'Bitti' : 'Düzenle'}
+                </button>
               </div>
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm group-hover:bg-white/30 transition-colors">
-                <Plus size={24} strokeWidth={2.5} />
+              <div className="grid grid-cols-4 gap-4">
+                {menuOrder.map(itemId => {
+                  const isSelected = swapSource === itemId;
+                  const isShake = reorderMode && !swapSource;
+
+                  const handleMenuClick = () => {
+                    if (reorderMode) {
+                      if (!swapSource) {
+                        setSwapSource(itemId)
+                      } else {
+                        if (swapSource === itemId) {
+                          setSwapSource(null)
+                        } else {
+                          const newOrder = [...menuOrder]
+                          const idx1 = newOrder.indexOf(swapSource)
+                          const idx2 = newOrder.indexOf(itemId)
+                          newOrder[idx1] = itemId
+                          newOrder[idx2] = swapSource
+                          setMenuOrder(newOrder)
+                          setSwapSource(null)
+                        }
+                      }
+                    } else {
+                      switch (itemId) {
+                        case 'limit': setLimitModalUser(activeUsers[0]?.id); setShowLimitModal(true); break;
+                        case 'future': setSelectedMonthDetail(null); setCurrentView('budgetDetail'); break;
+                        case 'cards': setShowCardsModal(true); break;
+                        case 'users': setShowUserModal(true); break;
+                        case 'reset': handleResetAllData(); break;
+                        case 'extract': setExtractFilterUser(null); setShowExtractModal(true); break;
+                        case 'portfolio': handleOpenPortfolio(); break;
+                        case 'feedback': setShowFeedbackModal(true); break;
+                        case 'settings': setShowSettingsModal(true); break;
+                      }
+                    }
+                  }
+
+                  let label, IconComponent, colorClass, borderColorClass;
+                  switch (itemId) {
+                    case 'limit': label = 'Limit'; IconComponent = Gauge; break;
+                    case 'future': label = 'Dönemler'; IconComponent = Calendar; break;
+                    case 'cards': label = 'Kartlar'; IconComponent = CreditCard; break;
+                    case 'users': label = 'Kişiler'; IconComponent = Users; break;
+                    case 'feedback': label = 'İstekler'; IconComponent = MessageSquare; break;
+                    case 'reset': label = 'Sıfırla'; IconComponent = Trash2; colorClass = 'bg-red-50 dark:bg-red-900/20 text-red-500/80 dark:text-red-400'; borderColorClass = 'border-red-100 dark:border-red-900/30'; break;
+                    case 'extract': label = 'Ekstre'; IconComponent = Receipt; break;
+                    case 'portfolio': label = 'Portföyüm'; IconComponent = Wallet; colorClass = 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400'; borderColorClass = 'border-yellow-100 dark:border-yellow-900/30'; break;
+                    case 'settings': label = 'Yönetim'; IconComponent = Settings; break;
+                    default: return null;
+                  }
+
+                  return (
+                    <button
+                      key={itemId}
+                      onClick={handleMenuClick}
+                      className={`flex flex-col items-center gap-2 group active:scale-95 transition-all duration-200 outline-none ${isShake ? 'animate-pulse' : ''} ${isSelected ? 'scale-110 z-10' : ''}`}
+                    >
+                      <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-sm border flex items-center justify-center transition-all relative overflow-hidden ${colorClass || 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700'} ${reorderMode ? 'ring-2 ring-indigo-500' : 'group-hover:-translate-y-1'}`}>
+                        <IconComponent size={24} className={`transition-colors ${itemId === 'reset' ? 'text-red-500' : 'text-indigo-600 dark:text-indigo-400'}`} />
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap">{label}</span>
+                    </button>
+                  )
+                })}
               </div>
-            </button>
-          </div>
+            </div>
+          )}
+
+
 
           <div className="mx-6 mb-4">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Kişi Bütçeleri</h3>
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Bütçe Yönetimi</h3>
             <div className="space-y-3 mb-4">
               {activeUsers.map(user => {
                 const userAccountIds = activeAccounts.filter(acc => acc.userId === user.id).map(acc => acc.id)
@@ -1054,8 +1598,8 @@ function App() {
                   <div
                     key={user.id}
                     onClick={() => {
-                      setShowFutureDebtsModal(true)
                       setSelectedMonthDetail({ monthKey: currentMonth, selectedUserId: user.id })
+                      setCurrentView('budgetDetail')
                     }}
                     className="bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
                   >
@@ -1100,133 +1644,55 @@ function App() {
             </div>
           </div>
 
-          <div className="bg-gray-50 dark:bg-slate-900/50 flex-1 rounded-t-[40px] px-6 pt-8 pb-[calc(1.5rem+var(--safe-area-inset-bottom))] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] transition-colors duration-300">
+          <div className="mx-6 mb-8">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Yatırım</h3>
+            <div
+              onClick={handleOpenPortfolio}
+              className="bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-yellow-600 dark:text-yellow-400 shadow-inner group-hover:bg-yellow-500 group-hover:text-white transition-all duration-300">
+                    <Wallet size={20} />
+                  </div>
+                  <div>
+                    <span className="font-bold text-gray-800 dark:text-white text-lg transition-colors">Portföyüm</span>
+                    <p className="text-[10px] text-gray-400 font-medium italic mt-0.5">Varlık ve birikim takibi</p>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-slate-300 group-hover:text-yellow-600 dark:group-hover:text-yellow-400 transition-colors">
+                  <ArrowRight size={20} />
+                </div>
+              </div>
 
-
-
-            <div className="flex justify-between items-center mb-2 px-1">
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">İşlemler</h3>
-              <button
-                onClick={() => {
-                  setReorderMode(!reorderMode)
-                  setSwapSource(null)
-                }}
-                className={`text-xs font-bold px-2 py-1 rounded-lg transition-colors ${reorderMode ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-              >
-                {reorderMode ? 'Bitti' : 'Düzenle'}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-4 gap-4 mb-4">
-              {menuOrder.map(itemId => {
-                const isSelected = swapSource === itemId;
-                const isShake = reorderMode && !swapSource;
-
-                // Handlers
-                const handleMenuClick = () => {
-                  if (reorderMode) {
-                    if (!swapSource) {
-                      setSwapSource(itemId)
-                    } else {
-                      if (swapSource === itemId) {
-                        setSwapSource(null) // Deselect
-                      } else {
-                        // Swap
-                        const newOrder = [...menuOrder]
-                        const idx1 = newOrder.indexOf(swapSource)
-                        const idx2 = newOrder.indexOf(itemId)
-                        newOrder[idx1] = itemId
-                        newOrder[idx2] = swapSource
-                        setMenuOrder(newOrder)
-                        setSwapSource(null)
-                      }
-                    }
-                  } else {
-                    // Normal Action
-                    switch (itemId) {
-                      case 'limit':
-                        setLimitModalUser(activeUsers[0]?.id)
-                        setShowLimitModal(true)
-                        break;
-                      case 'future':
-                        setShowFutureDebtsModal(true)
-                        break;
-                      case 'cards':
-                        setShowCardsModal(true)
-                        break;
-                      case 'users':
-                        setShowUserModal(true)
-                        break;
-                      case 'reset':
-                        handleResetAllData()
-                        break;
-                      case 'extract':
-                        setExtractFilterUser(null)
-                        setShowExtractModal(true)
-                        break;
-                      case 'portfolio':
-                        handleOpenPortfolio()
-                        break;
-                      case 'feedback':
-                        setShowFeedbackModal(true)
-                        break;
-                    }
-                  }
-                }
-
-                // Config
-                let label, IconComponent, colorClass, borderColorClass;
-                switch (itemId) {
-                  case 'limit': label = 'Limit'; IconComponent = Gauge; break;
-                  case 'future': label = 'Dönemler'; IconComponent = Calendar; break;
-                  case 'cards': label = 'Kartlar'; IconComponent = CreditCard; break;
-                  case 'users': label = 'Kişiler'; IconComponent = Users; break;
-                  case 'feedback': label = 'İstekler'; IconComponent = MessageSquare; break;
-                  case 'reset': label = 'Sıfırla'; IconComponent = Trash2; colorClass = 'bg-red-50 dark:bg-red-900/20 text-red-500/80 dark:text-red-400'; borderColorClass = 'border-red-100 dark:border-red-900/30'; break;
-                  case 'extract': label = 'Ekstre'; IconComponent = Receipt; break;
-                  case 'portfolio': label = 'Portföyüm'; IconComponent = Wallet; colorClass = 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400'; borderColorClass = 'border-yellow-100 dark:border-yellow-900/30'; break;
-                  default: return null;
-                }
-
-                return (
-                  <button
-                    key={itemId}
-                    onClick={handleMenuClick}
-                    className={`flex flex-col items-center gap-2 group active:scale-95 transition-all duration-200 outline-none ${isShake ? 'animate-pulse' : ''} ${isSelected ? 'scale-110 z-10' : ''}`}
-                  >
-                    <div className={`
-                      w-16 h-16 sm:w-20 sm:h-20 rounded-[24px] shadow-[0_4px_20px_rgba(0,0,0,0.04)] border flex items-center justify-center transition-all relative overflow-hidden
-                      ${colorClass || 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700'} 
-                      ${borderColorClass || ''}
-                      ${reorderMode ? 'ring-2 ring-offset-2 ring-indigo-500/50 cursor-grab' : 'group-hover:shadow-[0_8px_25px_rgba(0,0,0,0.06)] group-hover:-translate-y-1 cursor-pointer'}
-                      ${isSelected ? 'ring-4 ring-indigo-600 shadow-xl' : ''}
-                    `}>
-                      <div className="relative z-10 flex items-center justify-center w-full h-full">
-                        <IconComponent
-                          size={28}
-                          strokeWidth={1.5}
-                          className={`transition-colors duration-300 ${itemId === 'reset' ? 'text-red-500' : 'text-indigo-600 dark:text-indigo-400 group-hover:text-indigo-700 dark:group-hover:text-indigo-300'}`}
-                          {...(itemId === 'portfolio' ? { className: "text-yellow-600 dark:text-yellow-400" } : {})}
-                          {...(itemId === 'reset' ? { className: "text-red-500 dark:text-red-400" } : {})}
-                        />
-                      </div>
-
-                      {/* Subtle gradient overlay for depth */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 dark:to-transparent pointer-events-none"></div>
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Toplam Varlık</p>
+                  <p className="text-3xl font-black tracking-tight text-gray-800 dark:text-white transition-colors">
+                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(portfolio.lastTotal)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  {lastUpdateTime && (
+                    <div className="flex flex-col items-end">
+                      <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest mb-0.5">Canlı Kur</p>
+                      <p className="text-[10px] text-yellow-600 dark:text-yellow-500 font-black">
+                        {new Date(lastUpdateTime).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
                     </div>
+                  )}
+                </div>
+              </div>
 
-                    <span className={`text-[11px] font-bold tracking-tight text-center whitespace-nowrap ${itemId === 'reset' ? 'text-red-500/80 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'} group-hover:text-gray-800 dark:group-hover:text-gray-200 transition-colors`}>
-                      {label}
-                      {reorderMode && <span className="absolute -top-2 -right-2 bg-indigo-500 text-white w-5 h-5 text-[10px] flex items-center justify-center rounded-full shadow-md border-2 border-white dark:border-slate-900">↕</span>}
-                    </span>
-                  </button>
-                )
-              })}
+              {/* Decorative Background sparkle */}
+              <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-yellow-100/20 dark:bg-yellow-900/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700"></div>
             </div>
-
-
           </div>
+
+
         </div>
+        
+        {/* Floating Add Spending Button Removed and Moved to Header */}
       </div>
 
 
@@ -1496,236 +1962,7 @@ function App() {
         )
       }
 
-      {
-        showFutureDebtsModal && (
-          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowFutureDebtsModal(false); setSelectedMonthDetail(null); }}></div>
-            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[85svh] md:h-[85vh] md:max-h-[850px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
-              <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
 
-              <div className="flex justify-between items-start mb-8">
-                <div>
-                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{selectedMonthDetail ? 'İşlem Detayları' : 'Dönem Özetleri'}</h3>
-                  <p className="text-sm text-gray-500 font-medium mt-1">{selectedMonthDetail ? 'Kişi bazlı harcamalar' : 'Aylık harcama geçmişi'}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedMonthDetail && (
-                    <button onClick={() => setSelectedMonthDetail(null)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Geri">←</button>
-                  )}
-                  <button onClick={() => { setShowFutureDebtsModal(false); setSelectedMonthDetail(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
-                </div>
-              </div>
-
-              <div ref={futureDebtsListRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
-                {!selectedMonthDetail ? (
-                  // Month List View
-                  <>
-                    {monthlyBreakdown
-                      .sort((a, b) => b.date.localeCompare(a.date))
-                      .map(item => {
-                        const dateObj = new Date(item.date + '-01');
-                        const monthName = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
-                        const totalLimit = Object.values(userLimits).reduce((a, b) => a + b, 0);
-                        const isOverLimit = item.total > totalLimit;
-                        const isFuture = item.date > currentMonth;
-                        const isCurrent = item.date === currentMonth;
-
-                        return (
-                          <div
-                            key={item.date}
-                            ref={isCurrent ? currentMonthRef : null}
-                            onClick={() => setSelectedMonthDetail({ monthKey: item.date, selectedUserId: activeUsers[0]?.id })}
-                            className={`p-6 rounded-[32px] border relative overflow-hidden group transition-all duration-300 cursor-pointer ${isCurrent
-                              ? 'bg-indigo-600 text-white border-transparent shadow-2xl z-10'
-                              : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 shadow-[0_4px_20px_rgba(0,0,0,0.02)] hover:scale-[1.01]'
-                              }`}
-                          >
-                            {isCurrent && (
-                              <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none"></div>
-                            )}
-                            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl transition-colors ${isCurrent ? 'bg-white/10' : 'bg-indigo-50/50 dark:bg-indigo-900/20 group-hover:bg-indigo-100/50 dark:group-hover:bg-indigo-900/30'}`}></div>
-
-                            <div className="flex flex-col items-center gap-2 mb-4 relative z-10 text-center">
-                              <div className="flex flex-wrap shadow-sm justify-center items-center gap-2">
-                                <span className={`font-bold text-xl transition-colors ${isCurrent ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{monthName}</span>
-                                {isCurrent && <span className="text-[10px] font-bold px-2 py-0.5 bg-white/20 text-white rounded-full backdrop-blur-md">BU AY</span>}
-                                {isFuture && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isCurrent ? 'bg-white/10 text-white' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'}`}>GELECEK</span>}
-                              </div>
-                              <span className={`text-2xl font-black tracking-tight ${isOverLimit ? 'text-red-400' : (isCurrent ? 'text-indigo-200' : 'text-indigo-600 dark:text-indigo-400')}`}>
-                                {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.total)}
-                              </span>
-                            </div>
-
-                            <div className={`h-2.5 rounded-full overflow-hidden mb-5 relative z-10 ${isCurrent ? 'bg-white/10' : 'bg-gray-100 dark:bg-slate-900'}`}>
-                              <div
-                                className={`h-full rounded-full transition-all duration-1000 ${isOverLimit ? 'bg-red-400' : (isCurrent ? 'bg-white' : 'bg-gradient-to-r from-indigo-400 to-purple-400')}`}
-                                style={{ width: `${Math.min((item.total / totalLimit) * 100, 100)}%` }}
-                              ></div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-3 justify-center relative z-10">
-                              {activeUsers.map(u => {
-                                const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
-                                const userMonthTotal = activeTransactions
-                                  .filter(t => t.status === 1 && t.date.startsWith(item.date) && userAccs.includes(t.accountId))
-                                  .reduce((acc, curr) => acc + curr.amount, 0);
-
-                                if (userMonthTotal === 0) return null;
-
-                                return (
-                                  <div key={u.id} className={`flex items-center gap-2 backdrop-blur-sm px-3 py-1.5 rounded-xl border transition-colors ${isCurrent ? 'bg-white/10 border-white/10' : 'bg-gray-50/80 dark:bg-slate-900/80 border-gray-100 dark:border-slate-700'}`}>
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${u.id === 'u1' ? (isCurrent ? 'bg-white/20' : 'bg-indigo-500') : (isCurrent ? 'bg-white/20' : 'bg-pink-500')}`}>
-                                      {u.name.charAt(0)}
-                                    </div>
-                                    <span className={`text-xs font-bold transition-colors ${isCurrent ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}>
-                                      {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userMonthTotal)}
-                                    </span>
-                                  </div>
-                                )
-                              })}
-                            </div>
-
-                            {isOverLimit && (
-                              <div className="mt-3 flex items-center gap-2 text-red-500 bg-red-50/50 dark:bg-red-900/20 p-2 rounded-xl backdrop-blur-sm relative z-10">
-                                <span className="text-lg">⚠️</span>
-                                <span className="text-xs font-bold">{isFuture ? 'Limit aşımı öngörülüyor!' : 'Limit aşıldı!'}</span>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })
-                    }
-                    {monthlyBreakdown.length === 0 && (
-                      <div className="text-center py-20 text-gray-400">
-                        <div className="text-6xl mb-4 opacity-50">📊</div>
-                        <p className="font-bold">Henüz işlem yok</p>
-                        <p className="text-sm mt-1">İşlem ekledikçe dönem özetleri burada görünecek</p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  // Transaction Detail View
-                  <>
-                    {/* Person Filter Tabs */}
-                    <div className="flex gap-2 mb-6 sticky top-0 z-10 pt-2 pb-2">
-                      {activeUsers.map(u => {
-                        const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
-                        const userMonthTotal = activeTransactions
-                          .filter(t => t.status === 1 && t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
-                          .reduce((acc, curr) => acc + curr.amount, 0);
-
-                        const isSelected = selectedMonthDetail.selectedUserId === u.id;
-
-                        return (
-                          <button
-                            key={u.id}
-                            onClick={() => setSelectedMonthDetail({ ...selectedMonthDetail, selectedUserId: u.id })}
-                            className={`flex-1 py-3 px-4 rounded-[24px] text-sm font-bold transition-all duration-300 border ${isSelected
-                              ? 'bg-indigo-600 text-white border-transparent shadow-lg shadow-indigo-200 dark:shadow-none translate-y-[-2px]'
-                              : 'bg-white/50 dark:bg-slate-800/50 text-gray-500 border-gray-100 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800'
-                              }`}
-                          >
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className="text-[11px] uppercase tracking-wider opacity-80">{u.name}</span>
-                              <span className={`text-sm ${isSelected ? 'text-white' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                                {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userMonthTotal)}
-                              </span>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {/* Quick Add Button */}
-                    <div className="mb-4">
-                      <button
-                        onClick={() => {
-                          const userId = selectedMonthDetail.selectedUserId
-                          setNewUser(userId)
-                          handleUserChange(userId)
-
-                          // Set date: if current month, today; else 1st of that month
-                          const now = new Date()
-                          const currentMonthStr = now.toISOString().slice(0, 7)
-                          if (selectedMonthDetail.monthKey === currentMonthStr) {
-                            setDate(now.toISOString().split('T')[0])
-                          } else {
-                            setDate(selectedMonthDetail.monthKey + '-01')
-                          }
-
-                          setTransactionStep(1)
-                          setAmount('')
-                          setEditingTransaction(null)
-                          setShowAddModal(true)
-                        }}
-                        className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl p-4 text-white shadow-lg shadow-indigo-200 dark:shadow-none hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
-                      >
-                        <Plus size={20} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform duration-300" />
-                        <span className="font-bold">Harcama Yap</span>
-                      </button>
-                    </div>
-
-                    {/* Transaction List */}
-                    <div className="space-y-3">
-                      {(() => {
-                        const userAccs = activeAccounts.filter(a => a.userId === selectedMonthDetail.selectedUserId).map(a => a.id);
-                        const transactions = activeTransactions
-                          .filter(t => t.status === 1 && t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
-                          .sort((a, b) => b.date.localeCompare(a.date));
-
-                        if (transactions.length === 0) {
-                          return (
-                            <div className="text-center py-10 text-gray-400">
-                              <p className="text-sm">Bu kişi için bu ayda işlem bulunamadı.</p>
-                            </div>
-                          )
-                        }
-
-                        return transactions.map(t => {
-                          const account = activeAccounts.find(a => a.id === t.accountId);
-                          return (
-                            <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="flex-1">
-                                  <p className="font-bold text-gray-800 dark:text-white text-sm">{t.description}</p>
-                                  <p className="text-xs text-gray-400 mt-1">{account?.name}</p>
-                                </div>
-                                <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg ml-3">
-                                  {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
-                                </p>
-                              </div>
-                              <div className="flex items-center justify-between mt-2">
-                                <div className="flex items-center gap-2 text-xs text-gray-400">
-                                  <span>{new Date(t.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                  {t.type === 'taksitli' && <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full font-bold">Taksitli</span>}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    onClick={() => handleEditTransaction(t)}
-                                    className="p-2 rounded-xl bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                                  >
-                                    <Edit2 size={16} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteTransaction(t.id)}
-                                    className="p-2 rounded-xl bg-gray-50 dark:bg-slate-700 text-gray-400 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })
-                      })()}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      }
 
       {
         selectedUserSummary && (
@@ -2258,6 +2495,15 @@ function App() {
           onClose={() => setShowReminderModal(false)}
         />
       )}
+
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onOpenUsers={() => setShowUserModal(true)}
+        onOpenCards={() => setShowCardsModal(true)}
+        onOpenLimit={() => { setLimitModalUser(activeUsers[0]?.id); setShowLimitModal(true); }}
+        onResetAll={handleResetAllData}
+      />
     </div >
   )
 }

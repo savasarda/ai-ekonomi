@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { 
     Wallet, ShoppingCart, Lightbulb, Sun, Moon, 
     Sparkles, Calendar as CalendarIcon, ChevronRight, 
-    Bell, ArrowRight, User
+    Bell, ArrowRight, User, MessageSquare
 } from 'lucide-react';
 
 const financialTips = [
@@ -16,7 +16,7 @@ const financialTips = [
     "Acil durum fonu oluştur. Kenarda en az 3 aylık giderin kadar nakit bulundur."
 ];
 
-const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders }) => {
+const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders, onShowFeedback }) => {
     const [currentTip] = useState(financialTips[Math.floor(Math.random() * financialTips.length)]);
     const today = new Date();
     const formattedDate = today.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -31,8 +31,8 @@ const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders }) 
             <div className="w-full max-w-md md:max-w-[760px] relative z-10 flex flex-col h-full justify-center pt-8 pb-4 md:pt-16 md:pb-8 overflow-y-auto custom-scrollbar">
                 
                 {/* 1. Top Header Area: Tip + Theme Toggle */}
-                <div className="flex gap-3 mb-4 md:mb-10 items-start">
-                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-[24px] md:rounded-[28px] p-4 md:p-5 shadow-xl shadow-slate-200/50 dark:shadow-none border border-white dark:border-slate-800 relative overflow-hidden">
+                <div className="flex gap-3 mb-4 md:mb-10 items-stretch">
+                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-[24px] md:rounded-[28px] p-4 md:p-5 shadow-xl shadow-slate-200/50 dark:shadow-none border border-white dark:border-slate-800 relative overflow-hidden flex flex-col justify-center">
                         <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-2">
                             <Sparkles size={14} className="fill-current" />
                             <span>Günün İpucu</span>
@@ -42,12 +42,21 @@ const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders }) 
                         </p>
                     </div>
 
-                    <button
-                        onClick={toggleTheme}
-                        className="w-14 h-14 md:w-16 md:h-16 shrink-0 bg-white dark:bg-slate-900 rounded-[20px] md:rounded-[24px] border border-white dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
-                    >
-                        {darkMode ? <Sun size={28} className="text-yellow-400 fill-current" /> : <Moon size={28} className="text-indigo-600 fill-current" />}
-                    </button>
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={toggleTheme}
+                            className="w-14 h-14 md:w-16 md:h-16 shrink-0 bg-white dark:bg-slate-900 rounded-[20px] md:rounded-[24px] border border-white dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+                        >
+                            {darkMode ? <Sun size={28} className="text-yellow-400 fill-current" /> : <Moon size={28} className="text-indigo-600 fill-current" />}
+                        </button>
+
+                        <button
+                            onClick={onShowFeedback}
+                            className="w-14 h-14 md:w-16 md:h-16 shrink-0 bg-white dark:bg-slate-900 rounded-[20px] md:rounded-[24px] border border-white dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none flex items-center justify-center hover:scale-110 active:scale-95 transition-all text-indigo-600 dark:text-indigo-400"
+                        >
+                            <MessageSquare size={28} className="fill-current/10" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* 2. Welcome Greeting & Date */}
