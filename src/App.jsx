@@ -231,6 +231,7 @@ function App() {
       const { data: transactions } = await supabase.from('transactions').select('*')
       const { data: userLimitsData } = await supabase.from('user_limits').select('*')
       const { data: portfolioData } = await supabase.from('portfolios').select('*')
+      const { data: logsData } = await supabase.from('portfolio_logs').select('*').order('created_at', { ascending: false }).limit(1)
 
       if (users && accounts && transactions) {
         // Transform snake_case from DB to camelCase for App
@@ -265,10 +266,12 @@ function App() {
       if (portfolioData && portfolioData.length > 0) {
         try {
           const p = portfolioData[0];
+          const latestLog = logsData && logsData.length > 0 ? logsData[0] : null;
+          
           if (p) {
             const items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || {});
             setPortfolio({
-              lastTotal: p.last_total,
+              lastTotal: latestLog ? latestLog.total_value : p.last_total,
               lastUpdated: p.last_updated,
               items: items,
               customPrices: items.customPrices || {}
@@ -2509,8 +2512,10 @@ function App() {
             </div>
 
             <input
-              type="password"
+              type="tel"
+              pattern="[0-9]*"
               inputMode="numeric"
+              style={{ WebkitTextSecurity: 'disc' }}
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
