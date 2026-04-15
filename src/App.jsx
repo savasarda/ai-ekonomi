@@ -59,7 +59,7 @@ function App() {
 
   // Edit State
   const [editingTransaction, setEditingTransaction] = useState(null)
-  
+
   // User Symbol Selection State
   const [showSymbolPicker, setShowSymbolPicker] = useState(false)
   const [selectedUserForSymbol, setSelectedUserForSymbol] = useState(null)
@@ -198,7 +198,7 @@ function App() {
   // Auto-scroll to current month in Future Debts Modal and Budget Detail List
   useEffect(() => {
     const isShowingList = (showFutureDebtsModal || (currentView === 'budgetDetail' && !selectedMonthDetail));
-    
+
     if (isShowingList) {
       if (futureDebtsScrollTimeoutRef.current) {
         clearTimeout(futureDebtsScrollTimeoutRef.current)
@@ -267,7 +267,7 @@ function App() {
         try {
           const p = portfolioData[0];
           const latestLog = logsData && logsData.length > 0 ? logsData[0] : null;
-          
+
           if (p) {
             const items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || {});
             setPortfolio({
@@ -330,17 +330,17 @@ function App() {
   const handleTouchEnd = async () => {
     // Check for Left-to-Right swipe (Back)
     if (touchStartX && touchEndX && (touchEndX - touchStartX > 120)) {
-        if (currentView === 'budgetDetail') {
-          setCurrentView('economy');
-          setSelectedMonthDetail(null);
-        } else if (currentView === 'portfolio') {
-          setCurrentView('economy');
-        } else {
-          setCurrentView('welcome');
-        }
-        setTouchStartX(0)
-        setTouchEndX(0)
-        return
+      if (currentView === 'budgetDetail') {
+        setCurrentView('economy');
+        setSelectedMonthDetail(null);
+      } else if (currentView === 'portfolio') {
+        setCurrentView('economy');
+      } else {
+        setCurrentView('welcome');
+      }
+      setTouchStartX(0)
+      setTouchEndX(0)
+      return
     }
 
     if (pullMoveY > 100) { // Threshold to trigger refresh
@@ -1031,7 +1031,7 @@ function App() {
   // Render Budget Detail View
   if (currentView === 'budgetDetail') {
     return (
-      <div 
+      <div
         className="fixed inset-0 bg-[#F2F4F8] dark:bg-slate-950 z-[100] flex flex-col animate-in slide-in-from-right duration-300"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -1265,7 +1265,7 @@ function App() {
             </>
           )}
         </div>
-        
+
         {showReminderModal && (
           <ReminderModal
             events={upcomingEvents}
@@ -1312,7 +1312,12 @@ function App() {
                       </div>
                       <div className="mb-6">
                         <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">Tarih</label>
-                        <input type="date" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500" value={date} onChange={e => setDate(e.target.value)} />
+                        <div className="flex items-center gap-2">
+                          <input id="date-input-1" type="date" className="flex-1 p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500" value={date} onChange={e => setDate(e.target.value)} />
+                          <button type="button" onClick={() => document.getElementById('date-input-1').showPicker()} className="w-12 h-12 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 active:scale-95 transition-all shrink-0">
+                            <Calendar size={20} />
+                          </button>
+                        </div>
                       </div>
                       <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
                         {activeUsers.map(u => (
@@ -1520,7 +1525,7 @@ function App() {
           <header className="px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-3 sticky top-0 z-20 bg-[#F2F4F8]/80 dark:bg-slate-900/80 backdrop-blur-md transition-colors duration-300">
             {/* Header: Status Indicators & Days Left */}
             <div className="flex items-center justify-between">
-              
+
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setCurrentView('welcome')}
@@ -1777,7 +1782,7 @@ function App() {
 
 
         </div>
-        
+
         {/* Floating Add Spending Button Removed and Moved to Header */}
       </div>
 
@@ -1901,12 +1906,18 @@ function App() {
 
                       <div className="mb-6">
                         <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">Tarih</label>
-                        <input
-                          type="date"
-                          className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500"
-                          value={date}
-                          onChange={e => setDate(e.target.value)}
-                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            id="date-input-2"
+                            type="date"
+                            className="flex-1 p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500"
+                            value={date}
+                            onChange={e => setDate(e.target.value)}
+                          />
+                          <button type="button" onClick={() => document.getElementById('date-input-2').showPicker()} className="w-12 h-12 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 active:scale-95 transition-all shrink-0">
+                            <Calendar size={20} />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
