@@ -721,6 +721,16 @@ function App() {
     setInstallmentCount(3)
     setTransactionStep(1)
     setShowAddModal(false)
+
+    // Show success notification
+    if (editingTransaction) {
+      setSuccessMessage('İşlem başarıyla güncellendi.')
+    } else if (isInstallment) {
+      setSuccessMessage(`${installmentCount} taksitli işlem başarıyla kaydedildi.`)
+    } else {
+      setSuccessMessage('İşlem başarıyla kaydedildi.')
+    }
+    setShowSuccessModal(true)
   }
 
   const handleAddCard = () => {
