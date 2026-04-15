@@ -1312,7 +1312,7 @@ function App() {
                       </div>
                       <div className="mb-6">
                         <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">Tarih</label>
-                        <input type="date" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500" value={date} onChange={e => setDate(e.target.value)} />
+                        <input type="date" className="w-48 p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500" value={date} onChange={e => setDate(e.target.value)} />
                       </div>
                       <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
                         {activeUsers.map(u => (
@@ -1903,7 +1903,7 @@ function App() {
                         <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">Tarih</label>
                         <input
                           type="date"
-                          className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500"
+                          className="w-48 p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500"
                           value={date}
                           onChange={e => setDate(e.target.value)}
                         />
