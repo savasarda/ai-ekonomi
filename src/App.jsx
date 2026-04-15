@@ -9,7 +9,7 @@ import ReminderModal from './components/Modals/ReminderModal'
 import SettingsModal from './components/Modals/SettingsModal'
 
 import { moneyTips } from './data/moneyTips'
-import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer, Menu, ChevronDown, ChevronUp, Settings } from 'lucide-react'
+import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer, Menu, ChevronDown, ChevronUp, Settings, Eye, EyeOff } from 'lucide-react'
 
 import WelcomeScreen from './components/WelcomeScreen'
 import NeedsList from './components/NeedsList'
@@ -59,6 +59,11 @@ function App() {
 
   // Edit State
   const [editingTransaction, setEditingTransaction] = useState(null)
+  
+  // User Symbol Selection State
+  const [showSymbolPicker, setShowSymbolPicker] = useState(false)
+  const [selectedUserForSymbol, setSelectedUserForSymbol] = useState(null)
+  const [availableSymbols] = useState(['👤', '👨', '👩', '👔', '🏠', '👶', '🐱', '🐶', '🚗', '🚲', '🍕', '☕', '🎮', '💡', '💰', '📉', '📈', '🚀', '⭐', '❤️'])
 
   // Account Detail Modal State (Drill-down from Account Summaries)
   const [selectedUserSummary, setSelectedUserSummary] = useState(null)
@@ -164,6 +169,16 @@ function App() {
     }
   }, [darkMode])
 
+
+  // Balance Privacy State
+  const [isBalanceHidden, setIsBalanceHidden] = useState(() => {
+    return localStorage.getItem('isBalanceHidden') === 'true'
+  })
+
+  // Save privacy state to localStorage
+  useEffect(() => {
+    localStorage.setItem('isBalanceHidden', isBalanceHidden)
+  }, [isBalanceHidden])
 
   // Supabase Sync Logic
   const isSupabaseConfigured = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -728,6 +743,7 @@ function App() {
     const newUserObj = {
       id: 'u' + (data.users.length + 1) + Math.random().toString(36).substr(2, 5),
       name: newUserName.trim(),
+      symbol: newUserName.trim().charAt(0),
       status: 1
     }
     setData(prev => ({
@@ -737,6 +753,15 @@ function App() {
     setNewUserName('')
     // Also set a default limit for the new user
     setUserLimits(prev => ({ ...prev, [newUserObj.id]: 10000 }))
+  }
+
+  const handleUpdateUserSymbol = (userId, symbol) => {
+    setData(prev => ({
+      ...prev,
+      users: prev.users.map(u => u.id === userId ? { ...u, symbol } : u)
+    }))
+    setShowSymbolPicker(false)
+    setSelectedUserForSymbol(null)
   }
 
   const handleDeleteUser = (userId) => {
@@ -1090,8 +1115,8 @@ function App() {
 
                           return (
                             <div key={u.id} className={`flex items-center gap-2 backdrop-blur-sm px-3 py-1.5 rounded-xl border transition-colors ${isCurrent ? 'bg-white/10 border-white/10' : 'bg-gray-50/80 dark:bg-slate-900/80 border-gray-100 dark:border-slate-700'}`}>
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm ${u.id === 'u1' ? (isCurrent ? 'bg-white/20' : 'bg-indigo-500') : (isCurrent ? 'bg-white/20' : 'bg-pink-500')}`}>
-                                {u.name.charAt(0)}
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold text-white shadow-sm transition-transform hover:scale-110 ${u.id === 'u1' ? (isCurrent ? 'bg-white/20' : 'bg-indigo-500') : (isCurrent ? 'bg-white/20' : 'bg-pink-500')}`}>
+                                {u.symbol || u.name.charAt(0)}
                               </div>
                               <span className={`text-xs font-bold transition-colors ${isCurrent ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}>
                                 {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userMonthTotal)}
@@ -1123,7 +1148,7 @@ function App() {
             // Transaction Detail View
             <>
               {/* Person Filter Tabs */}
-              <div className="flex gap-2 mb-6 sticky top-0 z-10 pt-2 pb-2 bg-[#F2F4F8] dark:bg-slate-950 transition-colors">
+              <div className="flex flex-wrap gap-2 mb-6 transition-colors">
                 {activeUsers.map(u => {
                   const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
                   const userMonthTotal = activeTransactions
@@ -1176,7 +1201,7 @@ function App() {
                   className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl p-4 text-white shadow-lg shadow-indigo-200 dark:shadow-none hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
                 >
                   <Plus size={20} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform duration-300" />
-                  <span className="font-bold">Harcama Yap</span>
+                  <span className="font-bold">Harcama Ekle</span>
                 </button>
               </div>
 
@@ -1248,19 +1273,19 @@ function App() {
         {showAddModal && (
           <div className="absolute inset-0 z-[110] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }}></div>
-            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[90vh] md:h-[85vh] md:max-h-[850px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[92vh] md:h-[85vh] md:max-h-[850px] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors overflow-x-hidden">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
-              <div className="flex justify-between items-center mb-8">
+              <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{editingTransaction ? 'İşlemi Düzenle' : 'Yeni İşlem'}</h3>
                   <p className="text-sm text-gray-500 font-medium">{transactionStep === 1 ? 'Tutarı girin' : 'Detayları belirleyin'}</p>
                 </div>
                 <button onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
               </div>
-              <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-1">
-                {transactionStep === 1 ? (
-                  <>
-                    <div className="flex-1 flex flex-col justify-center mb-8">
+              <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pr-1">
+                  {transactionStep === 1 ? (
+                    <div className="flex-1 flex flex-col justify-center mb-6 py-12">
                       <div className="relative">
                         <span className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 text-4xl font-light">{'\u20BA'}</span>
                         <input
@@ -1276,22 +1301,9 @@ function App() {
                         />
                       </div>
                     </div>
-                    <div className="mt-auto">
-                      <button
-                        type="button"
-                        onClick={(e) => { if (amount) { document.activeElement?.blur(); setTransactionStep(2); } }}
-                        className={`w-full py-5 rounded-[24px] font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2 group ${amount ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-gray-200 dark:shadow-slate-700 hover:bg-black dark:hover:bg-gray-200 active:scale-[0.98]' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed'}`}
-                        disabled={!amount}
-                      >
-                        <span>Devam Et</span>
-                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="mb-6 animate-slide-up">
-                      <div className="flex items-center gap-2 mb-6" onClick={() => setTransactionStep(1)}>
+                  ) : (
+                    <div className="animate-slide-up space-y-6">
+                      <div className="flex flex-wrap items-center gap-2 mb-4" onClick={() => setTransactionStep(1)}>
                         <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount || '0'))}</span>
                         <span className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-lg font-bold cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">Düzenle</span>
                       </div>
@@ -1299,7 +1311,7 @@ function App() {
                         <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">Tarih</label>
                         <input type="date" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500" value={date} onChange={e => setDate(e.target.value)} />
                       </div>
-                      <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
+                      <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
                         {activeUsers.map(u => (
                           <button key={u.id} type="button" onClick={() => handleUserChange(u.id)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${newUser === u.id ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>{u.name}</button>
                         ))}
@@ -1321,7 +1333,7 @@ function App() {
                           <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-300 dark:placeholder-gray-600" placeholder="Örn: Market alışverişi" value={description} onChange={e => setDescription(e.target.value)} />
                         </div>
                       </div>
-                      <div className="mb-10">
+                      <div className="mb-6">
                         <div className={`flex items-center justify-between p-5 rounded-2xl border cursor-pointer transition-all duration-300 ${isInstallment ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'}`} onClick={() => setIsInstallment(!isInstallment)}>
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-colors ${isInstallment ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400' : 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400'}`}><Calendar size={20} /></div>
@@ -1333,36 +1345,91 @@ function App() {
                         </div>
                         {isInstallment && (
                           <div className="mt-6 animate-slide-up">
-                            <div className="grid grid-cols-5 gap-2 mb-6">
+                            <div className="grid grid-cols-5 gap-1.5 sm:gap-2 mb-4">
                               {[2, 3, 6, 9, 12].map(count => (
-                                <button key={count} type="button" onClick={() => setInstallmentCount(count)} className={`p-3 rounded-xl text-sm font-bold border-2 transition-all ${installmentCount === count ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 shadow-sm scale-105' : 'border-transparent bg-gray-50 dark:bg-slate-800 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700'}`}>{count}x</button>
+                                <button
+                                  key={count}
+                                  type="button"
+                                  onClick={() => setInstallmentCount(count)}
+                                  className={`py-3 px-1.5 rounded-2xl transition-all duration-300 flex items-center justify-center gap-1 border-2 ${installmentCount === count
+                                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/40 scale-105 z-10'
+                                    : 'border-gray-100 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/30 text-gray-500 dark:text-gray-400 hover:border-gray-200 dark:hover:border-slate-700'
+                                    }`}
+                                >
+                                  <span className="text-base font-black tracking-tight">{count}</span>
+                                  <span className="text-[10px] font-bold opacity-80 mt-0.5">ay</span>
+                                </button>
                               ))}
                             </div>
+
+                            <div className="flex items-center justify-center gap-3 mb-6">
+                              <div className="h-px bg-gray-100 dark:bg-slate-800 flex-1"></div>
+                              <div className="relative w-32">
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  placeholder="Diğer Seçim"
+                                  value={![2, 3, 6, 9, 12].includes(installmentCount) && installmentCount > 0 ? installmentCount : ''}
+                                  onChange={(e) => setInstallmentCount(parseInt(e.target.value) || 0)}
+                                  className={`w-full py-2 px-3 rounded-xl text-center text-sm font-black border-2 outline-none transition-all placeholder:text-[10px] placeholder:font-bold ${![2, 3, 6, 9, 12].includes(installmentCount) && installmentCount > 0
+                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 shadow-sm pr-7'
+                                    : 'border-gray-100 dark:border-slate-800 bg-transparent text-gray-400 focus:border-indigo-300'
+                                    }`}
+                                />
+                                {![2, 3, 6, 9, 12].includes(installmentCount) && installmentCount > 0 && (
+                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-indigo-400 pointer-events-none animate-fade-in">ay</span>
+                                )}
+                              </div>
+                              <div className="h-px bg-gray-100 dark:bg-slate-800 flex-1"></div>
+                            </div>
                             {amount && !isNaN(parseFloat(amount.replace(',', '.'))) && (
-                              <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100/50 backdrop-blur-sm">
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className="text-indigo-400 text-xs font-bold uppercase tracking-wide">Aylık Ödeme</span>
-                                  <span className="text-indigo-600 font-black text-xl tracking-tight">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')) / installmentCount)}</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-gray-400 text-xs font-medium">Toplam Tutar</span>
-                                  <span className="text-gray-600 font-bold text-sm">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')))}</span>
+                              <div className="bg-white/50 dark:bg-slate-800/50 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm backdrop-blur-sm">
+                                <div className="space-y-4">
+                                  <div className="flex justify-between items-baseline">
+                                    <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">Aylık Ödeme</span>
+                                    <div className="text-right">
+                                      <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')) / installmentCount)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="h-px bg-gray-100 dark:bg-slate-700 w-full"></div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-400 dark:text-gray-500 text-xs font-medium">Toplam Tutar</span>
+                                    <span className="text-gray-600 dark:text-gray-400 font-bold text-sm">
+                                      {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')))}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             )}
                           </div>
                         )}
                       </div>
-                      <div className="mt-auto pt-4 flex gap-3">
-                        <button type="button" onClick={() => setTransactionStep(1)} className="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 px-6 rounded-[24px] font-bold text-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"><ArrowLeft size={20} /></button>
-                        <button type="submit" className="flex-1 bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-5 rounded-[24px] font-bold text-lg shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2 group">
-                          <span>Kaydet</span>
-                          <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                        </button>
-                      </div>
                     </div>
-                  </>
-                )}
+                  )}
+                </div>
+                <div className="pt-6 border-t border-gray-100 dark:border-slate-800 mt-auto">
+                  {transactionStep === 1 ? (
+                    <button
+                      type="button"
+                      onClick={(e) => { if (amount) { document.activeElement?.blur(); setTransactionStep(2); } }}
+                      className={`w-full py-5 rounded-2xl font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2 group ${amount ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-gray-200 dark:shadow-slate-700 hover:bg-black dark:hover:bg-gray-200 active:scale-[0.98]' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed'}`}
+                      disabled={!amount}
+                    >
+                      <span>Devam Et</span>
+                      <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  ) : (
+                    <div className="flex gap-3">
+                      <button type="button" onClick={() => setTransactionStep(1)} className="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 px-6 rounded-2xl font-bold text-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"><ArrowLeft size={18} /></button>
+                      <button type="submit" className="flex-1 bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-5 rounded-2xl font-bold text-lg shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2 group">
+                        <span>Kaydet</span>
+                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </form>
             </div>
           </div>
@@ -1406,9 +1473,11 @@ function App() {
     <div className="min-h-screen bg-[#F2F4F8] dark:bg-slate-950 transition-colors duration-300 flex items-center justify-center p-0 sm:p-8 font-sans relative overflow-hidden">
 
 
-      {/* Background Blobs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-300/30 dark:bg-purple-900/20 rounded-full blur-[100px] animate-fade-in"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-300/30 dark:bg-indigo-900/20 rounded-full blur-[100px] animate-fade-in delay-100"></div>
+      {/* Background Blobs - Wrapped in a constrained container to prevent horizontal scroll */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-300/30 dark:bg-purple-900/20 rounded-full blur-[100px] animate-fade-in"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-300/30 dark:bg-indigo-900/20 rounded-full blur-[100px] animate-fade-in delay-100"></div>
+      </div>
 
       <div className="w-full max-w-[480px] md:max-w-[760px] bg-[#F8FAFC] dark:bg-slate-900 h-screen md:h-[92vh] md:max-h-[1000px] md:rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col md:border-[8px] md:border-white dark:md:border-slate-800 ring-1 ring-black/5 z-10 transition-colors duration-300">
 
@@ -1473,10 +1542,11 @@ function App() {
                     setAmount('')
                     setShowAddModal(true)
                   }}
-                  className="w-10 h-10 shrink-0 bg-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none rounded-xl flex items-center justify-center text-white hover:bg-indigo-700 transition-all active:scale-95"
+                  className="h-9 px-3 shrink-0 bg-indigo-600 shadow-lg shadow-indigo-100 dark:shadow-none rounded-xl flex items-center justify-center gap-1.5 text-white hover:bg-indigo-700 transition-all active:scale-95"
                   title="Harcama Ekle"
                 >
-                  <Plus size={20} strokeWidth={3} />
+                  <Plus size={16} strokeWidth={3} />
+                  <span className="text-[10px] font-black uppercase tracking-tight">Harcama Ekle</span>
                 </button>
               </div>
 
@@ -1509,7 +1579,7 @@ function App() {
                   {reorderMode ? 'Bitti' : 'Düzenle'}
                 </button>
               </div>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4 justify-items-center">
                 {menuOrder.map(itemId => {
                   const isSelected = swapSource === itemId;
                   const isShake = reorderMode && !swapSource;
@@ -1603,10 +1673,9 @@ function App() {
                     }}
                     className="bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
                   >
-
                     <div className="flex items-center gap-3 mb-4">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm text-white shadow-lg shadow-indigo-200 ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
-                        {user.name.charAt(0)}
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-indigo-200 ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
+                        {user.symbol || user.name.charAt(0)}
                       </div>
                       <span className="font-bold text-gray-800 dark:text-white text-lg transition-colors">{user.name}</span>
                     </div>
@@ -1667,9 +1736,23 @@ function App() {
 
               <div className="flex justify-between items-end">
                 <div>
-                  <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Toplam Varlık</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-wider">Toplam Varlık</p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsBalanceHidden(!isBalanceHidden);
+                      }}
+                      className="p-1 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      {isBalanceHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                   <p className="text-3xl font-black tracking-tight text-gray-800 dark:text-white transition-colors">
-                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(portfolio.lastTotal)}
+                    {isBalanceHidden
+                      ? '••••••'
+                      : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(portfolio.lastTotal)
+                    }
                   </p>
                 </div>
                 <div className="text-right">
@@ -1767,23 +1850,20 @@ function App() {
         showAddModal && (
           <div className="absolute inset-0 z-[70] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }}></div>
-            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[90vh] md:h-[85vh] md:max-h-[850px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[92vh] md:h-[85vh] md:max-h-[850px] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors overflow-x-hidden">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
-
-              <div className="flex justify-between items-center mb-8">
+              <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{editingTransaction ? 'İşlemi Düzenle' : 'Yeni İşlem'}</h3>
-                  <p className="text-sm text-gray-500 font-medium">
-                    {transactionStep === 1 ? 'Tutarı girin' : 'Detayları belirleyin'}
-                  </p>
+                  <p className="text-sm text-gray-500 font-medium">{transactionStep === 1 ? 'Tutarı girin' : 'Detayları belirleyin'}</p>
                 </div>
                 <button onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
               </div>
 
-              <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-y-auto custom-scrollbar pr-1">
-                {transactionStep === 1 ? (
-                  <>
-                    <div className="flex-1 flex flex-col justify-center mb-8">
+              <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pr-1">
+                  {transactionStep === 1 ? (
+                    <div className="flex-1 flex flex-col justify-center mb-6 py-12">
                       <div className="relative">
                         <span className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 text-4xl font-light">{'\u20BA'}</span>
                         <input
@@ -1807,27 +1887,9 @@ function App() {
                         />
                       </div>
                     </div>
-                    <div className="mt-auto">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          if (amount) {
-                            document.activeElement?.blur();
-                            setTransactionStep(2);
-                          }
-                        }}
-                        className={`w-full py-5 rounded-[24px] font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2 group ${amount ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-gray-200 dark:shadow-slate-700 hover:bg-black dark:hover:bg-gray-200 active:scale-[0.98]' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed'}`}
-                        disabled={!amount}
-                      >
-                        <span>Devam Et</span>
-                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="mb-6 animate-slide-up">
-                      <div className="flex items-center gap-2 mb-6" onClick={() => setTransactionStep(1)}>
+                  ) : (
+                    <div className="animate-slide-up space-y-6">
+                      <div className="flex flex-wrap items-center gap-2 mb-4" onClick={() => setTransactionStep(1)}>
                         <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
                           {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount || '0'))}
                         </span>
@@ -1844,7 +1906,7 @@ function App() {
                         />
                       </div>
 
-                      <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
+                      <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
                         {activeUsers.map(u => (
                           <button
                             key={u.id}
@@ -1889,7 +1951,7 @@ function App() {
                         </div>
                       </div>
 
-                      <div className="mb-10">
+                      <div className="mb-6">
                         <div
                           className={`flex items-center justify-between p-5 rounded-2xl border cursor-pointer transition-all duration-300 ${isInstallment ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                           onClick={() => setIsInstallment(!isInstallment)}
@@ -1907,55 +1969,106 @@ function App() {
 
                         {isInstallment && (
                           <div className="mt-6 animate-slide-up">
-                            <div className="grid grid-cols-5 gap-2 mb-6">
+                            <div className="grid grid-cols-5 gap-1.5 sm:gap-2 mb-4">
                               {[2, 3, 6, 9, 12].map(count => (
                                 <button
                                   key={count}
                                   type="button"
                                   onClick={() => setInstallmentCount(count)}
-                                  className={`p-3 rounded-xl text-sm font-bold border-2 transition-all ${installmentCount === count ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 shadow-sm scale-105' : 'border-transparent bg-gray-50 dark:bg-slate-800 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                                  className={`py-3 px-1.5 rounded-2xl transition-all duration-300 flex items-center justify-center gap-1 border-2 ${installmentCount === count
+                                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900/40 scale-105 z-10'
+                                    : 'border-gray-100 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/30 text-gray-500 dark:text-gray-400 hover:border-gray-200 dark:hover:border-slate-700'
+                                    }`}
                                 >
-                                  {count}x
+                                  <span className="text-base font-black tracking-tight">{count}</span>
+                                  <span className="text-[10px] font-bold opacity-80 mt-0.5">ay</span>
                                 </button>
                               ))}
                             </div>
 
+                            <div className="flex items-center justify-center gap-3 mb-6">
+                              <div className="h-px bg-gray-100 dark:bg-slate-800 flex-1"></div>
+                              <div className="relative w-32">
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  placeholder="Diğer Seçim"
+                                  value={![2, 3, 6, 9, 12].includes(installmentCount) && installmentCount > 0 ? installmentCount : ''}
+                                  onChange={(e) => setInstallmentCount(parseInt(e.target.value) || 0)}
+                                  className={`w-full py-2 px-3 rounded-xl text-center text-sm font-black border-2 outline-none transition-all placeholder:text-[10px] placeholder:font-bold ${![2, 3, 6, 9, 12].includes(installmentCount) && installmentCount > 0
+                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 shadow-sm pr-7'
+                                    : 'border-gray-100 dark:border-slate-800 bg-transparent text-gray-400 focus:border-indigo-300'
+                                    }`}
+                                />
+                                {![2, 3, 6, 9, 12].includes(installmentCount) && installmentCount > 0 && (
+                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-indigo-400 pointer-events-none animate-fade-in">ay</span>
+                                )}
+                              </div>
+                              <div className="h-px bg-gray-100 dark:bg-slate-800 flex-1"></div>
+                            </div>
+
                             {amount && !isNaN(parseFloat(amount.replace(',', '.'))) && (
-                              <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100/50 backdrop-blur-sm">
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className="text-indigo-400 text-xs font-bold uppercase tracking-wide">Aylık Ödeme</span>
-                                  <span className="text-indigo-600 font-black text-xl tracking-tight">
-                                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')) / installmentCount)}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                  <span className="text-gray-400 text-xs font-medium">Toplam Tutar</span>
-                                  <span className="text-gray-600 font-bold text-sm">
-                                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')))}
-                                  </span>
+                              <div className="bg-white/50 dark:bg-slate-800/50 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm backdrop-blur-sm">
+                                <div className="space-y-4">
+                                  <div className="flex justify-between items-baseline">
+                                    <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">Aylık Ödeme</span>
+                                    <div className="text-right">
+                                      <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
+                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')) / installmentCount)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="h-px bg-gray-100 dark:bg-slate-700 w-full"></div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-400 dark:text-gray-500 text-xs font-medium">Toplam Tutar</span>
+                                    <span className="text-gray-600 dark:text-gray-400 font-bold text-sm">
+                                      {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')))}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             )}
                           </div>
                         )}
                       </div>
-
-                      <div className="mt-auto pt-4 flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setTransactionStep(1)}
-                          className="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 px-6 rounded-[24px] font-bold text-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-                        >
-                          <ArrowLeft size={20} />
-                        </button>
-                        <button type="submit" className="flex-1 bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-5 rounded-[24px] font-bold text-lg shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2 group">
-                          <span>Kaydet</span>
-                          <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                        </button>
-                      </div>
                     </div>
-                  </>
-                )}
+                  )}
+                </div>
+                <div className="pt-6 border-t border-gray-100 dark:border-slate-800 mt-auto">
+                  {transactionStep === 1 ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        if (amount) {
+                          document.activeElement?.blur();
+                          setTransactionStep(2);
+                        }
+                      }}
+                      className={`w-full py-5 rounded-2xl font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2 group ${amount ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-gray-200 dark:shadow-slate-700 hover:bg-black dark:hover:bg-gray-200 active:scale-[0.98]' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 cursor-not-allowed'}`}
+                      disabled={!amount}
+                    >
+                      <span>Devam Et</span>
+                      <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                    </button>
+                  ) : (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setTransactionStep(1)}
+                        className="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 px-6 rounded-2xl font-bold text-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <ArrowLeft size={18} />
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-5 rounded-2xl font-bold text-lg shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2 group"
+                      >
+                        <span>Kaydet</span>
+                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </form>
             </div>
           </div >
@@ -2045,9 +2158,18 @@ function App() {
                   {activeUsers.map(user => (
                     <div key={user.id} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 dark:border-slate-700 flex justify-between items-center group hover:scale-[1.01] transition-all">
                       <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-colors ${user.id === 'u1' ? 'bg-indigo-50 text-indigo-500' : 'bg-pink-50 text-pink-500'}`}>
-                          <Users size={20} strokeWidth={2} />
-                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedUserForSymbol(user.id);
+                            setShowSymbolPicker(true);
+                          }}
+                          className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-transform active:scale-95 group/avatar relative overflow-hidden ${user.id === 'u1' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 shadow-indigo-100/50' : 'bg-pink-50 dark:bg-pink-900/30 text-pink-500 shadow-pink-100/50'}`}
+                        >
+                          <span className="text-2xl z-10">{user.symbol || user.name.charAt(0)}</span>
+                          <div className="absolute inset-0 bg-black/0 group-hover/avatar:bg-black/5 flex items-center justify-center transition-colors">
+                            <Plus size={10} className="opacity-0 group-hover/avatar:opacity-100 text-gray-400 mt-8" />
+                          </div>
+                        </button>
                         <div>
                           <p className="font-bold text-gray-800 dark:text-white text-base transition-colors">{user.name}</p>
                           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Kullanıcı</p>
@@ -2089,6 +2211,30 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Symbol Picker Overlay */}
+            {showSymbolPicker && (
+              <div className="absolute inset-0 z-[70] flex items-center justify-center p-6 sm:p-12 pointer-events-auto">
+                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-all animate-fade-in" onClick={() => setShowSymbolPicker(false)}></div>
+                <div className="bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl w-full max-w-[320px] rounded-[40px] p-8 relative z-[80] animate-scale-up shadow-3xl border border-white/50 dark:border-slate-800/50">
+                  <div className="flex justify-between items-center mb-6">
+                    <h4 className="text-lg font-black text-gray-800 dark:text-white tracking-tight transition-colors">Sembol Seç</h4>
+                    <button onClick={() => setShowSymbolPicker(false)} className="text-gray-400 hover:text-gray-600 font-bold transition-colors">✕</button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2 pb-2">
+                    {availableSymbols.map(sym => (
+                      <button
+                        key={sym}
+                        onClick={() => handleUpdateUserSymbol(selectedUserForSymbol, sym)}
+                        className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-90 border border-transparent hover:border-indigo-100 dark:hover:border-indigo-800"
+                      >
+                        {sym}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )
       }
@@ -2180,7 +2326,7 @@ function App() {
         showExtractModal && (
           <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowExtractModal(false)}></div>
-            <div id="print-area" className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[85vh] md:h-[85vh] md:max-h-[850px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+            <div id="print-area" className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[92vh] md:h-[90vh] md:max-h-[900px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden no-print"></div>
 
               {/* Print Only Header */}
@@ -2338,6 +2484,8 @@ function App() {
         fetchGoldPrices={fetchGoldPrices}
         lastUpdateTime={lastUpdateTime}
         isSupabaseConfigured={isSupabaseConfigured}
+        isBalanceHidden={isBalanceHidden}
+        setIsBalanceHidden={setIsBalanceHidden}
       />
 
       {/* Floating Action Button Removed */}

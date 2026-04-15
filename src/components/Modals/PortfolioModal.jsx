@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { X, Clock, TrendingUp, TrendingDown, ChevronDown, Plus, Minus, AlertTriangle, RefreshCw, Sparkles, RotateCcw, Trash2 } from 'lucide-react'
+import { X, Clock, TrendingUp, TrendingDown, ChevronDown, Plus, Minus, AlertTriangle, RefreshCw, Sparkles, RotateCcw, Trash2, Eye, EyeOff } from 'lucide-react'
 
 export default function PortfolioModal({
     isOpen,
@@ -11,7 +11,9 @@ export default function PortfolioModal({
     goldFetchError,
     fetchGoldPrices,
     lastUpdateTime,
-    isSupabaseConfigured
+    isSupabaseConfigured,
+    isBalanceHidden,
+    setIsBalanceHidden
 }) {
     const [showHistory, setShowHistory] = useState(false)
     const [portfolioHistory, setPortfolioHistory] = useState([])
@@ -163,7 +165,7 @@ export default function PortfolioModal({
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg">
-                                                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(log.total_value)}
+                                                    {isBalanceHidden ? '•••••' : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(log.total_value)}
                                                 </p>
                                                 <button
                                                     onClick={(e) => requestDeleteLog(log.id, e)}
@@ -214,7 +216,7 @@ export default function PortfolioModal({
                                                                 <div key={i} className="flex justify-between bg-gray-50 dark:bg-slate-950 px-3 py-2 rounded-lg">
                                                                     <span className="text-gray-500 dark:text-gray-400">{c.name}</span>
                                                                     <span className="font-bold text-gray-800 dark:text-white">
-                                                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(parseFloat(c.value) || ((parseFloat(c.qty) || 0) * (parseFloat(c.price) || 0)))}
+                                                                        {isBalanceHidden ? '•••••' : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(parseFloat(c.value) || ((parseFloat(c.qty) || 0) * (parseFloat(c.price) || 0)))}
                                                                     </span>
                                                                 </div>
                                                             ))}
@@ -237,15 +239,24 @@ export default function PortfolioModal({
                             <div className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-3xl p-6 text-white shadow-lg mb-6 relative overflow-hidden">
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -translate-y-1/2 translate-x-1/2 blur-xl"></div>
 
-                                <p className="text-yellow-100 text-xs font-bold uppercase tracking-wider mb-1">Toplam Portföy Değeri</p>
+                                <div className="flex items-center gap-3 mb-1">
+                                    <p className="text-yellow-100 text-[10px] font-bold uppercase tracking-wider">Toplam Portföy Değeri</p>
+                                    <button
+                                        onClick={() => setIsBalanceHidden(!isBalanceHidden)}
+                                        className="p-1 rounded-lg bg-white/10 text-yellow-100 hover:bg-white/20 transition-colors"
+                                    >
+                                        {isBalanceHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    </button>
+                                </div>
                                 <div className="flex items-baseline gap-2 mb-4">
                                     <h2 className="text-4xl font-black tracking-tight">
-                                        {goldPrices ?
-                                            new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(
-                                                calculateTotal(portfolio.items, goldPrices)
-                                            )
-                                            : '...'
-                                        }
+                                        {isBalanceHidden ? '••••••' : (
+                                            goldPrices ?
+                                                new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(
+                                                    calculateTotal(portfolio.items, goldPrices)
+                                                )
+                                                : '...'
+                                        )}
                                     </h2>
                                 </div>
 
