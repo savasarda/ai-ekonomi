@@ -1342,13 +1342,13 @@ function App() {
                         </div>
                       </div>
                       <div className="mb-6">
-                        <div className={`flex items-center justify-between p-5 rounded-2xl border cursor-pointer transition-all duration-300 ${isInstallment ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'}`} onClick={() => setIsInstallment(!isInstallment)}>
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-colors ${isInstallment ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400' : 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400'}`}><Calendar size={20} /></div>
-                            <span className={`text-sm font-bold ${isInstallment ? 'text-indigo-900 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400'}`}>Taksitlendir</span>
+                        <div className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all duration-300 ${isInstallment ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'}`} onClick={() => setIsInstallment(!isInstallment)}>
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors shrink-0 ${isInstallment ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400' : 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400'}`}><Calendar size={16} /></div>
+                            <span className={`text-sm font-bold whitespace-nowrap ${isInstallment ? 'text-indigo-900 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400'}`}>Taksitlendir</span>
                           </div>
-                          <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${isInstallment ? 'bg-indigo-600' : 'bg-gray-300'}`}>
-                            <div className={`bg-white w-6 h-6 rounded-full shadow-sm transform transition-transform duration-300 ${isInstallment ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                          <div className={`w-12 h-7 rounded-full p-0.5 transition-colors duration-300 shrink-0 ${isInstallment ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                            <div className={`bg-white w-6 h-6 rounded-full shadow-sm transform transition-transform duration-300 ${isInstallment ? 'translate-x-5' : 'translate-x-0'}`}></div>
                           </div>
                         </div>
                         {isInstallment && (
@@ -1967,17 +1967,17 @@ function App() {
 
                       <div className="mb-6">
                         <div
-                          className={`flex items-center justify-between p-5 rounded-2xl border cursor-pointer transition-all duration-300 ${isInstallment ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all duration-300 ${isInstallment ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
                           onClick={() => setIsInstallment(!isInstallment)}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl transition-colors ${isInstallment ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400' : 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400'}`}>
-                              <Calendar size={20} />
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors shrink-0 ${isInstallment ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400' : 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400'}`}>
+                              <Calendar size={16} />
                             </div>
-                            <span className={`text-sm font-bold ${isInstallment ? 'text-indigo-900 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400'}`}>Taksitlendir</span>
+                            <span className={`text-sm font-bold whitespace-nowrap ${isInstallment ? 'text-indigo-900 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400'}`}>Taksitlendir</span>
                           </div>
-                          <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${isInstallment ? 'bg-indigo-600' : 'bg-gray-300'}`}>
-                            <div className={`bg-white w-6 h-6 rounded-full shadow-sm transform transition-transform duration-300 ${isInstallment ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                          <div className={`w-12 h-7 rounded-full p-0.5 transition-colors duration-300 shrink-0 ${isInstallment ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                            <div className={`bg-white w-6 h-6 rounded-full shadow-sm transform transition-transform duration-300 ${isInstallment ? 'translate-x-5' : 'translate-x-0'}`}></div>
                           </div>
                         </div>
 
