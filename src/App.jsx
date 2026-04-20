@@ -16,9 +16,18 @@ import NeedsList from './components/NeedsList'
 import EventsCalendar from './components/EventsCalendar'
 import PortfolioView from './components/PortfolioView'
 
+// Auth Imports
+import { useAuth } from './contexts/AuthContext'
+import LoginScreen from './components/Auth/LoginScreen'
+import FamilySetup from './components/Auth/FamilySetup'
+
 function App() {
+  const { user, session, profile, loading: authLoading, signOut } = useAuth()
   const [currentView, setCurrentView] = useState('welcome')
   const [data, setData] = useState({ users: [], accounts: [], transactions: [] })
+
+  // Migration State
+  const [showMigrationModal, setShowMigrationModal] = useState(false)
 
   // Events State
   const [events, setEvents] = useState([])
@@ -223,15 +232,20 @@ function App() {
   const [upcomingEvents, setUpcomingEvents] = useState([])
 
   const fetchInitialData = useCallback(async () => {
-    if (!isSupabaseConfigured) return
+    if (!isSupabaseConfigured || !profile?.family_id) return
 
     try {
-      const { data: users } = await supabase.from('users').select('*')
-      const { data: accounts } = await supabase.from('accounts').select('*')
-      const { data: transactions } = await supabase.from('transactions').select('*')
-      const { data: userLimitsData } = await supabase.from('user_limits').select('*')
-      const { data: portfolioData } = await supabase.from('portfolios').select('*')
-      const { data: logsData } = await supabase.from('portfolio_logs').select('*').order('created_at', { ascending: false }).limit(1)
+      const familyId = profile.family_id
+
+      const { data: users, error: uErr } = await supabase.from('users').select('*').eq('family_id', familyId)
+      const { data: accounts, error: aErr } = await supabase.from('accounts').select('*').eq('family_id', familyId)
+      const { data: transactions, error: tErr } = await supabase.from('transactions').select('*').eq('family_id', familyId)
+      const { data: userLimitsData, error: lErr } = await supabase.from('user_limits').select('*').eq('family_id', familyId)
+      const { data: portfolioData, error: pErr } = await supabase.from('portfolios').select('*').eq('family_id', familyId)
+      
+      if (uErr || aErr || tErr) {
+        console.warn('Bazı tablolar henüz hazır değil (Schema lag). Refresh bekleniyor...', {uErr, aErr, tErr})
+      }
 
       if (users && accounts && transactions) {
         // Transform snake_case from DB to camelCase for App
@@ -242,7 +256,7 @@ function App() {
         })
       }
 
-      const { data: eventsData, error: eventsError } = await supabase.from('events').select('*')
+      const { data: eventsData, error: eventsError } = await supabase.from('events').select('*').eq('family_id', familyId)
       if (eventsData) {
         setEvents(eventsData.map(e => ({
           id: e.id,
@@ -251,8 +265,6 @@ function App() {
           description: e.description,
           time: e.time
         })))
-
-
       }
 
       if (userLimitsData) {
@@ -299,6 +311,30 @@ function App() {
       supabase.removeChannel(transactionSubscription)
     }
   }, [isSupabaseConfigured, fetchInitialData])
+
+  // Check for Orphan Data (Migration Check)
+  useEffect(() => {
+    const checkOrphans = async () => {
+      if (profile?.family_id) {
+        // Check multiple tables for orphans with safe error handling
+        const getCount = async (table) => {
+          const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true }).is('family_id', null)
+          return error ? 0 : (count || 0)
+        }
+
+        const tCount = await getCount('transactions')
+        const uCount = await getCount('users')
+        const aCount = await getCount('accounts')
+        const eCount = await getCount('events')
+        const nCount = await getCount('needs_list')
+
+        if (tCount > 0 || uCount > 0 || aCount > 0 || eCount > 0 || nCount > 0) {
+          setShowMigrationModal(true)
+        }
+      }
+    }
+    checkOrphans()
+  }, [profile])
 
 
   const handleTouchStart = (e) => {
@@ -361,17 +397,22 @@ function App() {
 
   // Function to save to Supabase
   const syncToSupabase = async (newData, newLimits) => {
-    if (!isSupabaseConfigured) return
+    if (!isSupabaseConfigured || !profile?.family_id) return
 
     try {
+      const familyId = profile.family_id
+      
+      const addFamilyId = (items) => items.map(item => ({ ...toSnakeCase([item])[0], family_id: familyId }))
+
       // Transform camelCase from App to snake_case for DB
-      if (newData.users) await supabase.from('users').upsert(toSnakeCase(newData.users))
-      if (newData.accounts) await supabase.from('accounts').upsert(toSnakeCase(newData.accounts))
-      if (newData.transactions) await supabase.from('transactions').upsert(toSnakeCase(newData.transactions))
+      if (newData.users) await supabase.from('users').upsert(addFamilyId(newData.users))
+      if (newData.accounts) await supabase.from('accounts').upsert(addFamilyId(newData.accounts))
+      if (newData.transactions) await supabase.from('transactions').upsert(addFamilyId(newData.transactions))
 
       const limitsArray = Object.entries(newLimits).map(([user_id, limit_amount]) => ({
         user_id,
-        limit_amount
+        limit_amount,
+        family_id: familyId
       }))
       if (limitsArray.length > 0) await supabase.from('user_limits').upsert(limitsArray)
     } catch (error) {
@@ -380,14 +421,14 @@ function App() {
   }
 
   const syncPortfolioToSupabase = async (newPortfolio) => {
-    if (!isSupabaseConfigured) return
+    if (!isSupabaseConfigured || !profile?.family_id) return
     try {
-      // Upsert based on a fixed ID or user ID. Let's assume a single global portfolio for this app instance 'p1'
       await supabase.from('portfolios').upsert({
-        id: 'p1',
+        id: `portfolio_${profile.family_id}`,
+        family_id: profile.family_id,
         last_total: newPortfolio.lastTotal,
         last_updated: new Date().toISOString(),
-        items: newPortfolio.items // Supabase handles JSONB transparently usually
+        items: newPortfolio.items 
       })
     } catch (error) {
       console.error('Error syncing portfolio:', error)
@@ -404,14 +445,15 @@ function App() {
   const handleAddEvent = async (newEvent) => {
     setEvents(prev => [...prev, newEvent])
 
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && profile?.family_id) {
       try {
         await supabase.from('events').insert({
           id: newEvent.id,
           date: newEvent.date,
           title: newEvent.title,
           description: newEvent.description,
-          time: newEvent.time
+          time: newEvent.time,
+          family_id: profile.family_id
         })
       } catch (e) {
         console.error("Event add error", e)
@@ -928,10 +970,81 @@ function App() {
   }
 
 
+  const handleMigrateData = async () => {
+    if (!profile?.family_id) return
+    setIsRefreshing(true)
+    try {
+      const familyId = profile.family_id
+      // Assign all orphan data to this family
+      await supabase.from('users').update({ family_id: familyId }).is('family_id', null)
+      await supabase.from('accounts').update({ family_id: familyId }).is('family_id', null)
+      await supabase.from('transactions').update({ family_id: familyId }).is('family_id', null)
+      await supabase.from('events').update({ family_id: familyId }).is('family_id', null)
+      await supabase.from('user_limits').update({ family_id: familyId }).is('family_id', null)
+      await supabase.from('needs_list').update({ family_id: familyId }).is('family_id', null)
+      
+      alert('Veriler başarıyla ailenize aktarıldı.')
+      setShowMigrationModal(false)
+      fetchInitialData()
+    } catch (error) {
+      console.error('Migration error:', error)
+      alert('Veri aktarımı sırasında hata oluştu.')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  // Auth & Loading Gates
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+      </div>
+    )
+  }
+
+  if (!session) {
+    return <LoginScreen />
+  }
+
+  if (!profile?.family_id) {
+    return <FamilySetup />
+  }
+
   // Render Welcome Screen
   if (currentView === 'welcome') {
     return (
       <>
+        {/* Migration Modal */}
+        {showMigrationModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 max-w-sm w-full relative z-10 animate-scale-up shadow-2xl border border-slate-200 dark:border-slate-800">
+              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mb-6">
+                <Share2 className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Verileri Aktar?</h2>
+              <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm leading-relaxed">
+                Sistemde sahipsiz veriler bulundu. Bu verileri yeni aile grubunuza aktarmak ister misiniz?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowMigrationModal(false)}
+                  className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold rounded-2xl transition-all"
+                >
+                  Hayır
+                </button>
+                <button
+                  onClick={handleMigrateData}
+                  className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/20 active:scale-95 transition-all"
+                >
+                  Evet, Aktar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <WelcomeScreen
           onNavigate={setCurrentView}
           darkMode={darkMode}

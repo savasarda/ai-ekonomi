@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Plus, Trash2, Check, Sparkles, AlertCircle, ShoppingBag } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 
 // Smart suggestions based on common shopping items
 const commonItems = [
@@ -17,6 +18,7 @@ const commonItems = [
 ];
 
 const NeedsList = ({ onBack, isSupabaseConfigured }) => {
+    const { profile } = useAuth();
     const [needs, setNeeds] = useState([]);
     const [newItem, setNewItem] = useState('');
     const [suggestions, setSuggestions] = useState(commonItems); // Show all by default
@@ -37,6 +39,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
             const { data, error } = await supabase
                 .from('needs_list')
                 .select('*')
+                .eq('family_id', profile?.family_id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -52,10 +55,15 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
         fetchNeeds();
 
         // Subscription
-        if (isSupabaseConfigured) {
+        if (isSupabaseConfigured && profile?.family_id) {
             const sub = supabase
-                .channel('public:needs_list')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'needs_list' }, fetchNeeds)
+                .channel(`public:needs_list:${profile.family_id}`)
+                .on('postgres_changes', { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'needs_list',
+                    filter: `family_id=eq.${profile.family_id}` 
+                }, fetchNeeds)
                 .subscribe();
 
             return () => {
@@ -86,7 +94,11 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
                 // Insert and return the record to get the real UUID
                 const { data, error } = await supabase
                     .from('needs_list')
-                    .insert([{ text: newItemObj.text, completed: false }])
+                    .insert([{ 
+                        text: newItemObj.text, 
+                        completed: false,
+                        family_id: profile?.family_id 
+                    }])
                     .select()
                     .single();
 
