@@ -27,6 +27,22 @@ function App() {
   window.supabase = supabase;
   
   const { user, session, profile, loading: authLoading, signOut } = useAuth()
+  
+  const handleSwitchFamily = async () => {
+    if (profile?.family_id) {
+        const saved = JSON.parse(localStorage.getItem('saved_families') || '[]');
+        if (!saved.find(f => f.family_id === profile.family_id)) {
+            saved.push({
+                family_id: profile.family_id,
+                name: profile.families?.name || 'Kayıtlı Aile',
+                invite_code: profile.families?.invite_code
+            });
+            localStorage.setItem('saved_families', JSON.stringify(saved));
+        }
+        await supabase.from('profiles').update({ family_id: null }).eq('id', profile.id);
+        window.location.reload(); 
+    }
+  };
   const [currentView, setCurrentView] = useState('welcome')
   const [data, setData] = useState({ users: [], accounts: [], transactions: [] })
 
@@ -1062,6 +1078,9 @@ function App() {
           toggleTheme={toggleTheme}
           onCheckReminders={handleCheckReminders}
           onShowFeedback={() => setShowFeedbackModal(true)}
+          profile={profile}
+          onSignOut={signOut}
+          onSwitchFamily={handleSwitchFamily}
         />
         {showReminderModal && (
           <ReminderModal
