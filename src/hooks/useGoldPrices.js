@@ -17,7 +17,15 @@ export function useGoldPrices() {
 
             if (resGold && resGold.ok) {
                 const responseData = await resGold.json();
-                const data = JSON.parse(responseData.contents);
+                if (!responseData.contents) throw new Error("CORS Proxy content empty");
+                
+                let data;
+                try {
+                    data = JSON.parse(responseData.contents);
+                } catch (pe) {
+                    console.error("JSON Parse Error:", pe);
+                    throw new Error("Invalid API Response");
+                }
                 const updateDate = data.Update_Date || new Date();
 
 
