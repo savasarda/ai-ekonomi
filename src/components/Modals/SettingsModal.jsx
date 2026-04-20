@@ -1,5 +1,7 @@
-import { X, Users, CreditCard, Trash2, ChevronRight, Settings, Gauge, LogOut, Share2 } from 'lucide-react'
+import { X, Users, CreditCard, Trash2, ChevronRight, Settings, Gauge, LogOut, Share2, MessageCircle, Check } from 'lucide-react'
+import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabaseClient'
 
 export default function SettingsModal({
     isOpen,
@@ -10,12 +12,23 @@ export default function SettingsModal({
     onResetAll
 }) {
     const { signOut, profile } = useAuth();
+    const [copied, setCopied] = useState(false);
+    
     if (!isOpen) return null;
 
     const copyInviteCode = () => {
         if (profile?.families?.invite_code) {
             navigator.clipboard.writeText(profile.families.invite_code);
-            alert('Davet kodu kopyalandı: ' + profile.families.invite_code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    const shareToWhatsApp = () => {
+        if (profile?.families?.invite_code) {
+            const text = `AIEkonomi aile grubumuza katıl! Davet kodumuz: #${profile.families.invite_code}`;
+            const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+            window.open(url, '_blank');
         }
     };
 
@@ -44,21 +57,30 @@ export default function SettingsModal({
                 <div className="space-y-4">
                     {/* Invite Code Section */}
                     {profile?.families?.invite_code && (
-                        <button 
-                            onClick={copyInviteCode}
-                            className="w-full bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-3xl border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98]"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm">
-                                    <Share2 size={24} />
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={copyInviteCode}
+                                className="flex-1 bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-3xl border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between group hover:shadow-md transition-all active:scale-[0.98]"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm relative">
+                                        {copied ? <Check size={24} className="text-green-500 animate-bounce" /> : <Share2 size={24} />}
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="font-bold text-indigo-900 dark:text-indigo-100 italic tracking-[0.2em]">#{profile.families.invite_code}</p>
+                                        <p className="text-[10px] text-indigo-400 font-bold uppercase">{copied ? 'Kopyalandı!' : 'Aile Davet Kodu'}</p>
+                                    </div>
                                 </div>
-                                <div className="text-left">
-                                    <p className="font-bold text-indigo-900 dark:text-indigo-100 italic tracking-[0.2em]">#{profile.families.invite_code}</p>
-                                    <p className="text-[10px] text-indigo-400 font-bold uppercase">Aile Davet Kodu (Kopyala)</p>
-                                </div>
-                            </div>
-                            <ChevronRight size={18} className="text-indigo-300" />
-                        </button>
+                            </button>
+                            
+                            <button 
+                                onClick={shareToWhatsApp}
+                                className="w-[72px] bg-green-50 dark:bg-green-900/20 rounded-3xl border border-green-100 dark:border-green-900/30 flex items-center justify-center text-green-600 hover:bg-green-100 transition-all active:scale-90 shadow-sm"
+                                title="WhatsApp ile Paylaş"
+                            >
+                                <MessageCircle size={32} />
+                            </button>
+                        </div>
                     )}
 
                     <button 
@@ -109,6 +131,7 @@ export default function SettingsModal({
                         <ChevronRight size={18} className="text-gray-300 group-hover:text-pink-500 transition-colors" />
                     </button>
 
+                    <div className="pt-4 mt-4 border-t border-gray-100 dark:border-slate-800 space-y-3">
                         <button 
                             onClick={async () => { 
                                 // Save to localStorage first
@@ -122,9 +145,7 @@ export default function SettingsModal({
                                         });
                                         localStorage.setItem('saved_families', JSON.stringify(saved));
                                     }
-                                    
                                     // Update profile to detach from family
-                                    const { supabase } = await import('../../lib/supabaseClient');
                                     await supabase.from('profiles').update({ family_id: null }).eq('id', profile.id);
                                     window.location.reload(); 
                                 }
