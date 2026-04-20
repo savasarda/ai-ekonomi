@@ -109,7 +109,40 @@ export default function SettingsModal({
                         <ChevronRight size={18} className="text-gray-300 group-hover:text-pink-500 transition-colors" />
                     </button>
 
-                    <div className="pt-4 mt-4 border-t border-gray-100 dark:border-slate-800 space-y-3">
+                        <button 
+                            onClick={async () => { 
+                                // Save to localStorage first
+                                if (profile?.family_id) {
+                                    const saved = JSON.parse(localStorage.getItem('saved_families') || '[]');
+                                    if (!saved.find(f => f.family_id === profile.family_id)) {
+                                        saved.push({
+                                            family_id: profile.family_id,
+                                            name: profile.families?.name || 'Kayıtlı Aile',
+                                            invite_code: profile.families?.invite_code
+                                        });
+                                        localStorage.setItem('saved_families', JSON.stringify(saved));
+                                    }
+                                    
+                                    // Update profile to detach from family
+                                    const { supabase } = await import('../../lib/supabaseClient');
+                                    await supabase.from('profiles').update({ family_id: null }).eq('id', profile.id);
+                                    window.location.reload(); 
+                                }
+                            }}
+                            className="w-full bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700 flex items-center justify-between group hover:border-blue-500 transition-all active:scale-[0.98]"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-sm">
+                                    <Users size={24} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-slate-800 dark:text-slate-200">Aileyi Değiştir</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">Başka bir aile grubuna geç</p>
+                                </div>
+                            </div>
+                            <ChevronRight size={18} className="text-slate-300 group-hover:text-blue-500 transition-colors" />
+                        </button>
+
                         <button 
                             onClick={signOut}
                             className="w-full bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700 flex items-center justify-between group hover:border-slate-400 transition-all active:scale-[0.98]"

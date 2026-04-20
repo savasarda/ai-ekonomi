@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
-import { Users, Plus, ArrowRight, Loader2, Home } from 'lucide-react';
+import { Users, Plus, ArrowRight, Loader2, Home, LogOut } from 'lucide-react';
 
 const FamilySetup = () => {
   const { user, setProfile } = useAuth();
@@ -9,6 +9,11 @@ const FamilySetup = () => {
   const [mode, setMode] = useState(null); // 'create' or 'join'
   const [familyName, setFamilyName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+
+  const [savedFamilies] = useState(() => {
+    const saved = localStorage.getItem('saved_families');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const generateInviteCode = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
@@ -143,6 +148,39 @@ const FamilySetup = () => {
               <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
             </button>
           </div>
+
+          {savedFamilies.length > 0 && (
+            <div className="mt-8 text-left animate-fade-in">
+              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-2">Kayıtlı Aileleriniz</h4>
+              <div className="space-y-2">
+                {savedFamilies.map(f => (
+                  <button
+                    key={f.family_id}
+                    onClick={() => {
+                        setInviteCode(f.invite_code);
+                        setMode('join');
+                    }}
+                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl hover:border-indigo-500 transition-all shadow-sm group active:scale-[0.98]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600">
+                        <Users className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                         <h4 className="text-sm font-bold text-slate-800 dark:text-white">{f.name}</h4>
+                         <p className="text-[10px] font-bold text-indigo-500 tracking-wider">#{f.invite_code}</p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button onClick={() => supabase.auth.signOut()} className="mt-10 flex items-center gap-2 text-slate-400 hover:text-red-500 mx-auto text-sm font-bold transition-all hover:scale-105">
+             Giriş Ekranına Dön
+          </button>
         </div>
       </div>
     );
