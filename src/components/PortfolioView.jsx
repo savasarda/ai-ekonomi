@@ -16,8 +16,10 @@ export default function PortfolioView({
     goldFetchError,
     fetchGoldPrices,
     lastUpdateTime,
-    isSupabaseConfigured
+    isSupabaseConfigured,
+    profile
 }) {
+    const familyId = profile?.family_id;
     const [showHistory, setShowHistory] = useState(false);
     const [portfolioHistory, setPortfolioHistory] = useState([]);
     const [expandedLogId, setExpandedLogId] = useState(null);
@@ -40,11 +42,12 @@ export default function PortfolioView({
     }, [showHistory]);
 
     const handleFetchHistory = async () => {
-        if (!isSupabaseConfigured) return;
+        if (!isSupabaseConfigured || !familyId) return;
         try {
             const { data: logs, error } = await supabase
                 .from('portfolio_logs')
                 .select('*')
+                .eq('family_id', familyId)
                 .order('created_at', { ascending: false })
                 .limit(30);
 
@@ -54,6 +57,7 @@ export default function PortfolioView({
             console.error("Error fetching history:", e);
         }
     };
+
 
     const confirmDeleteLog = async () => {
         if (!deleteConfirmation.logId) return;
@@ -156,7 +160,13 @@ export default function PortfolioView({
                             <div className="flex items-start justify-between mt-2">
                                 <div>
                                     <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Portföyüm</h1>
-                                    <p className="text-sm text-gray-400 font-medium">Varlıklarını yönet ve kazancını takip et</p>
+                                    <p className="text-sm text-gray-400 font-medium">
+                                        {portfolio.lastUpdated ? (
+                                            <>Son Kayıt: <span className="text-indigo-500 font-bold">{new Date(portfolio.lastUpdated).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></>
+                                        ) : (
+                                            'Varlıklarını yönet ve kazancını takip et'
+                                        )}
+                                    </p>
                                 </div>
                             </div>
                         </>
@@ -519,21 +529,26 @@ export default function PortfolioView({
                     <div className="mt-12 flex justify-center pb-12 animate-fade-in">
                         <button 
                             onClick={() => {
-                                if (isSupabaseConfigured) {
+                                if (isSupabaseConfigured && familyId) {
                                     const itemsWithPrices = { ...portfolio.items, customPrices: portfolio.customPrices };
                                     
                                     supabase.from('portfolio_logs').insert([
-                                        { items: itemsWithPrices, total_value: currentTotal }
+                                        { 
+                                            items: itemsWithPrices, 
+                                            total_value: currentTotal,
+                                            family_id: familyId
+                                        }
                                     ]).then(({ error }) => {
                                         if (error) console.error("Log error", error);
                                     });
 
                                     // Also update the main portfolio state in DB
-                                    supabase.from('portfolios').update({
+                                    supabase.from('portfolios').upsert({
+                                        family_id: familyId,
                                         items: itemsWithPrices,
                                         last_total: currentTotal,
                                         last_updated: new Date().toISOString()
-                                    }).eq('id', 'p1').then(({ error }) => {
+                                    }, { onConflict: 'family_id' }).then(({ error }) => {
                                         if (error) console.error("Update error", error);
                                     });
                                 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { logger } from '../../lib/logger';
 import { useAuth } from '../../contexts/AuthContext';
 import { Users, Plus, ArrowRight, Loader2, Home, LogOut } from 'lucide-react';
 
@@ -56,7 +57,7 @@ const FamilySetup = () => {
 
       setProfile({ ...profile, families: family });
     } catch (error) {
-      console.error('Error creating family:', error);
+      logger.error('handleCreateFamily error', { error: error.message });
       alert('Aile oluşturulurken hata: ' + error.message);
     } finally {
       setLoading(false);
@@ -96,7 +97,7 @@ const FamilySetup = () => {
 
       setProfile({ ...profile, families: family });
     } catch (error) {
-      console.error('Error joining family:', error);
+      logger.error('handleJoinFamily error', { error: error.message, inviteCode });
       alert('Aileye katılırken hata: ' + error.message);
     } finally {
       setLoading(false);

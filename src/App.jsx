@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabaseClient'
+import { logger } from './lib/logger'
 import { toCamelCase, toSnakeCase } from './lib/dataTransformers'
 import { useGoldPrices } from './hooks/useGoldPrices'
 import PortfolioModal from './components/Modals/PortfolioModal'
@@ -302,7 +303,7 @@ function App() {
       }
 
     } catch (error) {
-      console.error('Error fetching from Supabase:', error)
+      logger.error('App.fetchInitialData error', { error: error.message, stack: error.stack })
     }
   }, [isSupabaseConfigured, profile?.family_id])
 
@@ -1150,6 +1151,7 @@ function App() {
           fetchGoldPrices={fetchGoldPrices}
           lastUpdateTime={lastUpdateTime}
           isSupabaseConfigured={isSupabaseConfigured}
+          profile={profile}
         />
         {showReminderModal && (
           <ReminderModal
