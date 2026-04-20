@@ -77,7 +77,7 @@ const FamilySetup = () => {
         .single();
 
       if (familyError || !family) {
-        throw new Error('Geçersiz davet kodu.');
+        throw new Error('Geçersiz davet kodu.' + (familyError ? ' (Sistem: ' + familyError.message + ')' : ''));
       }
 
       // 2. Update Profile
