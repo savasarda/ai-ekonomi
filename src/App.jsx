@@ -22,6 +22,9 @@ import LoginScreen from './components/Auth/LoginScreen'
 import FamilySetup from './components/Auth/FamilySetup'
 
 function App() {
+  // DEBUG İÇİN EKLENDİ - SİLECEĞİZ
+  window.supabase = supabase;
+  
   const { user, session, profile, loading: authLoading, signOut } = useAuth()
   const [currentView, setCurrentView] = useState('welcome')
   const [data, setData] = useState({ users: [], accounts: [], transactions: [] })
