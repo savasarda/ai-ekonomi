@@ -278,12 +278,11 @@ function App() {
       if (portfolioData && portfolioData.length > 0) {
         try {
           const p = portfolioData[0];
-          const latestLog = logsData && logsData.length > 0 ? logsData[0] : null;
 
-          if (p) {
-            const items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || {});
-            setPortfolio({
-              lastTotal: latestLog ? latestLog.total_value : p.last_total,
+            if (p) {
+              const items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || {});
+              setPortfolio({
+                lastTotal: p.last_total,
               lastUpdated: p.last_updated,
               items: items,
               customPrices: items.customPrices || {}
