@@ -296,7 +296,7 @@ function App() {
     } catch (error) {
       console.error('Error fetching from Supabase:', error)
     }
-  }, [isSupabaseConfigured])
+  }, [isSupabaseConfigured, profile?.family_id])
 
   useEffect(() => {
     fetchInitialData()
