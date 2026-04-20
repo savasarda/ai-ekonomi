@@ -8,16 +8,16 @@ export function useGoldPrices() {
     const fetchGoldPrices = async () => {
         setGoldFetchError(false)
         try {
-            // Using stable Legacy API (today.json)
+            // Using direct API with CORS proxy since Vite proxy doesn't work on GH Pages
+            const goldUrl = encodeURIComponent(`https://finans.truncgil.com/today.json?_=${new Date().getTime()}`);
             const [resGold, resEth] = await Promise.all([
-                fetch(`/api/truncgil/today.json?_=${new Date().getTime()}`, {
-                    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-                }).catch(e => null),
+                fetch(`https://api.allorigins.win/get?url=${goldUrl}`).catch(e => null),
                 fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=try').catch(e => null)
             ])
 
             if (resGold && resGold.ok) {
-                const data = await resGold.json()
+                const responseData = await resGold.json();
+                const data = JSON.parse(responseData.contents);
                 const updateDate = data.Update_Date || new Date();
 
 
