@@ -292,7 +292,15 @@ function App() {
             });
           }
         } catch (e) { console.error("Portfolio parse error", e) }
+      } else {
+        setPortfolio({
+          lastTotal: 0,
+          lastUpdated: null,
+          items: { gram: 0, gram22: 0, ceyrek: 0, yarim: 0, tam: 0, cumhuriyet: 0, ethereum: 0, usd: 0, eur: 0, custom: [] },
+          customPrices: {}
+        });
       }
+
     } catch (error) {
       console.error('Error fetching from Supabase:', error)
     }
