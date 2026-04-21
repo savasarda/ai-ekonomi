@@ -29,8 +29,14 @@ function App() {
   
   const { user, session, profile, loading: authLoading, signOut } = useAuth()
   
-  const handleSwitchFamily = async () => {
-    if (!window.confirm('Mevcut aile grubundan ayrılıp başka bir gruba geçmek istediğinize emin misiniz?')) return;
+  const [showSwitchFamilyModal, setShowSwitchFamilyModal] = useState(false)
+
+  const handleSwitchFamily = () => {
+    setShowSwitchFamilyModal(true)
+  }
+
+  const confirmSwitchFamily = async () => {
+    setShowSwitchFamilyModal(false)
 
     if (profile?.family_id) {
       try {
@@ -65,7 +71,15 @@ function App() {
   const [events, setEvents] = useState([])
 
   // Active Data Helpers (Soft Delete Logic: status !== 0)
-  const activeUsers = data.users ? data.users.filter(u => u.status != 0) : []
+  const activeUsers = data.users 
+    ? data.users
+        .filter(u => u.status != 0)
+        .sort((a, b) => {
+          if (a.profileId === profile?.id) return -1;
+          if (b.profileId === profile?.id) return 1;
+          return 0;
+        })
+    : []
   const activeAccounts = data.accounts ? data.accounts.filter(a => a.status != 0) : []
   const activeTransactions = data.transactions ? data.transactions.filter(t => t.status != 0) : []
 
@@ -887,13 +901,33 @@ function App() {
     try {
       const { error } = await supabase.from('users').update({ profile_id: profile.id }).eq('id', userId);
       if (error) throw error;
-      alert("Hesabınız bu kişiyle başarıyla eşleştirildi.");
+      
+      setSuccessMessage("Hesabınız bu kişiyle başarıyla eşleştirildi.");
+      setShowSuccessModal(true);
+      
       fetchInitialData();
     } catch (err) {
       console.error("Claim error", err);
       alert("Hata: " + err.message);
     }
   };
+
+  const handleUnclaimAccount = async (userId) => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const { error } = await supabase.from('users').update({ profile_id: null }).eq('id', userId);
+      if (error) throw error;
+      
+      setSuccessMessage("Hesap eşleşmesi başarıyla kaldırıldı.");
+      setShowSuccessModal(true);
+      
+      fetchInitialData();
+    } catch (err) {
+      console.error("Unclaim error", err);
+      alert("Hata: " + err.message);
+    }
+  };
+
 
 
   const handleResetAllData = async () => {
@@ -2421,9 +2455,13 @@ function App() {
                           </button>
                         )}
                         {user.profileId === profile?.id && (
-                          <span className="px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[10px] font-black uppercase rounded-lg border border-green-100 dark:border-green-800/50">
+                          <button
+                            onClick={() => handleUnclaimAccount(user.id)}
+                            className="px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[10px] font-black uppercase rounded-lg border border-green-100 dark:border-green-800/50 hover:bg-green-100 transition-all active:scale-95"
+                            title="Eşleşmeyi Kaldır"
+                          >
                             Siz
-                          </span>
+                          </button>
                         )}
                         <button
                           onClick={() => handleDeleteUser(user.id)}
@@ -2912,7 +2950,44 @@ function App() {
         onSwitchFamily={handleSwitchFamily}
         onSignOut={signOut}
       />
+
+      {/* Switch Family Confirmation Modal */}
+      {showSwitchFamilyModal && (
+        <div className="absolute inset-0 z-[120] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowSwitchFamilyModal(false)}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Users size={40} className="text-indigo-500" />
+              </div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Aileyi Değiştir?</h3>
+              <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                Mevcut aile grubundan ayrılıp başka bir gruba geçmek istediğinize emin misiniz?
+              </p>
+              <p className="text-xs text-gray-400 mt-4 px-4">
+                Mevcut grubunuzun bilgilerini tekrar girmek için davet koduna ihtiyacınız olacak.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSwitchFamilyModal(false)}
+                className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={confirmSwitchFamily}
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+              >
+                Değiştir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
+
   )
 }
 
