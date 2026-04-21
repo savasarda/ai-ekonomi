@@ -17,7 +17,7 @@ const financialTips = [
     "Acil durum fonu oluştur. Kenarda en az 3 aylık giderin kadar nakit bulundur."
 ];
 
-const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders, onShowFeedback, profile, onSignOut, onSwitchFamily }) => {
+const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders, onShowFeedback, profile, onSignOut, onSwitchFamily, onOpenFamily }) => {
     const [currentTip] = useState(financialTips[Math.floor(Math.random() * financialTips.length)]);
     const [copied, setCopied] = useState(false);
     const today = new Date();
@@ -155,62 +155,22 @@ const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders, on
                             </div>
                         </button>
                     </div>
-                </div>
 
-                {/* 4. Aile Yönetimi Section */}
-                <div className="mt-8 space-y-3">
-                    <p className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest px-4 mb-1">AİLE YÖNETİMİ</p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {/* Invite Code Card */}
-                        <div className="bg-white dark:bg-slate-900 p-4 rounded-[24px] border border-white dark:border-slate-800 flex items-center justify-between shadow-lg shadow-slate-200/50 dark:shadow-none">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                                    <Users size={20} />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-gray-400 font-bold uppercase">AİLE KODU</p>
-                                    <p className="text-sm font-black text-slate-800 dark:text-white tracking-widest">#{profile?.families?.invite_code || '---'}</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <button 
-                                    onClick={copyInviteCode}
-                                    className="p-2 bg-slate-50 dark:bg-slate-850 rounded-lg text-slate-500 hover:text-indigo-600 transition-colors"
-                                >
-                                    {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
-                                </button>
-                                <button 
-                                    onClick={shareToWhatsApp}
-                                    className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-600 hover:bg-green-600 hover:text-white transition-all"
-                                >
-                                    <MessageCircle size={18} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Switch Family Button */}
-                        <button 
-                            onClick={onSwitchFamily}
-                            className="bg-white dark:bg-slate-900 p-4 rounded-[24px] border border-white dark:border-slate-800 flex items-center gap-3 shadow-lg shadow-slate-200/50 dark:shadow-none hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all group scale-100 active:scale-95"
-                        >
-                            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 group-hover:text-indigo-600">
-                                <RefreshCw size={20} />
-                            </div>
-                            <div className="text-left">
-                                <p className="text-sm font-bold text-slate-800 dark:text-white">Aileyi Değiştir</p>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase">BAŞKA GRUBA GEÇ</p>
-                            </div>
-                        </button>
-                    </div>
-
-                    {/* Simple Logout Button */}
-                    <button 
-                        onClick={onSignOut}
-                        className="w-full bg-red-50 dark:bg-red-900/10 p-4 rounded-[24px] border border-red-100 dark:border-red-900/20 flex items-center justify-center gap-2 text-red-500 font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all active:scale-[0.98]"
+                    {/* Ailem */}
+                    <button
+                        onClick={onOpenFamily}
+                        className="group bg-white dark:bg-slate-900 p-4 md:p-6 rounded-[24px] md:rounded-[32px] shadow-xl shadow-emerald-100/50 dark:shadow-none border border-white dark:border-slate-800 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 flex items-center gap-4 md:gap-5"
                     >
-                        <LogOut size={16} />
-                        Oturumu Kapat
+                        <div className="w-12 h-12 md:w-14 md:h-14 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl md:rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-inner group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500">
+                            <Users size={24} className="md:w-7 md:h-7" />
+                        </div>
+                        <div className="text-left flex-1">
+                            <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white leading-tight">Ailem</h2>
+                            <p className="text-[10px] md:text-xs text-slate-400 font-medium italic mt-0.5">Aile üyeleri ve yönetim</p>
+                        </div>
+                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-slate-300 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                            <ArrowRight size={20} className="md:w-6 md:h-6" />
+                        </div>
                     </button>
                 </div>
 

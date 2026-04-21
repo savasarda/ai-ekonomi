@@ -30,18 +30,29 @@ function App() {
   const { user, session, profile, loading: authLoading, signOut } = useAuth()
   
   const handleSwitchFamily = async () => {
+    if (!window.confirm('Mevcut aile grubundan ayrılıp başka bir gruba geçmek istediğinize emin misiniz?')) return;
+
     if (profile?.family_id) {
+      try {
         const saved = JSON.parse(localStorage.getItem('saved_families') || '[]');
         if (!saved.find(f => f.family_id === profile.family_id)) {
-            saved.push({
-                family_id: profile.family_id,
-                name: profile.families?.name || 'Kayıtlı Aile',
-                invite_code: profile.families?.invite_code
-            });
-            localStorage.setItem('saved_families', JSON.stringify(saved));
+          saved.push({
+            family_id: profile.family_id,
+            name: profile.families?.name || 'Kayıtlı Aile',
+            invite_code: profile.families?.invite_code
+          });
+          localStorage.setItem('saved_families', JSON.stringify(saved));
         }
-        await supabase.from('profiles').update({ family_id: null }).eq('id', profile.id);
-        window.location.reload(); 
+
+        // don't try to update if it's the dev user to avoid hanging on failing internal supabase calls
+        if (profile.id !== 'dev-user') {
+          await supabase.from('profiles').update({ family_id: null }).eq('id', profile.id);
+        }
+      } catch (err) {
+        console.error('Switch family error:', err);
+      } finally {
+        window.location.reload();
+      }
     }
   };
   const [currentView, setCurrentView] = useState('welcome')
@@ -59,6 +70,7 @@ function App() {
   const activeTransactions = data.transactions ? data.transactions.filter(t => t.status != 0) : []
 
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showLimitModal, setShowLimitModal] = useState(false)
 
   const [userLimits, setUserLimits] = useState({})
 
@@ -83,6 +95,7 @@ function App() {
   const [transactionStep, setTransactionStep] = useState(1) // 1: Amount, 2: Details
 
   // User Management State
+  const [showUserModal, setShowUserModal] = useState(false)
   const [newUserName, setNewUserName] = useState('')
 
   // Edit State
@@ -134,13 +147,12 @@ function App() {
   const [passwordInput, setPasswordInput] = useState('')
 
   // Menu Reordering State
-  const defaultMenuOrder = ['family', 'future', 'extract', 'settings']
+  const defaultMenuOrder = ['future', 'users', 'limit', 'extract', 'settings']
   const [menuOrder, setMenuOrder] = useState(() => {
     const saved = localStorage.getItem('menuOrder')
     if (saved) {
       const parsed = JSON.parse(saved)
-      let finalOrder = parsed.filter(item => !['feedback', 'portfolio', 'cards', 'users', 'reset', 'limit'].includes(item))
-      if (!finalOrder.includes('family')) finalOrder.unshift('family')
+      let finalOrder = parsed.filter(item => !['feedback', 'portfolio', 'cards', 'reset', 'family'].includes(item))
       if (!finalOrder.includes('settings')) finalOrder.push('settings')
       return finalOrder
     }
@@ -1081,6 +1093,7 @@ function App() {
           profile={profile}
           onSignOut={signOut}
           onSwitchFamily={handleSwitchFamily}
+          onOpenFamily={() => setShowFamilyModal(true)}
         />
         {showReminderModal && (
           <ReminderModal
@@ -1092,8 +1105,26 @@ function App() {
           isOpen={showFeedbackModal}
           onClose={() => setShowFeedbackModal(false)}
         />
+
+        <SettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+          onOpenUsers={() => { setShowUserModal(true); setIsMenuOpen(false); }}
+          onOpenCards={() => setShowCardsModal(true)}
+          onOpenLimit={() => { setShowLimitModal(true); setIsMenuOpen(false); }}
+          onResetAll={handleResetAllData}
+        />
+
+        <FamilyModal
+          isOpen={showFamilyModal}
+          onClose={() => setShowFamilyModal(false)}
+          profile={profile}
+          onSwitchFamily={handleSwitchFamily}
+          onSignOut={signOut}
+        />
+
         {showSuccessModal && (
-          <div className="absolute inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="absolute inset-0 z-[150] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowSuccessModal(false)}></div>
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
               <div className="text-center mb-6">
@@ -1765,9 +1796,10 @@ function App() {
                       }
                     } else {
                       switch (itemId) {
-                        case 'family': setShowFamilyModal(true); break;
+                        case 'limit': setLimitModalUser(activeUsers[0]?.id); setShowLimitModal(true); break;
                         case 'future': setSelectedMonthDetail(null); setCurrentView('budgetDetail'); break;
                         case 'cards': setShowCardsModal(true); break;
+                        case 'users': setShowUserModal(true); break;
                         case 'reset': handleResetAllData(); break;
                         case 'extract': setExtractFilterUser(null); setShowExtractModal(true); break;
                         case 'portfolio': handleOpenPortfolio(); break;
@@ -1779,9 +1811,10 @@ function App() {
 
                   let label, IconComponent, colorClass, borderColorClass;
                   switch (itemId) {
-                    case 'family': label = 'Ailem'; IconComponent = Users; colorClass = 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'; break;
+                    case 'limit': label = 'Limit'; IconComponent = Gauge; break;
                     case 'future': label = 'Dönemler'; IconComponent = Calendar; break;
                     case 'cards': label = 'Kartlar'; IconComponent = CreditCard; break;
+                    case 'users': label = 'Kişiler'; IconComponent = Users; break;
                     case 'feedback': label = 'İstekler'; IconComponent = MessageSquare; break;
                     case 'reset': label = 'Sıfırla'; IconComponent = Trash2; colorClass = 'bg-red-50 dark:bg-red-900/20 text-red-500/80 dark:text-red-400'; borderColorClass = 'border-red-100 dark:border-red-900/30'; break;
                     case 'extract': label = 'Ekstre'; IconComponent = Receipt; break;
@@ -1809,7 +1842,69 @@ function App() {
 
 
 
-          {/* Budget Management cards removed to declutter - now part of Family Center if needed */}
+          <div className="mx-6 mb-4">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Bütçe Yönetimi</h3>
+            <div className="space-y-3 mb-4">
+              {activeUsers.map(user => {
+                const userAccountIds = activeAccounts.filter(acc => acc.userId === user.id).map(acc => acc.id)
+                const userSpending = activeTransactions
+                  .filter(t => t.date.startsWith(currentMonth) && userAccountIds.includes(t.accountId))
+                  .reduce((acc, curr) => acc + curr.amount, 0)
+
+                const userLimit = userLimits[user.id] || 0
+                const remaining = userLimit - userSpending
+                const percentage = Math.min((userSpending / userLimit) * 100, 100)
+                const isLimitExceeded = userSpending > userLimit
+
+
+                return (
+                  <div
+                    key={user.id}
+                    onClick={() => {
+                      setSelectedMonthDetail({ monthKey: currentMonth, selectedUserId: user.id })
+                      setCurrentView('budgetDetail')
+                    }}
+                    className="bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-indigo-200 ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
+                        {user.symbol || user.name.charAt(0)}
+                      </div>
+                      <span className="font-bold text-gray-800 dark:text-white text-lg transition-colors">{user.name}</span>
+                    </div>
+
+                    <div className="flex justify-between items-end mb-4">
+                      <div>
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Harcanan</p>
+                        <p className={`text-3xl font-black tracking-tight ${isLimitExceeded ? 'text-red-500' : 'text-gray-800 dark:text-white transition-colors'}`}>
+                          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(userSpending)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Kalan</p>
+                        <p className="text-lg font-bold text-gray-600 dark:text-gray-300 transition-colors">
+                          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(remaining)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ease-out ${isLimitExceeded ? 'bg-red-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`}
+                        style={{ width: `${percentage}%` }}
+                      ></div>
+                    </div>
+
+                    <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                      <span>% {percentage.toFixed(0)}</span>
+                      <span>Limit: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(userLimit)}</span>
+                    </div>
+                  </div>
+                )
+
+              })}
+            </div>
+          </div>
 
           <div className="mx-6 mb-8">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Yatırım</h3>
@@ -2177,7 +2272,171 @@ function App() {
       }
 
 
-      {/* Redundant User Modal Removed */}
+      {
+        showLimitModal && (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-all" onClick={() => setShowLimitModal(false)}></div>
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl w-full max-w-[320px] rounded-[40px] p-8 relative z-10 animate-scale-up text-center shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/50 dark:border-slate-800/50">
+              <h3 className="text-xl font-black text-gray-800 dark:text-white mb-8 tracking-tight transition-colors">Limit Ayarları</h3>
+
+              <div className="bg-gray-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl flex mb-8 backdrop-blur-md transition-colors">
+                {activeUsers.map(u => (
+                  <button
+                    key={u.id}
+                    onClick={() => setLimitModalUser(u.id)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 ${limitModalUser === u.id ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400 scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                  >
+                    {u.name}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mb-10 relative">
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-2">Aylık Harcama Limiti</p>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-xl font-black text-indigo-600 dark:text-indigo-500 mt-1">{'\u20BA'}</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={limitModalUser ? userLimits[limitModalUser] : 0}
+                    onChange={(e) => setUserLimits(prev => ({ ...prev, [limitModalUser]: Number(e.target.value) }))}
+                    className="w-48 text-5xl font-black text-indigo-600 dark:text-indigo-500 bg-transparent border-none outline-none text-center tracking-tighter transition-all focus:scale-105 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="relative mb-10 px-2">
+                <input
+                  type="range"
+                  min="0"
+                  max="100000"
+                  step="1000"
+                  className="w-full h-3 bg-gray-200 rounded-full appearance-none cursor-pointer accent-indigo-600 hover:accent-indigo-500 transition-all"
+                  value={limitModalUser ? userLimits[limitModalUser] : 0}
+                  onChange={(e) => setUserLimits(prev => ({ ...prev, [limitModalUser]: Number(e.target.value) }))}
+                />
+                <div className="flex justify-between text-[10px] text-gray-400 font-bold mt-3 uppercase tracking-wider">
+                  <span>0</span>
+                  <span>Limit</span>
+                  <span>100k</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowLimitModal(false)
+                  setLimitModalUser(null)
+                  setSuccessMessage('Limit ayarları başarıyla kaydedildi.')
+                  setShowSuccessModal(true)
+                }}
+                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-100"
+              >
+                Kaydet
+              </button>
+            </div>
+          </div>
+        )
+      }
+
+      {
+        showUserModal && (
+          <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowUserModal(false)}></div>
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[450px] h-[75vh] md:h-[80vh] md:max-h-[800px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+              <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
+
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Kişi Yönetimi</h3>
+                  <p className="text-sm text-gray-500 font-medium">Kullanıcıları düzenleyin</p>
+                </div>
+                <button onClick={() => setShowUserModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar mb-8 pr-2">
+                <div className="space-y-4">
+                  {activeUsers.map(user => (
+                    <div key={user.id} className="bg-white dark:bg-slate-800 p-5 rounded-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100 dark:border-slate-700 flex justify-between items-center group hover:scale-[1.01] transition-all">
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => {
+                            setSelectedUserForSymbol(user.id);
+                            setShowSymbolPicker(true);
+                          }}
+                          className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner transition-transform active:scale-95 group/avatar relative overflow-hidden ${user.id === 'u1' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 shadow-indigo-100/50' : 'bg-pink-50 dark:bg-pink-900/30 text-pink-500 shadow-pink-100/50'}`}
+                        >
+                          <span className="text-2xl z-10">{user.symbol || user.name.charAt(0)}</span>
+                          <div className="absolute inset-0 bg-black/0 group-hover/avatar:bg-black/5 flex items-center justify-center transition-colors">
+                            <Plus size={10} className="opacity-0 group-hover/avatar:opacity-100 text-gray-400 mt-8" />
+                          </div>
+                        </button>
+                        <div>
+                          <p className="font-bold text-gray-800 dark:text-white text-base transition-colors">{user.name}</p>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Kullanıcı</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="w-10 h-10 flex items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-500 opacity-60 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all"
+                        title="Kişiyi Sil"
+                      >
+                        <Trash2 size={16} strokeWidth={2} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-gray-50/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-[32px] p-6 border border-gray-100 dark:border-slate-700 transition-colors">
+                <h4 className="font-bold text-gray-800 dark:text-white text-sm mb-4 flex items-center gap-2 transition-colors">
+                  <span className="w-6 h-6 bg-teal-100 dark:bg-teal-900/30 rounded-full flex items-center justify-center text-xs text-teal-600 dark:text-teal-400"><Plus size={14} /></span>
+                  Yeni Kişi Ekle
+                </h4>
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    placeholder="İsim Girin"
+                    className="flex-1 p-4 bg-white dark:bg-slate-900 rounded-2xl text-sm font-bold outline-none border border-transparent focus:ring-2 focus:ring-teal-100 dark:focus:ring-teal-900 transition-all placeholder-gray-300 dark:placeholder-gray-600 text-gray-800 dark:text-white"
+                    value={newUserName}
+                    onChange={e => setNewUserName(e.target.value)}
+                  />
+                  <button
+                    onClick={handleAddUser}
+                    className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 w-14 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-lg hover:scale-105 active:scale-95 transition-all"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Symbol Picker Overlay */}
+            {showSymbolPicker && (
+              <div className="absolute inset-0 z-[70] flex items-center justify-center p-6 sm:p-12 pointer-events-auto">
+                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-all animate-fade-in" onClick={() => setShowSymbolPicker(false)}></div>
+                <div className="bg-white/98 dark:bg-slate-900/98 backdrop-blur-2xl w-full max-w-[320px] rounded-[40px] p-8 relative z-[80] animate-scale-up shadow-3xl border border-white/50 dark:border-slate-800/50">
+                  <div className="flex justify-between items-center mb-6">
+                    <h4 className="text-lg font-black text-gray-800 dark:text-white tracking-tight transition-colors">Sembol Seç</h4>
+                    <button onClick={() => setShowSymbolPicker(false)} className="text-gray-400 hover:text-gray-600 font-bold transition-colors">✕</button>
+                  </div>
+                  <div className="grid grid-cols-4 gap-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2 pb-2">
+                    {availableSymbols.map(sym => (
+                      <button
+                        key={sym}
+                        onClick={() => handleUpdateUserSymbol(selectedUserForSymbol, sym)}
+                        className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 flex items-center justify-center text-2xl transition-all hover:scale-110 active:scale-90 border border-transparent hover:border-indigo-100 dark:hover:border-indigo-800"
+                      >
+                        {sym}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      }
 
 
       {
@@ -2589,9 +2848,9 @@ function App() {
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        onOpenUsers={() => { setShowFamilyModal(true); setIsMenuOpen(false); }}
+        onOpenUsers={() => { setShowUserModal(true); setIsMenuOpen(false); }}
         onOpenCards={() => setShowCardsModal(true)}
-        onOpenLimit={() => { setShowFamilyModal(true); setIsMenuOpen(false); }}
+        onOpenLimit={() => { setShowLimitModal(true); setIsMenuOpen(false); }}
         onResetAll={handleResetAllData}
       />
 
@@ -2599,33 +2858,6 @@ function App() {
         isOpen={showFamilyModal}
         onClose={() => setShowFamilyModal(false)}
         profile={profile}
-        activeUsers={activeUsers}
-        userLimits={userLimits}
-        activeAccounts={activeAccounts}
-        activeTransactions={activeTransactions}
-        currentMonth={currentMonth}
-        onUpdateLimit={(userId, limit) => setUserLimits(prev => ({ ...prev, [userId]: limit }))}
-        onAddUser={(name) => {
-          if (!name.trim()) return;
-          const newUserObj = {
-            id: 'u' + (data.users.length + 1) + Math.random().toString(36).substr(2, 5),
-            name: name.trim(),
-            symbol: name.trim().charAt(0),
-            status: 1
-          };
-          setData(prev => ({ ...prev, users: [...prev.users, newUserObj] }));
-          setUserLimits(prev => ({ ...prev, [newUserObj.id]: 10000 }));
-        }}
-        onDeleteUser={(userId) => {
-          if (activeUsers.length <= 1) {
-            alert('En az bir kullanıcı kalmalıdır.');
-            return;
-          }
-          if (window.confirm('Bu kişiyi silmek istediğinize emin misiniz?')) {
-            setData(prev => ({ ...prev, users: prev.users.map(u => u.id === userId ? { ...u, status: 0 } : u) }));
-          }
-        }}
-        onUpdateUserSymbol={handleUpdateUserSymbol}
         onSwitchFamily={handleSwitchFamily}
         onSignOut={signOut}
       />
