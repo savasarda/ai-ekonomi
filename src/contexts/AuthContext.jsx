@@ -4,33 +4,65 @@ import { supabase } from '../lib/supabaseClient';
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [session, setSession] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const isLocal = typeof window !== 'undefined' && 
+                 (window.location.hostname === 'localhost' || 
+                  window.location.hostname === '127.0.0.1' ||
+                  window.location.hostname.startsWith('192.168.') ||
+                  window.location.hostname.endsWith('.local'));
+
+  const [user, setUser] = useState(isLocal ? { id: 'dev-user', email: 'dev@example.com' } : null);
+  const [session, setSession] = useState(isLocal ? { user: { id: 'dev-user', email: 'dev@example.com' } } : null);
+  const [profile, setProfile] = useState(isLocal ? {
+    id: 'dev-user',
+    family_id: 'dev-family',
+    families: { name: 'Geliştirici Ailesi', invite_code: 'DEV123' }
+  } : null);
+  const [loading, setLoading] = useState(!isLocal);
 
   useEffect(() => {
+    const handleLocalDev = () => {
+      const mockUser = { id: 'dev-user', email: 'dev@example.com' };
+      setSession({ user: mockUser });
+      setUser(mockUser);
+      setProfile({
+        id: 'dev-user',
+        family_id: 'dev-family',
+        families: { name: 'Geliştirici Ailesi', invite_code: 'DEV123' }
+      });
+      setLoading(false);
+    };
+
     // Check active sessions
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else setLoading(false);
+      if (session) {
+        setSession(session);
+        setUser(session.user);
+        fetchProfile(session.user.id);
+      } else if (isLocal) {
+        handleLocalDev();
+      } else {
+        setLoading(false);
+      }
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else {
+      if (session) {
+        setSession(session);
+        setUser(session.user);
+        fetchProfile(session.user.id);
+      } else if (isLocal) {
+        handleLocalDev();
+      } else {
+        setSession(null);
+        setUser(null);
         setProfile(null);
         setLoading(false);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [isLocal]);
 
   const fetchProfile = async (userId) => {
     try {
