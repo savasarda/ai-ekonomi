@@ -1,2 +1,5 @@
-/api/truncgil/*  /.netlify/functions/gold-proxy/:splat  200
+# Proxy for Altın Kurları (CORS bypass for Netlify)
+/api/truncgil/*  https://finans.truncgil.com/:splat  200
+
+# React Router Fallback
 /* /index.html 200
