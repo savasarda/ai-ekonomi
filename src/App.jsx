@@ -69,6 +69,18 @@ function App() {
   const activeAccounts = data.accounts ? data.accounts.filter(a => a.status != 0) : []
   const activeTransactions = data.transactions ? data.transactions.filter(t => t.status != 0) : []
 
+  // Authority Logic
+  const isFamilyAdmin = profile?.id === profile?.families?.created_by;
+  const isAuthorized = (targetUserId) => {
+    if (isFamilyAdmin) return true;
+    const targetUser = activeUsers.find(u => u.id === targetUserId);
+    return targetUser?.profileId === profile?.id;
+  };
+
+  // Filtered users for adding transactions
+  const authorizedUsers = activeUsers.filter(u => isAuthorized(u.id));
+
+
   const [showAddModal, setShowAddModal] = useState(false)
   const [showLimitModal, setShowLimitModal] = useState(false)
 
@@ -870,6 +882,20 @@ function App() {
     }
   }
 
+  const handleClaimAccount = async (userId) => {
+    if (!profile?.id || !isSupabaseConfigured) return;
+    try {
+      const { error } = await supabase.from('users').update({ profile_id: profile.id }).eq('id', userId);
+      if (error) throw error;
+      alert("Hesabınız bu kişiyle başarıyla eşleştirildi.");
+      fetchInitialData();
+    } catch (err) {
+      console.error("Claim error", err);
+      alert("Hata: " + err.message);
+    }
+  };
+
+
   const handleResetAllData = async () => {
     // Show password modal
     setPasswordInput('')
@@ -917,6 +943,7 @@ function App() {
         const { data: logs, error } = await supabase
           .from('portfolio_logs')
           .select('total_value, items')
+          .eq('family_id', profile.family_id)
           .order('created_at', { ascending: false })
           .limit(1)
 
@@ -1366,32 +1393,34 @@ function App() {
               </div>
 
               {/* Quick Add Button */}
-              <div className="mb-4">
-                <button
-                  onClick={() => {
-                    const userId = selectedMonthDetail.selectedUserId
-                    setNewUser(userId)
-                    handleUserChange(userId)
+              {isAuthorized(selectedMonthDetail.selectedUserId) && (
+                <div className="mb-4">
+                  <button
+                    onClick={() => {
+                      const userId = selectedMonthDetail.selectedUserId
+                      setNewUser(userId)
+                      handleUserChange(userId)
 
-                    const now = new Date()
-                    const currentMonthStr = now.toISOString().slice(0, 7)
-                    if (selectedMonthDetail.monthKey === currentMonthStr) {
-                      setDate(now.toISOString().split('T')[0])
-                    } else {
-                      setDate(selectedMonthDetail.monthKey + '-01')
-                    }
+                      const now = new Date()
+                      const currentMonthStr = now.toISOString().slice(0, 7)
+                      if (selectedMonthDetail.monthKey === currentMonthStr) {
+                        setDate(now.toISOString().split('T')[0])
+                      } else {
+                        setDate(selectedMonthDetail.monthKey + '-01')
+                      }
 
-                    setTransactionStep(1)
-                    setAmount('')
-                    setEditingTransaction(null)
-                    setShowAddModal(true)
-                  }}
-                  className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl p-4 text-white shadow-lg shadow-indigo-200 dark:shadow-none hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
-                >
-                  <Plus size={20} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform duration-300" />
-                  <span className="font-bold">Harcama Ekle</span>
-                </button>
-              </div>
+                      setTransactionStep(1)
+                      setAmount('')
+                      setEditingTransaction(null)
+                      setShowAddModal(true)
+                    }}
+                    className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl p-4 text-white shadow-lg shadow-indigo-200 dark:shadow-none hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 group"
+                  >
+                    <Plus size={20} strokeWidth={2.5} className="group-hover:rotate-90 transition-transform duration-300" />
+                    <span className="font-bold">Harcama Ekle</span>
+                  </button>
+                </div>
+              )}
 
               {/* Transaction List */}
               <div className="space-y-3">
@@ -2041,7 +2070,7 @@ function App() {
                       </div>
 
                       <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 mb-6 border border-gray-100 dark:border-slate-700 transition-colors">
-                        {activeUsers.map(u => (
+                        {authorizedUsers.map(u => (
                           <button
                             key={u.id}
                             type="button"
@@ -2054,6 +2083,12 @@ function App() {
                             {u.name}
                           </button>
                         ))}
+                        {authorizedUsers.length === 0 && (
+                          <div className="w-full py-4 px-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800/50 text-center">
+                            <p className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Yetkiniz Yok</p>
+                            <p className="text-[11px] text-amber-500 dark:text-amber-500 leading-tight">Yönetim menüsünden kendi adınızı <b>"Bu Benim"</b> seçeneği ile eşleştirin.</p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-6 mb-6">
@@ -2376,13 +2411,28 @@ function App() {
                           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Kullanıcı</p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="w-10 h-10 flex items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-500 opacity-60 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all"
-                        title="Kişiyi Sil"
-                      >
-                        <Trash2 size={16} strokeWidth={2} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {!user.profileId && (
+                          <button
+                            onClick={() => handleClaimAccount(user.id)}
+                            className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-lg border border-indigo-100 dark:border-indigo-800/50 hover:bg-indigo-100 transition-all active:scale-95"
+                          >
+                            Bu Benim
+                          </button>
+                        )}
+                        {user.profileId === profile?.id && (
+                          <span className="px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[10px] font-black uppercase rounded-lg border border-green-100 dark:border-green-800/50">
+                            Siz
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="w-10 h-10 flex items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-500 opacity-60 hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/40 transition-all"
+                          title="Kişiyi Sil"
+                        >
+                          <Trash2 size={16} strokeWidth={2} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2685,6 +2735,7 @@ function App() {
         isSupabaseConfigured={isSupabaseConfigured}
         isBalanceHidden={isBalanceHidden}
         setIsBalanceHidden={setIsBalanceHidden}
+        profile={profile}
       />
 
       {/* Floating Action Button Removed */}

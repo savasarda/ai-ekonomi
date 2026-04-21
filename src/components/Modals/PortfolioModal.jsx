@@ -13,7 +13,8 @@ export default function PortfolioModal({
     lastUpdateTime,
     isSupabaseConfigured,
     isBalanceHidden,
-    setIsBalanceHidden
+    setIsBalanceHidden,
+    profile
 }) {
     const [showHistory, setShowHistory] = useState(false)
     const [portfolioHistory, setPortfolioHistory] = useState([])
@@ -36,6 +37,7 @@ export default function PortfolioModal({
             const { data: logs, error } = await supabase
                 .from('portfolio_logs')
                 .select('*')
+                .eq('family_id', profile.family_id)
                 .order('created_at', { ascending: false })
                 .limit(20)
 
@@ -449,6 +451,7 @@ export default function PortfolioModal({
                                                 {
                                                     items: portfolio.items,
                                                     total_value: currentTotal,
+                                                    family_id: profile.family_id
                                                 }
                                             ]).then(({ error }) => {
                                                 if (error) console.error("Log insert error", error)
@@ -457,7 +460,8 @@ export default function PortfolioModal({
                                             // 2. Update/Upsert Main State (for main screen)
                                             supabase.from('portfolios').upsert([
                                                 {
-                                                    id: 1, // Assuming single user/portfolio for now, adjust if multiple users
+                                                    id: `portfolio_${profile.family_id}`,
+                                                    family_id: profile.family_id,
                                                     items: JSON.stringify(portfolio.items),
                                                     last_total: currentTotal,
                                                     last_updated: new Date().toISOString()
