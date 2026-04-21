@@ -87,6 +87,14 @@ function App() {
   const isFamilyAdmin = profile?.id === profile?.families?.created_by;
   const isAuthorized = (targetUserId) => {
     if (isFamilyAdmin) return true;
+    
+    // Check if the current profile has CLAIMED any user in this family
+    const hasClaimedAny = activeUsers.some(u => u.profileId === profile?.id);
+    
+    // If they haven't claimed anyone yet, everyone is accessible (initial state)
+    if (!hasClaimedAny) return true;
+    
+    // Once they claim a person, they are restricted to ONLY that person
     const targetUser = activeUsers.find(u => u.id === targetUserId);
     return targetUser?.profileId === profile?.id;
   };
@@ -1152,6 +1160,7 @@ function App() {
           onCheckReminders={handleCheckReminders}
           onShowFeedback={() => setShowFeedbackModal(true)}
           profile={profile}
+          isFamilyAdmin={isFamilyAdmin}
           onSignOut={signOut}
           onSwitchFamily={handleSwitchFamily}
           onOpenFamily={() => setShowFamilyModal(true)}

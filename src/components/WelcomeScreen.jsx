@@ -17,7 +17,7 @@ const financialTips = [
     "Acil durum fonu oluştur. Kenarda en az 3 aylık giderin kadar nakit bulundur."
 ];
 
-const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders, onShowFeedback, profile, onSignOut, onSwitchFamily, onOpenFamily }) => {
+const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders, onShowFeedback, profile, onSignOut, onSwitchFamily, onOpenFamily, isFamilyAdmin }) => {
     const [currentTip] = useState(financialTips[Math.floor(Math.random() * financialTips.length)]);
     const [copied, setCopied] = useState(false);
     const today = new Date();
@@ -85,6 +85,11 @@ const WelcomeScreen = ({ onNavigate, darkMode, toggleTheme, onCheckReminders, on
                     </div>
                     <h1 className="text-2xl md:text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1 md:mb-2">
                         Merhaba, <span className="text-indigo-600 dark:text-indigo-400">Hoş Geldin!</span>
+                        {isFamilyAdmin && (
+                            <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] md:text-xs font-black bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 tracking-wider uppercase">
+                                Yönetici
+                            </span>
+                        )}
                     </h1>
                     <p className="text-xs md:text-base text-gray-400 dark:text-gray-500 font-medium">Finansal asistanın bugün senin için hazır.</p>
                 </div>
