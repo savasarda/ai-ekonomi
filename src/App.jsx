@@ -1193,6 +1193,41 @@ function App() {
           onSignOut={signOut}
         />
 
+        {showSwitchFamilyModal && (
+          <div className="absolute inset-0 z-[130] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowSwitchFamilyModal(false)}></div>
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users size={40} className="text-indigo-500" />
+                </div>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Aileyi Değiştir?</h3>
+                <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                  Mevcut aile grubundan ayrılıp başka bir gruba geçmek istediğinize emin misiniz?
+                </p>
+                <p className="text-xs text-gray-400 mt-4 px-4">
+                  Mevcut grubunuzun bilgilerini tekrar girmek için davet koduna ihtiyacınız olacak.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSwitchFamilyModal(false)}
+                  className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={confirmSwitchFamily}
+                  className="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95"
+                >
+                  Değiştir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showSuccessModal && (
           <div className="absolute inset-0 z-[150] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowSuccessModal(false)}></div>
@@ -2962,7 +2997,7 @@ function App() {
 
       {/* Switch Family Confirmation Modal */}
       {showSwitchFamilyModal && (
-        <div className="absolute inset-0 z-[120] flex items-center justify-center p-4">
+        <div className="absolute inset-0 z-[130] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowSwitchFamilyModal(false)}></div>
           <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
             <div className="text-center mb-8">
