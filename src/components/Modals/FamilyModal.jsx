@@ -1,4 +1,4 @@
-import { X, Users, Share2, MessageCircle, Check, Gauge, UserPlus, Trash2, Edit2, ChevronRight, Hash, ShieldCheck, Settings } from 'lucide-react'
+import { X, Users, Share2, MessageCircle, Check, Gauge, UserPlus, Trash2, Edit2, ChevronRight, Hash, ShieldCheck, Settings, LogOut } from 'lucide-react'
 import { useState } from 'react';
 
 export default function FamilyModal({
@@ -7,11 +7,15 @@ export default function FamilyModal({
     profile,
     activeUsers,
     userLimits,
+    activeAccounts,
+    activeTransactions,
+    currentMonth,
     onUpdateLimit,
     onAddUser,
     onDeleteUser,
     onUpdateUserSymbol,
-    onSwitchFamily
+    onSwitchFamily,
+    onSignOut
 }) {
     const [copied, setCopied] = useState(false);
     const [newUserName, setNewUserName] = useState('');
@@ -113,26 +117,54 @@ export default function FamilyModal({
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-8 pb-8">
                     {activeTab === 'members' && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                            <div className="space-y-3 mb-8">
-                                {activeUsers.map(user => (
-                                    <div key={user.id} className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-gray-100 dark:border-slate-700 flex justify-between items-center group transition-all">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner ${user.id === 'u1' ? 'bg-indigo-50 text-indigo-500' : 'bg-pink-50 text-pink-500'}`}>
-                                                {user.symbol || user.name.charAt(0)}
+                            <div className="space-y-4 mb-8">
+                                {activeUsers.map(user => {
+                                    const userAccountIds = activeAccounts?.filter(acc => acc.userId === user.id).map(acc => acc.id) || [];
+                                    const userSpending = activeTransactions
+                                        ?.filter(t => t.date.startsWith(currentMonth) && userAccountIds.includes(t.accountId))
+                                        .reduce((acc, curr) => acc + curr.amount, 0) || 0;
+                                    const userLimit = userLimits[user.id] || 0;
+                                    const percentage = userLimit > 0 ? Math.min((userSpending / userLimit) * 100, 100) : 0;
+                                    const isLimitExceeded = userSpending > userLimit && userLimit > 0;
+
+                                    return (
+                                        <div key={user.id} className="bg-white dark:bg-slate-800 p-5 rounded-[32px] border border-gray-100 dark:border-slate-700 shadow-sm transition-all">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner ${user.id === 'u1' ? 'bg-indigo-50 text-indigo-500' : 'bg-pink-50 text-pink-500'}`}>
+                                                        {user.symbol || user.name.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-800 dark:text-white text-base">{user.name}</p>
+                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Harcama Durumu</p>
+                                                    </div>
+                                                </div>
+                                                <button 
+                                                    onClick={() => onDeleteUser(user.id)}
+                                                    className="w-10 h-10 flex items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-500 opacity-40 hover:opacity-100 transition-all"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
                                             </div>
-                                            <div>
-                                                <p className="font-bold text-gray-800 dark:text-white text-base">{user.name}</p>
-                                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Grup Üyesi</p>
+
+                                            <div className="flex justify-between items-end mb-2 px-1">
+                                                <p className={`text-lg font-black ${isLimitExceeded ? 'text-red-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                                                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(userSpending)}
+                                                </p>
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase">
+                                                    Limit: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(userLimit)}
+                                                </p>
+                                            </div>
+
+                                            <div className="h-2 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                <div 
+                                                    className={`h-full transition-all duration-1000 ease-out ${isLimitExceeded ? 'bg-red-500' : 'bg-indigo-500'}`}
+                                                    style={{ width: `${percentage}%` }}
+                                                />
                                             </div>
                                         </div>
-                                        <button 
-                                            onClick={() => onDeleteUser(user.id)}
-                                            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-500 opacity-60 hover:opacity-100 transition-all"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
 
                             <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-6 rounded-[32px] border border-indigo-100/50 dark:border-indigo-900/30">
@@ -229,6 +261,22 @@ export default function FamilyModal({
                                     Davet kodunu paylaştığınız kişiler tüm harcama geçmişini görebilir ve yeni işlemler ekleyebilir. Kodu yalnızca güvendiğiniz aile üyeleriyle paylaşın.
                                 </p>
                             </div>
+
+                            <button 
+                                onClick={onSignOut}
+                                className="w-full bg-red-50 dark:bg-red-900/10 p-6 rounded-[32px] border border-red-100 dark:border-red-900/30 flex items-center justify-between group hover:border-red-500 transition-all active:scale-[0.98] shadow-sm mt-8"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400">
+                                        <LogOut size={24} />
+                                    </div>
+                                    <div className="text-left">
+                                        <p className="font-bold text-red-800 dark:text-red-200 text-base">Oturumu Kapat</p>
+                                        <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Altın verilerinizi güvenceye alın</p>
+                                    </div>
+                                </div>
+                                <ChevronRight size={18} className="text-red-300 group-hover:text-red-500 transition-colors" />
+                            </button>
                         </div>
                     )}
                 </div>

@@ -1809,69 +1809,7 @@ function App() {
 
 
 
-          <div className="mx-6 mb-4">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Bütçe Yönetimi</h3>
-            <div className="space-y-3 mb-4">
-              {activeUsers.map(user => {
-                const userAccountIds = activeAccounts.filter(acc => acc.userId === user.id).map(acc => acc.id)
-                const userSpending = activeTransactions
-                  .filter(t => t.date.startsWith(currentMonth) && userAccountIds.includes(t.accountId))
-                  .reduce((acc, curr) => acc + curr.amount, 0)
-
-                const userLimit = userLimits[user.id] || 0
-                const remaining = userLimit - userSpending
-                const percentage = Math.min((userSpending / userLimit) * 100, 100)
-                const isLimitExceeded = userSpending > userLimit
-
-
-                return (
-                  <div
-                    key={user.id}
-                    onClick={() => {
-                      setSelectedMonthDetail({ monthKey: currentMonth, selectedUserId: user.id })
-                      setCurrentView('budgetDetail')
-                    }}
-                    className="bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-indigo-200 ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
-                        {user.symbol || user.name.charAt(0)}
-                      </div>
-                      <span className="font-bold text-gray-800 dark:text-white text-lg transition-colors">{user.name}</span>
-                    </div>
-
-                    <div className="flex justify-between items-end mb-4">
-                      <div>
-                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Harcanan</p>
-                        <p className={`text-3xl font-black tracking-tight ${isLimitExceeded ? 'text-red-500' : 'text-gray-800 dark:text-white transition-colors'}`}>
-                          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(userSpending)}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Kalan</p>
-                        <p className="text-lg font-bold text-gray-600 dark:text-gray-300 transition-colors">
-                          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(remaining)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
-                      <div
-                        className={`h-full rounded-full transition-all duration-1000 ease-out ${isLimitExceeded ? 'bg-red-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`}
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
-
-                    <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      <span>% {percentage.toFixed(0)}</span>
-                      <span>Limit: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(userLimit)}</span>
-                    </div>
-                  </div>
-                )
-
-              })}
-            </div>
-          </div>
+          {/* Budget Management cards removed to declutter - now part of Family Center if needed */}
 
           <div className="mx-6 mb-8">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Yatırım</h3>
@@ -2663,6 +2601,9 @@ function App() {
         profile={profile}
         activeUsers={activeUsers}
         userLimits={userLimits}
+        activeAccounts={activeAccounts}
+        activeTransactions={activeTransactions}
+        currentMonth={currentMonth}
         onUpdateLimit={(userId, limit) => setUserLimits(prev => ({ ...prev, [userId]: limit }))}
         onAddUser={(name) => {
           if (!name.trim()) return;
@@ -2686,6 +2627,7 @@ function App() {
         }}
         onUpdateUserSymbol={handleUpdateUserSymbol}
         onSwitchFamily={handleSwitchFamily}
+        onSignOut={signOut}
       />
     </div >
   )
