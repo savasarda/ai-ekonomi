@@ -70,7 +70,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
                 supabase.removeChannel(sub);
             };
         }
-    }, [isSupabaseConfigured]);
+    }, [isSupabaseConfigured, profile?.family_id]);
 
     const handleAddItem = async (text) => {
         if (!text.trim()) return;
@@ -90,6 +90,12 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
         setSuggestions(commonItems);
 
         if (isSupabaseConfigured) {
+            if (!profile?.family_id) {
+                alert("Hata: Aile kimliği bulunamadı. Lütfen sayfayı yenileyin.");
+                setNeeds(needs);
+                return;
+            }
+
             try {
                 // Insert and return the record to get the real UUID
                 const { data, error } = await supabase
@@ -97,7 +103,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
                     .insert([{ 
                         text: newItemObj.text, 
                         completed: false,
-                        family_id: profile?.family_id 
+                        family_id: profile.family_id 
                     }])
                     .select()
                     .single();

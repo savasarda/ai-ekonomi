@@ -1818,7 +1818,7 @@ function App() {
             {/* Header: Status Indicators & Days Left */}
             <div className="flex items-center justify-between">
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 md:gap-3">
                 <button
                   onClick={() => setCurrentView('welcome')}
                   className="w-10 h-10 shrink-0 bg-white dark:bg-slate-800 shadow-sm rounded-xl flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95"
@@ -1842,7 +1842,7 @@ function App() {
                     setAmount('')
                     setShowAddModal(true)
                   }}
-                  className="h-9 px-3 shrink-0 bg-indigo-600 shadow-lg shadow-indigo-100 dark:shadow-none rounded-xl flex items-center justify-center gap-1.5 text-white hover:bg-indigo-700 transition-all active:scale-95"
+                  className="h-9 px-2 md:px-3 shrink-0 bg-indigo-600 shadow-lg shadow-indigo-100 dark:shadow-none rounded-xl flex items-center justify-center gap-1.5 text-white hover:bg-indigo-700 transition-all active:scale-95"
                   title="Harcama Ekle"
                 >
                   <Plus size={16} strokeWidth={3} />
@@ -1850,17 +1850,21 @@ function App() {
                 </button>
               </div>
 
+
               {(() => {
                 const now = new Date();
                 const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 const daysLeft = lastDay.getDate() - now.getDate();
                 return (
-                  <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm">
+                  <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 md:px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm shrink-0">
                     <span className="text-[8px] font-black uppercase mb-0.5 tracking-wider">Yeni Döneme</span>
-                    <span className="text-xs font-black leading-none">{daysLeft === 0 ? "Yarın Yeni Dönem" : `${daysLeft} Gün`}</span>
+                    <span className="text-xs font-black leading-none">{daysLeft === 0 ? "Yarın" : `${daysLeft} Gün`}</span>
                   </div>
                 );
               })()}
+
+
+
             </div>
           </header>
 
