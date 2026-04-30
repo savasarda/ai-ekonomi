@@ -25,14 +25,19 @@ serve(async (req) => {
     // 1. O aileye ait tüm FCM Token'ları çek
     const { data: profiles, error: pErr } = await supabase
       .from('profiles')
-      .select('fcm_token')
+      .select('fcm_token, id')
       .eq('family_id', family_id)
       .not('fcm_token', 'is', null)
 
     if (pErr) throw pErr
-    const tokens = profiles.map(p => p.fcm_token)
+
+    // Göndereni (admin) hariç tut ve aynı cihaza mükerrer gitmemesi için tekilleştir (Set)
+    const filteredProfiles = profiles.filter(p => p.id !== record.sender_id)
+    const tokens = [...new Set(filteredProfiles.map(p => p.fcm_token))]
 
     if (tokens.length === 0) {
+      // Gönderilecek cihaz yoksa status'u iptal/failed yap
+      await supabase.from('notification_queue').update({ status: 'no_device' }).eq('id', record.id)
       return new Response(JSON.stringify({ message: 'Gönderilecek cihaz bulunamadı.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -62,6 +67,16 @@ serve(async (req) => {
     })
 
   } catch (error) {
+    // Hata olursa veritabanında status'u error yapalım
+    try {
+        const payload = await req.json().catch(() => ({}));
+        if (payload?.record?.id) {
+            await supabase.from('notification_queue').update({ status: 'error', error_log: error.message }).eq('id', payload.record.id)
+        }
+    } catch (e) {
+        // Log update failed, ignore
+    }
+
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,

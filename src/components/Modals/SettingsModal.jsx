@@ -146,9 +146,27 @@ export default function SettingsModal({
                             </div>
                             <div className="text-left flex-1 min-w-0">
                                 <p className="font-bold text-gray-800 dark:text-white">Bildirim Durumu</p>
-                                <p className="text-[10px] text-gray-400 font-bold truncate">
-                                    {profile?.fcm_token ? 'Aktif: ' + profile.fcm_token.substring(0, 15) + '...' : 'İzin verilmedi veya kurulu değil'}
-                                </p>
+                                {profile?.fcm_token ? (
+                                    <p className="text-[10px] text-gray-400 font-bold truncate">
+                                        Aktif: {profile.fcm_token.substring(0, 15)}...
+                                    </p>
+                                ) : (
+                                    <button 
+                                        onClick={async () => {
+                                            const { requestNotificationPermission } = await import('../../lib/firebase');
+                                            const token = await requestNotificationPermission();
+                                            if (token) {
+                                                await supabase.from('profiles').update({ fcm_token: token }).eq('id', profile.id);
+                                                window.location.reload();
+                                            } else {
+                                                alert("Bildirim izni alınamadı. Telefon ayarlarından uygulamanın bildirimlerine izin verdiğinizden emin olun.");
+                                            }
+                                        }}
+                                        className="mt-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all"
+                                    >
+                                        Bildirimleri Aç
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
