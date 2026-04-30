@@ -14,14 +14,8 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// FCM, 'notification' payload'unu otomatik olarak gösterir.
+// Çifte bildirimi engellemek için manuel showNotification çağrısını sildik.
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/pwa-icon.png'
-  };
-
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  console.log('[firebase-messaging-sw.js] Arka plan mesajı alındı, sistem otomatik gösterecek: ', payload);
 });
