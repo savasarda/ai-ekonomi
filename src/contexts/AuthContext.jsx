@@ -10,24 +10,27 @@ export const AuthProvider = ({ children }) => {
                   window.location.hostname.startsWith('192.168.') ||
                   window.location.hostname.endsWith('.local'));
 
-  const [user, setUser] = useState(isLocal ? { id: 'dev-user', email: 'dev@example.com' } : null);
-  const [session, setSession] = useState(isLocal ? { user: { id: 'dev-user', email: 'dev@example.com' } } : null);
+  const mockUUID = '00000000-0000-0000-0000-000000000000';
+  const mockFamilyUUID = '11111111-1111-1111-1111-111111111111';
+
+  const [user, setUser] = useState(isLocal ? { id: mockUUID, email: 'dev@example.com' } : null);
+  const [session, setSession] = useState(isLocal ? { user: { id: mockUUID, email: 'dev@example.com' } } : null);
   const [profile, setProfile] = useState(isLocal ? {
-    id: 'dev-user',
-    family_id: 'dev-family',
-    families: { name: 'Geliştirici Ailesi', invite_code: 'DEV123' }
+    id: mockUUID,
+    family_id: mockFamilyUUID,
+    families: { id: mockFamilyUUID, name: 'Geliştirici Ailesi', invite_code: 'DEV123', created_by: mockUUID }
   } : null);
   const [loading, setLoading] = useState(!isLocal);
 
   useEffect(() => {
-    const handleLocalDev = () => {
-      const mockUser = { id: 'dev-user', email: 'dev@example.com' };
+    if (isLocal) {
+      const mockUser = { id: mockUUID, email: 'dev@example.com' };
       setSession({ user: mockUser });
       setUser(mockUser);
       setProfile({
-        id: 'dev-user',
-        family_id: 'dev-family',
-        families: { name: 'Geliştirici Ailesi', invite_code: 'DEV123' }
+        id: mockUUID,
+        family_id: mockFamilyUUID,
+        families: { id: mockFamilyUUID, name: 'Geliştirici Ailesi', invite_code: 'DEV123', created_by: mockUUID }
       });
       setLoading(false);
     };

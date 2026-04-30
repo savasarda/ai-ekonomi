@@ -1,4 +1,4 @@
-import { X, Users, CreditCard, Trash2, ChevronRight, Settings, Gauge, LogOut, Share2, MessageCircle, Check } from 'lucide-react'
+import { X, Users, CreditCard, Trash2, ChevronRight, Settings, Gauge, LogOut, Share2, MessageCircle, Check, Bell, Loader2 } from 'lucide-react'
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
@@ -9,10 +9,45 @@ export default function SettingsModal({
     onOpenUsers,
     onOpenCards,
     onOpenLimit,
-    onResetAll
+    onResetAll,
+    isFamilyAdmin
 }) {
     const { signOut, profile } = useAuth();
     const [copied, setCopied] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+    const [showAnnouncement, setShowAnnouncement] = useState(false);
+    const [announcementText, setAnnouncementText] = useState('');
+    const [success, setSuccess] = useState(false);
+
+    const handleSendAnnouncement = async () => {
+        if (!announcementText.trim() || isSending) return;
+
+        setIsSending(true);
+        try {
+            const { error } = await supabase
+                .from('notification_queue')
+                .insert({
+                    family_id: profile.family_id,
+                    sender_id: profile.id,
+                    title: 'Aile Duyurusu',
+                    message: announcementText.trim()
+                });
+
+            if (error) throw error;
+            
+            setSuccess(true);
+            setAnnouncementText('');
+            setTimeout(() => {
+                setSuccess(false);
+                setShowAnnouncement(false);
+            }, 3000);
+        } catch (err) {
+            console.error('Duyuru gönderme hatası:', err);
+            alert('Duyuru gönderilemedi. Lütfen tekrar deneyin.');
+        } finally {
+            setIsSending(false);
+        }
+    };
     
     if (!isOpen) return null;
 
@@ -103,6 +138,79 @@ export default function SettingsModal({
                         </div>
                         <ChevronRight size={18} className="text-gray-300 group-hover:text-orange-500 transition-colors" />
                     </button>
+
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${profile?.fcm_token ? 'bg-green-50 dark:bg-green-900/30 text-green-600' : 'bg-gray-50 dark:bg-slate-800 text-gray-400'}`}>
+                                <Bell size={24} />
+                            </div>
+                            <div className="text-left flex-1 min-w-0">
+                                <p className="font-bold text-gray-800 dark:text-white">Bildirim Durumu</p>
+                                <p className="text-[10px] text-gray-400 font-bold truncate">
+                                    {profile?.fcm_token ? 'Aktif: ' + profile.fcm_token.substring(0, 15) + '...' : 'İzin verilmedi veya kurulu değil'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {isFamilyAdmin && (
+                        <div className="pt-2">
+                            {!showAnnouncement ? (
+                                <button 
+                                    onClick={() => setShowAnnouncement(true)}
+                                    className="w-full bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-3xl border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-between group hover:bg-indigo-100 transition-all active:scale-[0.98]"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm">
+                                            <MessageCircle size={24} />
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="font-bold text-indigo-700 dark:text-indigo-400">Duyuru Gönder</p>
+                                            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Tüm aileye bildirim gider</p>
+                                        </div>
+                                    </div>
+                                    <ChevronRight size={18} className="text-indigo-300 group-hover:text-indigo-500 transition-colors" />
+                                </button>
+                            ) : (
+                                <div className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-[32px] border border-indigo-100 dark:border-indigo-900/30 animate-in zoom-in-95 duration-200">
+                                    <h4 className="text-sm font-black text-indigo-900 dark:text-indigo-300 mb-3 flex items-center gap-2">
+                                        <MessageCircle size={16} />
+                                        Aile Duyurusu
+                                    </h4>
+                                    <textarea
+                                        value={announcementText}
+                                        onChange={(e) => setAnnouncementText(e.target.value)}
+                                        placeholder="Mesajınızı buraya yazın..."
+                                        className="w-full bg-white dark:bg-slate-800 border-none rounded-2xl p-4 text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 min-h-[100px] mb-3 resize-none shadow-inner"
+                                    />
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => setShowAnnouncement(false)}
+                                            className="flex-1 py-3 text-sm font-bold text-gray-500 hover:text-gray-700"
+                                        >
+                                            Vazgeç
+                                        </button>
+                                        <button 
+                                            onClick={handleSendAnnouncement}
+                                            disabled={!announcementText.trim() || isSending}
+                                            className={`flex-[2] py-3 rounded-xl font-bold text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 ${success ? 'bg-green-500 text-white' : 'bg-indigo-600 text-white'}`}
+                                        >
+                                            {isSending ? (
+                                                <Loader2 size={18} className="animate-spin" />
+                                            ) : success ? (
+                                                <>
+                                                    <Check size={18} />
+                                                    Gönderildi!
+                                                </>
+                                            ) : (
+                                                'Hemen Gönder'
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <div className="pt-4 mt-4 border-t border-gray-100 dark:border-slate-800 space-y-3">
 

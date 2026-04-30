@@ -10,6 +10,7 @@ import ReminderModal from './components/Modals/ReminderModal'
 import SettingsModal from './components/Modals/SettingsModal'
 
 import { moneyTips } from './data/moneyTips'
+import { requestNotificationPermission } from './lib/firebase'
 import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer, Menu, ChevronDown, ChevronUp, Settings, Eye, EyeOff, Home } from 'lucide-react'
 
 import WelcomeScreen from './components/WelcomeScreen'
@@ -27,7 +28,7 @@ function App() {
   // DEBUG İÇİN EKLENDİ - SİLECEĞİZ
   window.supabase = supabase;
   
-  const { user, session, profile, loading: authLoading, signOut } = useAuth()
+  const { user, session, profile, loading: authLoading, signOut, setProfile } = useAuth()
   
   const [showSwitchFamilyModal, setShowSwitchFamilyModal] = useState(false)
 
@@ -294,9 +295,62 @@ function App() {
   }, [showFutureDebtsModal, currentView, selectedMonthDetail])
 
   // Reminder State
-  // Reminder State
   const [showReminderModal, setShowReminderModal] = useState(false)
   const [upcomingEvents, setUpcomingEvents] = useState([])
+
+  // Notification Registration Effect
+  useEffect(() => {
+    const setupNotifications = async () => {
+      console.log('Notification setup starting...', { isSupabaseConfigured, profileId: profile?.id });
+      
+      // Don't run if Supabase not configured or profile not loaded
+      if (!isSupabaseConfigured || !profile?.id) {
+        console.log('Notification setup skipped: Supabase not configured or profile missing');
+        return;
+      }
+
+      try {
+        const token = await requestNotificationPermission();
+        if (token) {
+          console.log('Notification token received:', token);
+          
+          const mockUUID = '00000000-0000-0000-0000-000000000000';
+          // If we are in dev-user mode, skip DB save but update UI for testing
+          if (profile.id === mockUUID) {
+            console.log('Dev mode: Skipping DB save, updating local state only.');
+            if (setProfile) {
+              setProfile(prev => ({ ...prev, fcm_token: token }));
+            }
+            return;
+          }
+
+          // Real user: Save to Supabase
+          const { error } = await supabase
+            .from('profiles')
+            .update({ fcm_token: token })
+            .eq('id', profile.id);
+            
+          if (error) {
+            console.error('Error saving FCM token to Supabase:', error);
+          } else {
+            console.log('FCM token successfully saved to Supabase');
+            // Update local state so UI reflects it immediately
+            if (setProfile) {
+              setProfile(prev => ({ ...prev, fcm_token: token }));
+            }
+          }
+        } else {
+          console.warn('No notification token received (Permission denied or setup failed)');
+        }
+      } catch (err) {
+        console.error('Notification setup failed with error:', err);
+      }
+    };
+
+    // Delay slightly to not block initial load
+    const timer = setTimeout(setupNotifications, 5000);
+    return () => clearTimeout(timer);
+  }, [isSupabaseConfigured, profile?.id]);
 
   const fetchInitialData = useCallback(async () => {
     if (!isSupabaseConfigured || !profile?.family_id) return
@@ -2989,6 +3043,7 @@ function App() {
         onOpenCards={() => setShowCardsModal(true)}
         onOpenLimit={() => { setShowLimitModal(true); setIsMenuOpen(false); }}
         onResetAll={handleResetAllData}
+        isFamilyAdmin={isFamilyAdmin}
       />
 
       <FamilyModal
