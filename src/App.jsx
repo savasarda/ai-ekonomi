@@ -358,12 +358,22 @@ function App() {
     try {
       const familyId = profile.family_id
 
-      const { data: users, error: uErr } = await supabase.from('users').select('*').eq('family_id', familyId)
-      const { data: accounts, error: aErr } = await supabase.from('accounts').select('*').eq('family_id', familyId)
-      const { data: transactions, error: tErr } = await supabase.from('transactions').select('*').eq('family_id', familyId)
-      const { data: userLimitsData, error: lErr } = await supabase.from('user_limits').select('*').eq('family_id', familyId)
-      const { data: portfolioData, error: pErr } = await supabase.from('portfolios').select('*').eq('family_id', familyId)
-      
+      const [
+        { data: users, error: uErr },
+        { data: accounts, error: aErr },
+        { data: transactions, error: tErr },
+        { data: userLimitsData, error: lErr },
+        { data: portfolioData, error: pErr },
+        { data: eventsData, error: eventsError }
+      ] = await Promise.all([
+        supabase.from('users').select('*').eq('family_id', familyId),
+        supabase.from('accounts').select('*').eq('family_id', familyId),
+        supabase.from('transactions').select('*').eq('family_id', familyId),
+        supabase.from('user_limits').select('*').eq('family_id', familyId),
+        supabase.from('portfolios').select('*').eq('family_id', familyId),
+        supabase.from('events').select('*').eq('family_id', familyId)
+      ]);
+
       if (uErr || aErr || tErr) {
         console.warn('Bazı tablolar henüz hazır değil (Schema lag). Refresh bekleniyor...', {uErr, aErr, tErr})
       }
@@ -377,7 +387,6 @@ function App() {
         })
       }
 
-      const { data: eventsData, error: eventsError } = await supabase.from('events').select('*').eq('family_id', familyId)
       if (eventsData) {
         setEvents(eventsData.map(e => ({
           id: e.id,
@@ -450,11 +459,13 @@ function App() {
           return error ? 0 : (count || 0)
         }
 
-        const tCount = await getCount('transactions')
-        const uCount = await getCount('users')
-        const aCount = await getCount('accounts')
-        const eCount = await getCount('events')
-        const nCount = await getCount('needs_list')
+        const [tCount, uCount, aCount, eCount, nCount] = await Promise.all([
+          getCount('transactions'),
+          getCount('users'),
+          getCount('accounts'),
+          getCount('events'),
+          getCount('needs_list')
+        ]);
 
         if (tCount > 0 || uCount > 0 || aCount > 0 || eCount > 0 || nCount > 0) {
           setShowMigrationModal(true)

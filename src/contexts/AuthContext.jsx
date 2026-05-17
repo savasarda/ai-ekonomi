@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
         setUser(session.user);
         fetchProfile(session.user.id);
       } else if (isLocal) {
-        handleLocalDev();
+        setLoading(false);
       } else {
         setLoading(false);
       }
@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }) => {
         setUser(session.user);
         fetchProfile(session.user.id);
       } else if (isLocal) {
-        handleLocalDev();
+        setLoading(false);
       } else {
         setSession(null);
         setUser(null);
