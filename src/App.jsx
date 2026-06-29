@@ -11,7 +11,7 @@ import SettingsModal from './components/Modals/SettingsModal'
 
 import { moneyTips } from './data/moneyTips'
 import { requestNotificationPermission } from './lib/firebase'
-import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer, Menu, ChevronDown, ChevronUp, Settings, Eye, EyeOff, Home } from 'lucide-react'
+import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer, Menu, ChevronDown, ChevronUp, Settings, Eye, EyeOff, Home, Repeat } from 'lucide-react'
 
 import WelcomeScreen from './components/WelcomeScreen'
 import NeedsList from './components/NeedsList'
@@ -106,6 +106,7 @@ function App() {
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [showLimitModal, setShowLimitModal] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
   const [userLimits, setUserLimits] = useState({})
 
@@ -126,8 +127,18 @@ function App() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [isInstallment, setIsInstallment] = useState(false)
 
+  const [installmentAmountMode, setInstallmentAmountMode] = useState('total') // total: toplam tutar, monthly: taksit tutari
   const [installmentCount, setInstallmentCount] = useState(3)
   const [transactionStep, setTransactionStep] = useState(1) // 1: Amount, 2: Details
+
+  const [subscriptions, setSubscriptions] = useState(() => {
+    const saved = localStorage.getItem('subscriptions')
+    return saved ? JSON.parse(saved) : []
+  })
+  const [subscriptionName, setSubscriptionName] = useState('')
+  const [subscriptionAmount, setSubscriptionAmount] = useState('')
+  const [subscriptionUser, setSubscriptionUser] = useState(activeUsers[0]?.id || '')
+  const [subscriptionAccount, setSubscriptionAccount] = useState(activeAccounts[0]?.id || '')
 
   // User Management State
   const [showUserModal, setShowUserModal] = useState(false)
@@ -182,12 +193,13 @@ function App() {
   const [passwordInput, setPasswordInput] = useState('')
 
   // Menu Reordering State
-  const defaultMenuOrder = ['future', 'users', 'limit', 'extract', 'settings']
+  const defaultMenuOrder = ['future', 'subscriptions', 'users', 'limit', 'extract', 'settings']
   const [menuOrder, setMenuOrder] = useState(() => {
     const saved = localStorage.getItem('menuOrder')
     if (saved) {
       const parsed = JSON.parse(saved)
       let finalOrder = parsed.filter(item => !['feedback', 'portfolio', 'cards', 'reset', 'family'].includes(item))
+      if (!finalOrder.includes('subscriptions')) finalOrder.splice(1, 0, 'subscriptions')
       if (!finalOrder.includes('settings')) finalOrder.push('settings')
       return finalOrder
     }
@@ -663,7 +675,66 @@ function App() {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+  const parseMoneyInput = (value) => {
+    if (!value) return NaN
+    let safeValue = value.toString()
+    if (safeValue.includes('.') && safeValue.includes(',')) {
+      safeValue = safeValue.replace(/\./g, '').replace(',', '.')
+    } else if (safeValue.includes(',')) {
+      safeValue = safeValue.replace(',', '.')
+    }
+    return parseFloat(safeValue)
+  }
 
+  const getDisplayDescription = (value) => {
+    return (value || '').replace(/\s*\[abonelik:[^\]]+\]/g, '').trim()
+  }
+
+  useEffect(() => {
+    localStorage.setItem('subscriptions', JSON.stringify(subscriptions))
+  }, [subscriptions])
+
+  useEffect(() => {
+    if (!subscriptionUser && activeUsers.length > 0) {
+      setSubscriptionUser(activeUsers[0].id)
+    }
+  }, [activeUsers, subscriptionUser])
+
+  useEffect(() => {
+    const userAccounts = activeAccounts.filter(a => a.userId === subscriptionUser)
+    const selectableAccounts = userAccounts.length > 0 ? userAccounts : activeAccounts
+    if ((!subscriptionAccount || !selectableAccounts.some(a => a.id === subscriptionAccount)) && selectableAccounts.length > 0) {
+      setSubscriptionAccount(selectableAccounts[0].id)
+    }
+  }, [activeAccounts, subscriptionAccount, subscriptionUser])
+
+  useEffect(() => {
+    if (!subscriptions.length || !activeAccounts.length) return
+
+    const generatedTransactions = subscriptions
+      .filter(subscription => subscription.status !== 0)
+      .filter(subscription => activeAccounts.some(account => account.id === subscription.accountId))
+      .filter(subscription => {
+        const marker = `[abonelik:${subscription.id}:${currentMonth}]`
+        return !data.transactions.some(t => t.status !== 0 && t.description.includes(marker))
+      })
+      .map(subscription => ({
+        id: `sub-${subscription.id}-${currentMonth}`,
+        accountId: subscription.accountId,
+        amount: subscription.amount,
+        date: `${currentMonth}-15`,
+        description: `${subscription.name} [abonelik:${subscription.id}:${currentMonth}]`,
+        type: 'abonelik',
+        status: 1
+      }))
+
+    if (generatedTransactions.length > 0) {
+      setData(prev => ({
+        ...prev,
+        transactions: [...prev.transactions, ...generatedTransactions]
+      }))
+    }
+  }, [subscriptions, activeAccounts, currentMonth, data.transactions])
 
 
 
@@ -699,10 +770,54 @@ function App() {
     if (userAccs.length > 0) setNewAccount(userAccs[0].id)
   }
 
+  const handleSubscriptionUserChange = (uId) => {
+    setSubscriptionUser(uId)
+    const userAccs = activeAccounts.filter(a => a.userId === uId)
+    if (userAccs.length > 0) setSubscriptionAccount(userAccs[0].id)
+  }
+
+  const handleAddSubscription = (e) => {
+    e.preventDefault()
+
+    const amountVal = parseMoneyInput(subscriptionAmount)
+    if (!subscriptionName.trim()) {
+      alert("Lütfen abonelik adı giriniz.")
+      return
+    }
+    if (isNaN(amountVal) || amountVal <= 0) {
+      alert("Geçerli bir abonelik tutarı giriniz.")
+      return
+    }
+    if (!subscriptionAccount) {
+      alert("Lütfen aboneliğin yazılacağı hesap/kart seçiniz.")
+      return
+    }
+
+    setSubscriptions(prev => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        name: subscriptionName.trim(),
+        amount: amountVal,
+        userId: subscriptionUser,
+        accountId: subscriptionAccount,
+        status: 1
+      }
+    ])
+    setSubscriptionName('')
+    setSubscriptionAmount('')
+    setSuccessMessage('Abonelik kaydedildi. Bu ayın gideri otomatik oluşturulacak.')
+    setShowSuccessModal(true)
+  }
+
+  const handleDeleteSubscription = (subscriptionId) => {
+    setSubscriptions(prev => prev.map(item => item.id === subscriptionId ? { ...item, status: 0 } : item))
+  }
+
   const handleEditTransaction = (t) => {
     setEditingTransaction(t)
     setAmount(t.amount.toString())
-    setDescription(t.description.replace(/ \(\d+\/\d+\)$/, '').replace(/ \(\d+ Taksit\)$/, '')) // Strip installment info for pure edit if possible, or just strict edit
+    setDescription(getDisplayDescription(t.description).replace(/ \(\d+\/\d+\)$/, '').replace(/ \(\d+ Taksit\)$/, '')) // Strip installment info for pure edit if possible, or just strict edit
     // Date: t.date is YYYY-MM-DD
     setDate(t.date)
     setNewAccount(t.accountId)
@@ -777,7 +892,7 @@ function App() {
       const amount = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount);
       const acc = activeAccounts.find(a => a.id === t.accountId)?.name || 'Bilinmiyor';
       message += `▫️ *${date}* | ${amount}\n`;
-      message += `   ${t.description} (${acc})\n\n`;
+      message += `   ${getDisplayDescription(t.description)} (${acc})\n\n`;
     });
 
     message += `--------------------------------\n`;
@@ -818,22 +933,24 @@ function App() {
     // Let's stick to standard but add preview so user sees what's happening.
 
     // Better parsing: 
-    let safeAmount = amount;
-    // If it contains dots and commas:
-    if (amount.includes('.') && amount.includes(',')) {
-      safeAmount = amount.replace(/\./g, '').replace(',', '.');
-    } else if (amount.includes(',')) {
-      safeAmount = amount.replace(',', '.');
-    }
-    // If only dot and it looks like thousands (e.g. 3.000), browser might send '3000' if type=number, or '3.000'.
-    // If browser is set to TR, type=number usually allows comma, not dot, for decimal.
-
-    // Let's trust parseFloat(amount.replace(',', '.')) but add the preview.
-    const amountVal = parseFloat(safeAmount); // Use the processed safeAmount
-    if (isNaN(amountVal) || amountVal <= 0) {
+    const enteredAmountVal = parseMoneyInput(amount)
+    if (isNaN(enteredAmountVal) || enteredAmountVal <= 0) {
       alert("Geçerli bir tutar giriniz.");
       return;
     }
+
+    if (isInstallment && (!installmentCount || installmentCount <= 0)) {
+      alert("Geçerli bir taksit sayısı giriniz.");
+      return;
+    }
+
+    const installmentAmountVal = isInstallment && installmentAmountMode === 'monthly'
+      ? enteredAmountVal
+      : enteredAmountVal / installmentCount
+    const totalAmountVal = isInstallment && installmentAmountMode === 'monthly'
+      ? enteredAmountVal * installmentCount
+      : enteredAmountVal
+    const amountVal = isInstallment ? totalAmountVal : enteredAmountVal
 
     if (editingTransaction) {
       // Update existing
@@ -862,9 +979,7 @@ function App() {
       }
 
       if (isInstallment) {
-        newTransaction.description += ` (${installmentCount} Taksit)`
         const transactionsToAdd = []
-        const installmentAmount = amountVal / installmentCount
         const [y, m, d] = date.split('-').map(Number)
 
         for (let i = 0; i < installmentCount; i++) {
@@ -875,7 +990,7 @@ function App() {
           transactionsToAdd.push({
             id: Date.now().toString() + '-' + i,
             accountId: newAccount,
-            amount: installmentAmount,
+            amount: installmentAmountVal,
             date: dateStr,
             description: `${description} (${i + 1}/${installmentCount})`,
             type: 'taksitli',
@@ -900,6 +1015,7 @@ function App() {
     setDescription('')
     setDate(new Date().toISOString().split('T')[0])
     setIsInstallment(false)
+    setInstallmentAmountMode('total')
     setInstallmentCount(3)
     setTransactionStep(1)
     setShowAddModal(false)
@@ -1588,7 +1704,12 @@ function App() {
                       <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex-1">
-                            <p className="font-bold text-gray-800 dark:text-white text-sm">{t.description}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-bold text-gray-800 dark:text-white text-sm">{getDisplayDescription(t.description)}</p>
+                              {t.type === 'abonelik' && (
+                                <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">Abonelik</span>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-400 mt-1">{account?.name}</p>
                           </div>
                           <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg ml-3">
@@ -1631,9 +1752,86 @@ function App() {
           />
         )}
 
+        {showSubscriptionModal && (
+          <div className="absolute inset-0 z-[110] flex items-end sm:items-center justify-center pointer-events-none">
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowSubscriptionModal(false)}></div>
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] max-h-[90vh] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+              <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Abonelikler</h3>
+                  <p className="text-sm text-gray-500 font-medium">Aylik sabit giderleri otomatik yaz</p>
+                </div>
+                <button onClick={() => setShowSubscriptionModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
+              </div>
+
+              <div className="overflow-y-auto custom-scrollbar pr-1">
+                <form onSubmit={handleAddSubscription} className="space-y-4 mb-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Abonelik Adi</label>
+                      <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="Netflix, YouTube..." value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Tutar</label>
+                      <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionAmount} onChange={e => setSubscriptionAmount(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
+                    {authorizedUsers.map(u => (
+                      <button key={u.id} type="button" onClick={() => handleSubscriptionUserChange(u.id)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${subscriptionUser === u.id ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>{u.name}</button>
+                    ))}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Hesap</label>
+                    <select className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 appearance-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all cursor-pointer" value={subscriptionAccount} onChange={e => setSubscriptionAccount(e.target.value)}>
+                      {activeAccounts.length === 0 && <option value="">Önce kart ekleyin</option>}
+                      {(activeAccounts.filter(a => a.userId === subscriptionUser).length > 0 ? activeAccounts.filter(a => a.userId === subscriptionUser) : activeAccounts).map(acc => (
+                        <option key={acc.id} value={acc.id}>{acc.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2">
+                    <Plus size={18} />
+                    <span>Abonelik Ekle</span>
+                  </button>
+                </form>
+
+                <div className="space-y-3">
+                  {subscriptions.filter(item => item.status !== 0).map(item => {
+                    const account = activeAccounts.find(acc => acc.id === item.accountId)
+                    return (
+                      <div key={item.id} className="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-black text-gray-800 dark:text-white truncate">{item.name}</p>
+                          <p className="text-[11px] font-bold text-gray-400">{account?.name || 'Hesap yok'}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.amount)}</span>
+                          <button type="button" onClick={() => handleDeleteSubscription(item.id)} className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {subscriptions.filter(item => item.status !== 0).length === 0 && (
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-5 border border-indigo-100 dark:border-indigo-900/40 text-center">
+                      <p className="text-sm font-bold text-indigo-600 dark:text-indigo-300">Netflix, YouTube, Spotify gibi aylik giderleri buraya ekleyebilirsin.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showAddModal && (
           <div className="absolute inset-0 z-[110] flex items-end sm:items-center justify-center pointer-events-none">
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }}></div>
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setInstallmentAmountMode('total'); setEditingTransaction(null); }}></div>
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[92vh] md:h-[85vh] md:max-h-[850px] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors overflow-x-hidden">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
               <div className="flex justify-between items-center mb-6">
@@ -1641,7 +1839,7 @@ function App() {
                   <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{editingTransaction ? 'İşlemi Düzenle' : 'Yeni İşlem'}</h3>
                   <p className="text-sm text-gray-500 font-medium">{transactionStep === 1 ? 'Tutarı girin' : 'Detayları belirleyin'}</p>
                 </div>
-                <button onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+                <button onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setInstallmentAmountMode('total'); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
               </div>
               <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pr-1">
@@ -1665,7 +1863,12 @@ function App() {
                   ) : (
                     <div className="animate-slide-up space-y-6">
                       <div className="flex flex-wrap items-center gap-2 mb-4" onClick={() => setTransactionStep(1)}>
-                        <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount || '0'))}</span>
+                        <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseMoneyInput(amount) || 0)}</span>
+                        {isInstallment && (
+                          <span className="text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-lg font-black uppercase">
+                            {installmentAmountMode === 'monthly' ? 'Taksit Tutarı' : 'Toplam Tutar'}
+                          </span>
+                        )}
                         <span className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-lg font-bold cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">Düzenle</span>
                       </div>
                       <div className="mb-6">
@@ -1711,6 +1914,25 @@ function App() {
                         </div>
                         {isInstallment && (
                           <div className="mt-6 animate-slide-up">
+                            <div className="bg-gray-100/50 dark:bg-slate-800/70 p-1.5 rounded-2xl flex gap-1 mb-4 border border-gray-100 dark:border-slate-700">
+                              {[
+                                { key: 'total', label: 'Toplam Tutar' },
+                                { key: 'monthly', label: 'Taksit Tutarı' }
+                              ].map(option => (
+                                <button
+                                  key={option.key}
+                                  type="button"
+                                  onClick={() => setInstallmentAmountMode(option.key)}
+                                  className={`flex-1 py-3 px-2 rounded-xl text-xs font-black transition-all ${installmentAmountMode === option.key
+                                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                                    }`}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+
                             <div className="grid grid-cols-5 gap-1.5 sm:gap-2 mb-4">
                               {[2, 3, 6, 9, 12].map(count => (
                                 <button
@@ -1748,14 +1970,14 @@ function App() {
                               </div>
                               <div className="h-px bg-gray-100 dark:bg-slate-800 flex-1"></div>
                             </div>
-                            {amount && !isNaN(parseFloat(amount.replace(',', '.'))) && (
+                            {amount && !isNaN(parseMoneyInput(amount)) && installmentCount > 0 && (
                               <div className="bg-white/50 dark:bg-slate-800/50 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm backdrop-blur-sm">
                                 <div className="space-y-4">
                                   <div className="flex justify-between items-baseline">
                                     <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">Aylık Ödeme</span>
                                     <div className="text-right">
                                       <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
-                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')) / installmentCount)}
+                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(installmentAmountMode === 'monthly' ? parseMoneyInput(amount) : parseMoneyInput(amount) / installmentCount)}
                                       </span>
                                     </div>
                                   </div>
@@ -1763,7 +1985,7 @@ function App() {
                                   <div className="flex justify-between items-center">
                                     <span className="text-gray-400 dark:text-gray-500 text-xs font-medium">Toplam Tutar</span>
                                     <span className="text-gray-600 dark:text-gray-400 font-bold text-sm">
-                                      {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')))}
+                                      {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(installmentAmountMode === 'monthly' ? parseMoneyInput(amount) * installmentCount : parseMoneyInput(amount))}
                                     </span>
                                   </div>
                                 </div>
@@ -1975,6 +2197,7 @@ function App() {
                       switch (itemId) {
                         case 'limit': setLimitModalUser(activeUsers[0]?.id); setShowLimitModal(true); break;
                         case 'future': setSelectedMonthDetail(null); setCurrentView('budgetDetail'); break;
+                        case 'subscriptions': setShowSubscriptionModal(true); break;
                         case 'cards': setShowCardsModal(true); break;
                         case 'users': setShowUserModal(true); break;
                         case 'reset': handleResetAllData(); break;
@@ -1990,6 +2213,7 @@ function App() {
                   switch (itemId) {
                     case 'limit': label = 'Limit'; IconComponent = Gauge; break;
                     case 'future': label = 'Dönemler'; IconComponent = Calendar; break;
+                    case 'subscriptions': label = 'Abonelik'; IconComponent = Repeat; break;
                     case 'cards': label = 'Kartlar'; IconComponent = CreditCard; break;
                     case 'users': label = 'Kişiler'; IconComponent = Users; break;
                     case 'feedback': label = 'İstekler'; IconComponent = MessageSquare; break;
@@ -2151,10 +2375,87 @@ function App() {
 
       {/* Legacy Modals Removed */}
 
+      {showSubscriptionModal && (
+        <div className="absolute inset-0 z-[70] flex items-end sm:items-center justify-center pointer-events-none">
+          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowSubscriptionModal(false)}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] max-h-[90vh] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+            <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Abonelikler</h3>
+                <p className="text-sm text-gray-500 font-medium">Aylik sabit giderleri otomatik yaz</p>
+              </div>
+              <button onClick={() => setShowSubscriptionModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
+            </div>
+
+            <div className="overflow-y-auto custom-scrollbar pr-1">
+              <form onSubmit={handleAddSubscription} className="space-y-4 mb-6">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Abonelik Adi</label>
+                    <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="Netflix, YouTube..." value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Tutar</label>
+                    <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionAmount} onChange={e => setSubscriptionAmount(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
+                  {authorizedUsers.map(u => (
+                    <button key={u.id} type="button" onClick={() => handleSubscriptionUserChange(u.id)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${subscriptionUser === u.id ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>{u.name}</button>
+                  ))}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Hesap</label>
+                  <select className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 appearance-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all cursor-pointer" value={subscriptionAccount} onChange={e => setSubscriptionAccount(e.target.value)}>
+                    {activeAccounts.length === 0 && <option value="">Önce kart ekleyin</option>}
+                    {(activeAccounts.filter(a => a.userId === subscriptionUser).length > 0 ? activeAccounts.filter(a => a.userId === subscriptionUser) : activeAccounts).map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2">
+                  <Plus size={18} />
+                  <span>Abonelik Ekle</span>
+                </button>
+              </form>
+
+              <div className="space-y-3">
+                {subscriptions.filter(item => item.status !== 0).map(item => {
+                  const account = activeAccounts.find(acc => acc.id === item.accountId)
+                  return (
+                    <div key={item.id} className="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-black text-gray-800 dark:text-white truncate">{item.name}</p>
+                        <p className="text-[11px] font-bold text-gray-400">{account?.name || 'Hesap yok'}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.amount)}</span>
+                        <button type="button" onClick={() => handleDeleteSubscription(item.id)} className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+                {subscriptions.filter(item => item.status !== 0).length === 0 && (
+                  <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-5 border border-indigo-100 dark:border-indigo-900/40 text-center">
+                    <p className="text-sm font-bold text-indigo-600 dark:text-indigo-300">Netflix, YouTube, Spotify gibi aylik giderleri buraya ekleyebilirsin.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {
         showAddModal && (
           <div className="absolute inset-0 z-[70] flex items-end sm:items-center justify-center pointer-events-none">
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }}></div>
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setInstallmentAmountMode('total'); setEditingTransaction(null); }}></div>
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[92vh] md:h-[85vh] md:max-h-[850px] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors overflow-x-hidden">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
               <div className="flex justify-between items-center mb-6">
@@ -2162,7 +2463,7 @@ function App() {
                   <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{editingTransaction ? 'İşlemi Düzenle' : 'Yeni İşlem'}</h3>
                   <p className="text-sm text-gray-500 font-medium">{transactionStep === 1 ? 'Tutarı girin' : 'Detayları belirleyin'}</p>
                 </div>
-                <button onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+                <button onClick={() => { setShowAddModal(false); setTransactionStep(1); setAmount(''); setInstallmentAmountMode('total'); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
               </div>
 
               <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -2196,8 +2497,13 @@ function App() {
                     <div className="animate-slide-up space-y-6">
                       <div className="flex flex-wrap items-center gap-2 mb-4" onClick={() => setTransactionStep(1)}>
                         <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
-                          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount || '0'))}
+                          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseMoneyInput(amount) || 0)}
                         </span>
+                        {isInstallment && (
+                          <span className="text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-2 py-1 rounded-lg font-black uppercase">
+                            {installmentAmountMode === 'monthly' ? 'Taksit Tutarı' : 'Toplam Tutar'}
+                          </span>
+                        )}
                         <span className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-lg font-bold cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">Düzenle</span>
                       </div>
 
@@ -2286,6 +2592,25 @@ function App() {
 
                         {isInstallment && (
                           <div className="mt-6 animate-slide-up">
+                            <div className="bg-gray-100/50 dark:bg-slate-800/70 p-1.5 rounded-2xl flex gap-1 mb-4 border border-gray-100 dark:border-slate-700">
+                              {[
+                                { key: 'total', label: 'Toplam Tutar' },
+                                { key: 'monthly', label: 'Taksit Tutarı' }
+                              ].map(option => (
+                                <button
+                                  key={option.key}
+                                  type="button"
+                                  onClick={() => setInstallmentAmountMode(option.key)}
+                                  className={`flex-1 py-3 px-2 rounded-xl text-xs font-black transition-all ${installmentAmountMode === option.key
+                                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                                    }`}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+
                             <div className="grid grid-cols-5 gap-1.5 sm:gap-2 mb-4">
                               {[2, 3, 6, 9, 12].map(count => (
                                 <button
@@ -2324,14 +2649,14 @@ function App() {
                               <div className="h-px bg-gray-100 dark:bg-slate-800 flex-1"></div>
                             </div>
 
-                            {amount && !isNaN(parseFloat(amount.replace(',', '.'))) && (
+                            {amount && !isNaN(parseMoneyInput(amount)) && installmentCount > 0 && (
                               <div className="bg-white/50 dark:bg-slate-800/50 p-6 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm backdrop-blur-sm">
                                 <div className="space-y-4">
                                   <div className="flex justify-between items-baseline">
                                     <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">Aylık Ödeme</span>
                                     <div className="text-right">
                                       <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">
-                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')) / installmentCount)}
+                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(installmentAmountMode === 'monthly' ? parseMoneyInput(amount) : parseMoneyInput(amount) / installmentCount)}
                                       </span>
                                     </div>
                                   </div>
@@ -2339,7 +2664,7 @@ function App() {
                                   <div className="flex justify-between items-center">
                                     <span className="text-gray-400 dark:text-gray-500 text-xs font-medium">Toplam Tutar</span>
                                     <span className="text-gray-600 dark:text-gray-400 font-bold text-sm">
-                                      {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(parseFloat(amount.replace(',', '.')))}
+                                      {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(installmentAmountMode === 'monthly' ? parseMoneyInput(amount) * installmentCount : parseMoneyInput(amount))}
                                     </span>
                                   </div>
                                 </div>
@@ -2825,7 +3150,12 @@ function App() {
                       <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:scale-[1.01] transition-transform print-transaction">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-bold text-gray-800 dark:text-white text-sm">{t.description || 'İşlem'}</p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-bold text-gray-800 dark:text-white text-sm">{getDisplayDescription(t.description) || 'İşlem'}</p>
+                              {t.type === 'abonelik' && (
+                                <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">Abonelik</span>
+                              )}
+                            </div>
                             <p className="text-xs text-gray-400">{account?.name} • {user?.name}</p>
                           </div>
                           <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg">

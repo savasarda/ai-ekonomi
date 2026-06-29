@@ -16,6 +16,9 @@ const BudgetDetailView = ({
 }) => {
     const [touchStart, setTouchStart] = useState(null);
     const [touchEnd, setTouchEnd] = useState(null);
+    const getDisplayDescription = (value) => {
+        return (value || '').replace(/\s*\[abonelik:[^\]]+\]/g, '').trim();
+    };
 
     // Swipe back logic
     const handleTouchStart = (e) => setTouchStart(e.targetTouches[0].clientX);
@@ -190,7 +193,12 @@ const BudgetDetailView = ({
                                                     <CreditCard size={20} />
                                                 </div>
                                                 <div>
-                                                    <p className="font-black text-slate-800 dark:text-white leading-none mb-1.5">{t.description}</p>
+                                                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                                        <p className="font-black text-slate-800 dark:text-white leading-none">{getDisplayDescription(t.description)}</p>
+                                                        {t.type === 'abonelik' && (
+                                                            <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">Abonelik</span>
+                                                        )}
+                                                    </div>
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-[10px] font-bold text-gray-400 uppercase">{new Date(t.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}</span>
                                                         <span className="w-1 h-1 bg-gray-200 dark:bg-slate-700 rounded-full"></span>
