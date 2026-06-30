@@ -71,9 +71,9 @@ export default function SettingsModal({
     return (
         <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-all" onClick={onClose}></div>
-            <div className="bg-[#F8FAFC] dark:bg-slate-900 w-full sm:max-w-[400px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up sm:animate-scale-up flex flex-col shadow-2xl border-t border-white/50 dark:border-slate-800/50">
+            <div className="bg-[#F8FAFC] dark:bg-slate-900 w-full sm:max-w-[400px] max-h-[92dvh] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up sm:animate-scale-up flex flex-col shadow-2xl border-t border-white/50 dark:border-slate-800/50">
                 
-                <div className="flex justify-between items-center mb-8">
+                <div className="flex justify-between items-center mb-6 sm:mb-8 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-gray-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center text-gray-600 dark:text-gray-400">
                            <Settings size={28} />
@@ -90,7 +90,7 @@ export default function SettingsModal({
                     </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 overflow-y-auto custom-scrollbar pr-1 pb-3">
 
                     <button 
                         onClick={() => { onOpenUsers(); onClose(); }}
@@ -267,7 +267,7 @@ export default function SettingsModal({
                     </div>
                 </div>
 
-                <div className="mt-8 text-center">
+                <div className="mt-5 sm:mt-8 text-center shrink-0">
                     <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] opacity-50">AIEKONOMI PREMIUM v3.1</p>
                 </div>
             </div>
