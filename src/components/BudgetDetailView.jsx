@@ -17,8 +17,19 @@ const BudgetDetailView = ({
     const [touchStart, setTouchStart] = useState(null);
     const [touchEnd, setTouchEnd] = useState(null);
     const getDisplayDescription = (value) => {
-        return (value || '').replace(/\s*\[abonelik:[^\]]+\]/g, '').trim();
+        return (value || '').replace(/\s*\[(abonelik|tekrar):[^\]]+\]/g, '').trim();
     };
+
+    const getRecurringTransactionLabel = (type) => {
+        if (type === 'debt') return 'Borc';
+        if (type === 'fixed') return 'Sabit';
+        if (type === 'subscription' || type === 'abonelik') return 'Abonelik';
+        return null;
+    };
+
+    const isIncomeTransaction = (transaction) => transaction?.type === 'gelir';
+    const isExpenseTransaction = (transaction) => !isIncomeTransaction(transaction);
+    const formatTransactionAmount = (transaction) => `${isIncomeTransaction(transaction) ? '+' : ''}${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(transaction.amount)}`;
 
     // Swipe back logic
     const handleTouchStart = (e) => setTouchStart(e.targetTouches[0].clientX);
@@ -114,6 +125,7 @@ const BudgetDetailView = ({
                                                 const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
                                                 const userMonthTotal = activeTransactions
                                                     .filter(t => t.status === 1 && t.date.startsWith(item.date) && userAccs.includes(t.accountId))
+                                                    .filter(isExpenseTransaction)
                                                     .reduce((acc, curr) => acc + curr.amount, 0);
 
                                                 if (userMonthTotal === 0) return null;
@@ -144,6 +156,7 @@ const BudgetDetailView = ({
                                 const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
                                 const userMonthTotal = activeTransactions
                                     .filter(t => t.status === 1 && t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
+                                    .filter(isExpenseTransaction)
                                     .reduce((acc, curr) => acc + curr.amount, 0);
                                 const isSelected = selectedMonthDetail.selectedUserId === u.id;
 
@@ -195,8 +208,11 @@ const BudgetDetailView = ({
                                                 <div>
                                                     <div className="flex flex-wrap items-center gap-2 mb-1.5">
                                                         <p className="font-black text-slate-800 dark:text-white leading-none">{getDisplayDescription(t.description)}</p>
-                                                        {t.type === 'abonelik' && (
-                                                            <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">Abonelik</span>
+                                                        {getRecurringTransactionLabel(t.type) && (
+                                                            <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">{getRecurringTransactionLabel(t.type)}</span>
+                                                        )}
+                                                        {isIncomeTransaction(t) && (
+                                                            <span className="px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-[9px] font-black uppercase tracking-wide border border-green-100 dark:border-green-800/50">Gelir</span>
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
@@ -207,8 +223,8 @@ const BudgetDetailView = ({
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-4">
-                                                <p className="font-black text-slate-800 dark:text-white text-lg">
-                                                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
+                                                <p className={`font-black text-lg ${isIncomeTransaction(t) ? 'text-green-600 dark:text-green-400' : 'text-slate-800 dark:text-white'}`}>
+                                                    {formatTransactionAmount(t)}
                                                 </p>
                                                 <button 
                                                     onClick={() => {

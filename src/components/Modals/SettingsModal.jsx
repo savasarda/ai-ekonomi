@@ -1,4 +1,4 @@
-import { X, Users, CreditCard, Trash2, ChevronRight, Settings, Gauge, LogOut, Share2, MessageCircle, Check, Bell, Loader2 } from 'lucide-react'
+import { X, Users, CreditCard, Trash2, ChevronRight, Settings, Gauge, LogOut, Share2, MessageCircle, Check, Bell, Loader2, Wallet } from 'lucide-react'
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
@@ -9,6 +9,7 @@ export default function SettingsModal({
     onOpenUsers,
     onOpenCards,
     onOpenLimit,
+    onOpenIncome,
     onResetAll,
     isFamilyAdmin
 }) {
@@ -137,6 +138,22 @@ export default function SettingsModal({
                             </div>
                         </div>
                         <ChevronRight size={18} className="text-gray-300 group-hover:text-orange-500 transition-colors" />
+                    </button>
+
+                    <button 
+                        onClick={() => { onOpenIncome(); onClose(); }}
+                        className="w-full bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700 flex items-center justify-between group hover:border-green-500 transition-all hover:shadow-lg active:scale-[0.98]"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-green-50 dark:bg-green-900/30 rounded-2xl flex items-center justify-center text-green-600 dark:text-green-400">
+                                <Wallet size={24} />
+                            </div>
+                            <div className="text-left">
+                                <p className="font-bold text-gray-800 dark:text-white">Gelirler</p>
+                                <p className="text-[10px] text-gray-400 font-bold">Kisi bazli gelir girisi</p>
+                            </div>
+                        </div>
+                        <ChevronRight size={18} className="text-gray-300 group-hover:text-green-500 transition-colors" />
                     </button>
 
                     <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700">

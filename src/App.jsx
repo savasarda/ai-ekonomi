@@ -139,6 +139,10 @@ function App() {
   const [subscriptionAmount, setSubscriptionAmount] = useState('')
   const [subscriptionUser, setSubscriptionUser] = useState(activeUsers[0]?.id || '')
   const [subscriptionAccount, setSubscriptionAccount] = useState(activeAccounts[0]?.id || '')
+  const [subscriptionPaymentType, setSubscriptionPaymentType] = useState('subscription')
+  const [subscriptionTotalInstallments, setSubscriptionTotalInstallments] = useState('')
+  const [subscriptionPaidInstallments, setSubscriptionPaidInstallments] = useState('')
+  const [subscriptionDueDay, setSubscriptionDueDay] = useState('15')
 
   // User Management State
   const [showUserModal, setShowUserModal] = useState(false)
@@ -187,18 +191,28 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showFamilyModal, setShowFamilyModal] = useState(false)
+  const [showIncomeModal, setShowIncomeModal] = useState(false)
+  const [incomeAmount, setIncomeAmount] = useState('')
+  const [incomeDescription, setIncomeDescription] = useState('')
+  const [incomeDate, setIncomeDate] = useState(new Date().toISOString().split('T')[0])
+  const [incomeUser, setIncomeUser] = useState(activeUsers[0]?.id || '')
+  const [incomeAccount, setIncomeAccount] = useState(activeAccounts[0]?.id || '')
+  const [cashFlowUser, setCashFlowUser] = useState('all')
+  const [cashFlowStartDate, setCashFlowStartDate] = useState('')
+  const [cashFlowEndDate, setCashFlowEndDate] = useState('')
 
   // Reset Password Modal
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [passwordInput, setPasswordInput] = useState('')
 
   // Menu Reordering State
-  const defaultMenuOrder = ['future', 'subscriptions', 'users', 'limit', 'extract', 'settings']
+  const defaultMenuOrder = ['future', 'cashflow', 'subscriptions', 'users', 'limit', 'extract', 'settings']
   const [menuOrder, setMenuOrder] = useState(() => {
     const saved = localStorage.getItem('menuOrder')
     if (saved) {
       const parsed = JSON.parse(saved)
       let finalOrder = parsed.filter(item => !['feedback', 'portfolio', 'cards', 'reset', 'family'].includes(item))
+      if (!finalOrder.includes('cashflow')) finalOrder.splice(Math.min(1, finalOrder.length), 0, 'cashflow')
       if (!finalOrder.includes('subscriptions')) finalOrder.splice(1, 0, 'subscriptions')
       if (!finalOrder.includes('settings')) finalOrder.push('settings')
       return finalOrder
@@ -295,9 +309,9 @@ function App() {
 
       futureDebtsScrollTimeoutRef.current = setTimeout(() => {
         if (currentMonthRef.current) {
-          currentMonthRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          currentMonthRef.current.scrollIntoView({ behavior: 'auto', block: 'center' })
         }
-      }, 300)
+      }, 0)
     }
     return () => {
       if (futureDebtsScrollTimeoutRef.current) {
@@ -376,18 +390,24 @@ function App() {
         { data: transactions, error: tErr },
         { data: userLimitsData, error: lErr },
         { data: portfolioData, error: pErr },
-        { data: eventsData, error: eventsError }
+        { data: eventsData, error: eventsError },
+        { data: recurringPaymentsData, error: recurringPaymentsError }
       ] = await Promise.all([
         supabase.from('users').select('*').eq('family_id', familyId),
         supabase.from('accounts').select('*').eq('family_id', familyId),
         supabase.from('transactions').select('*').eq('family_id', familyId),
         supabase.from('user_limits').select('*').eq('family_id', familyId),
         supabase.from('portfolios').select('*').eq('family_id', familyId),
-        supabase.from('events').select('*').eq('family_id', familyId)
+        supabase.from('events').select('*').eq('family_id', familyId),
+        supabase.from('recurring_payments').select('*').eq('family_id', familyId).neq('status', 0).order('created_at', { ascending: true })
       ]);
 
       if (uErr || aErr || tErr) {
         console.warn('Bazı tablolar henüz hazır değil (Schema lag). Refresh bekleniyor...', {uErr, aErr, tErr})
+      }
+
+      if (recurringPaymentsError) {
+        console.warn('Tekrarlayan odemeler tablosu hazir degil. SQL scriptini calistirdiktan sonra DB senkronu aktif olacak.', recurringPaymentsError)
       }
 
       if (users && accounts && transactions) {
@@ -407,6 +427,37 @@ function App() {
           description: e.description,
           time: e.time
         })))
+      }
+
+      if (recurringPaymentsData) {
+        const migrationKey = `recurring_payments_migrated_${familyId}`
+        const localSubscriptions = JSON.parse(localStorage.getItem('subscriptions') || '[]')
+
+        if (recurringPaymentsData.length === 0 && localSubscriptions.length > 0 && localStorage.getItem(migrationKey) !== 'true') {
+          const migratedPayments = localSubscriptions
+            .filter(item => item.status !== 0)
+            .map(item => ({
+              ...toSnakeCase([{
+                ...item,
+                paymentType: item.paymentType || 'subscription',
+                dueDay: item.dueDay || 15,
+                status: item.status ?? 1
+              }])[0],
+              family_id: familyId
+            }))
+
+          if (migratedPayments.length > 0) {
+            const { error: migrationError } = await supabase.from('recurring_payments').upsert(migratedPayments)
+            if (migrationError) {
+              console.error('Recurring payments migration error:', migrationError)
+            } else {
+              localStorage.setItem(migrationKey, 'true')
+              setSubscriptions(toCamelCase(migratedPayments))
+            }
+          }
+        } else {
+          setSubscriptions(toCamelCase(recurringPaymentsData))
+        }
       }
 
       if (userLimitsData) {
@@ -456,8 +507,14 @@ function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, fetchInitialData)
       .subscribe()
 
+    const recurringPaymentSubscription = supabase
+      .channel('public:recurring_payments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'recurring_payments' }, fetchInitialData)
+      .subscribe()
+
     return () => {
       supabase.removeChannel(transactionSubscription)
+      supabase.removeChannel(recurringPaymentSubscription)
     }
   }, [isSupabaseConfigured, fetchInitialData])
 
@@ -687,7 +744,73 @@ function App() {
   }
 
   const getDisplayDescription = (value) => {
-    return (value || '').replace(/\s*\[abonelik:[^\]]+\]/g, '').trim()
+    return (value || '').replace(/\s*\[(abonelik|tekrar):[^\]]+\]/g, '').trim()
+  }
+
+  const recurringPaymentTypes = {
+    subscription: { label: 'Abonelik', shortLabel: 'Abonelik', helper: 'Netflix, Spotify, internet gibi iptal edilebilir servisler' },
+    debt: { label: 'Kredi / Borc', shortLabel: 'Borc', helper: 'Ev kredisi, arac kredisi, ihtiyac kredisi gibi bitisi olan odemeler' },
+    fixed: { label: 'Sabit Gider', shortLabel: 'Sabit', helper: 'Kira, aidat, okul, sigorta gibi duzenli odemeler' }
+  }
+
+  const getRecurringPaymentType = (item) => recurringPaymentTypes[item?.paymentType || 'subscription'] || recurringPaymentTypes.subscription
+
+  const getRecurringTransactionLabel = (type) => {
+    if (type === 'debt') return recurringPaymentTypes.debt.shortLabel
+    if (type === 'fixed') return recurringPaymentTypes.fixed.shortLabel
+    if (type === 'subscription' || type === 'abonelik') return recurringPaymentTypes.subscription.shortLabel
+    return null
+  }
+
+  const isIncomeTransaction = (transaction) => transaction?.type === 'gelir'
+  const isExpenseTransaction = (transaction) => !isIncomeTransaction(transaction)
+  const getSignedTransactionAmount = (transaction) => isIncomeTransaction(transaction) ? transaction.amount : -transaction.amount
+  const formatTransactionAmount = (transaction) => `${isIncomeTransaction(transaction) ? '+' : ''}${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(transaction.amount)}`
+  const getTransactionAmountClass = (transaction) => isIncomeTransaction(transaction)
+    ? 'text-green-600 dark:text-green-400'
+    : 'text-indigo-600 dark:text-indigo-400'
+
+  const saveRecurringPaymentToSupabase = async (payment) => {
+    if (!isSupabaseConfigured || !profile?.family_id) return false
+
+    const payload = {
+      ...toSnakeCase([payment])[0],
+      family_id: profile.family_id
+    }
+
+    const { error } = await supabase.from('recurring_payments').upsert(payload)
+    if (error) {
+      console.error('Error saving recurring payment:', error)
+      return false
+    }
+    return true
+  }
+
+  const deleteRecurringPaymentFromSupabase = async (paymentId) => {
+    if (!isSupabaseConfigured || !profile?.family_id) return false
+
+    const { error } = await supabase
+      .from('recurring_payments')
+      .update({ status: 0 })
+      .eq('id', paymentId)
+      .eq('family_id', profile.family_id)
+
+    if (error) {
+      console.error('Error deleting recurring payment:', error)
+      return false
+    }
+    return true
+  }
+
+  const getRecurringInstallmentInfo = (item) => {
+    if ((item?.paymentType || 'subscription') !== 'debt') return null
+    const total = Number(item.totalInstallments) || 0
+    const paid = Number(item.paidInstallments) || 0
+    if (!total) return null
+    const nextInstallment = Math.min(paid + 1, total)
+    const remainingAfterThisMonth = Math.max(total - nextInstallment, 0)
+    const remainingDebt = remainingAfterThisMonth * (Number(item.amount) || 0)
+    return { total, paid, nextInstallment, remainingAfterThisMonth, remainingDebt }
   }
 
   useEffect(() => {
@@ -709,24 +832,43 @@ function App() {
   }, [activeAccounts, subscriptionAccount, subscriptionUser])
 
   useEffect(() => {
+    if (!incomeUser && activeUsers.length > 0) {
+      setIncomeUser(activeUsers[0].id)
+    }
+  }, [activeUsers, incomeUser])
+
+  useEffect(() => {
+    const userAccounts = activeAccounts.filter(a => a.userId === incomeUser)
+    const selectableAccounts = userAccounts.length > 0 ? userAccounts : activeAccounts
+    if ((!incomeAccount || !selectableAccounts.some(a => a.id === incomeAccount)) && selectableAccounts.length > 0) {
+      setIncomeAccount(selectableAccounts[0].id)
+    }
+  }, [activeAccounts, incomeAccount, incomeUser])
+
+  useEffect(() => {
     if (!subscriptions.length || !activeAccounts.length) return
 
     const generatedTransactions = subscriptions
       .filter(subscription => subscription.status !== 0)
       .filter(subscription => activeAccounts.some(account => account.id === subscription.accountId))
       .filter(subscription => {
-        const marker = `[abonelik:${subscription.id}:${currentMonth}]`
+        const marker = `[tekrar:${subscription.id}:${currentMonth}]`
         return !data.transactions.some(t => t.status !== 0 && t.description.includes(marker))
       })
-      .map(subscription => ({
-        id: `sub-${subscription.id}-${currentMonth}`,
-        accountId: subscription.accountId,
-        amount: subscription.amount,
-        date: `${currentMonth}-15`,
-        description: `${subscription.name} [abonelik:${subscription.id}:${currentMonth}]`,
-        type: 'abonelik',
-        status: 1
-      }))
+      .map(subscription => {
+        const dueDay = String(Math.min(Math.max(Number(subscription.dueDay) || 15, 1), 28)).padStart(2, '0')
+        const installmentInfo = getRecurringInstallmentInfo(subscription)
+        const installmentText = installmentInfo ? ` (${installmentInfo.nextInstallment}/${installmentInfo.total})` : ''
+        return {
+          id: `sub-${subscription.id}-${currentMonth}`,
+          accountId: subscription.accountId,
+          amount: subscription.amount,
+          date: `${currentMonth}-${dueDay}`,
+          description: `${subscription.name}${installmentText} [tekrar:${subscription.id}:${currentMonth}]`,
+          type: subscription.paymentType || 'abonelik',
+          status: 1
+        }
+      })
 
     if (generatedTransactions.length > 0) {
       setData(prev => ({
@@ -744,7 +886,7 @@ function App() {
   const getMonthlyBreakdown = () => {
     const groups = {}
     activeTransactions.forEach(t => {
-      if (t.status === 1) {
+      if (t.status === 1 && isExpenseTransaction(t)) {
         const monthKey = t.date.slice(0, 7)
         if (!groups[monthKey]) groups[monthKey] = 0
         groups[monthKey] += t.amount
@@ -757,10 +899,149 @@ function App() {
 
   const monthlyBreakdown = getMonthlyBreakdown()
 
+  const getIstanbulToday = () => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Istanbul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date())
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
+    return new Date(Number(values.year), Number(values.month) - 1, Number(values.day))
+  }
+
+  const addDays = (baseDate, days) => {
+    const result = new Date(baseDate)
+    result.setDate(result.getDate() + days)
+    return result
+  }
+
+  const formatDateKey = (dateObj) => `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`
+
+  useEffect(() => {
+    if (!cashFlowStartDate || !cashFlowEndDate) {
+      const todayKey = formatDateKey(getIstanbulToday())
+      const endKey = formatDateKey(addDays(getIstanbulToday(), 30))
+      if (!cashFlowStartDate) setCashFlowStartDate(todayKey)
+      if (!cashFlowEndDate) setCashFlowEndDate(endKey)
+    }
+  }, [cashFlowStartDate, cashFlowEndDate])
+
+  useEffect(() => {
+    if (cashFlowUser !== 'all' && !activeUsers.some(user => user.id === cashFlowUser)) {
+      setCashFlowUser('all')
+    }
+  }, [activeUsers, cashFlowUser])
+
+  const parseDateKey = (dateKey) => {
+    const [year, month, day] = dateKey.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+
+  const isDateBetween = (dateKey, startDate, endDate) => {
+    return dateKey >= formatDateKey(startDate) && dateKey <= formatDateKey(endDate)
+  }
+
+  const getCashFlowAccountIds = (userId) => {
+    if (userId === 'all') return activeAccounts.map(account => account.id)
+    return activeAccounts.filter(account => account.userId === userId).map(account => account.id)
+  }
+
+  const getRecurringOccurrencesForRange = (startDate, endDate, userId = 'all') => {
+    const occurrences = []
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+    const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+    const accountIds = getCashFlowAccountIds(userId)
+
+    while (cursor <= lastMonth) {
+      const monthKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+
+      subscriptions
+        .filter(item => item.status !== 0)
+        .filter(item => accountIds.includes(item.accountId))
+        .forEach(item => {
+          const dueDay = Math.min(Math.max(Number(item.dueDay) || 15, 1), 28)
+          const dateKey = `${monthKey}-${String(dueDay).padStart(2, '0')}`
+          if (!isDateBetween(dateKey, startDate, endDate)) return
+
+          const marker = `[tekrar:${item.id}:${monthKey}]`
+          const alreadyGenerated = activeTransactions.some(t => t.status !== 0 && t.description?.includes(marker))
+          if (alreadyGenerated) return
+
+          occurrences.push({
+            id: `recurring-${item.id}-${monthKey}`,
+            date: dateKey,
+            description: item.name,
+            amount: item.amount,
+            type: item.paymentType || 'subscription',
+            accountId: item.accountId,
+            source: 'recurring'
+          })
+        })
+
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+
+    return occurrences
+  }
+
+  const getCashFlowForRange = (startDate, endDate, userId = 'all') => {
+    const accountIds = getCashFlowAccountIds(userId)
+
+    const realTransactions = activeTransactions
+      .filter(t => t.status === 1)
+      .filter(t => accountIds.includes(t.accountId))
+      .filter(t => isDateBetween(t.date, startDate, endDate))
+      .map(t => ({
+        id: t.id,
+        date: t.date,
+        description: getDisplayDescription(t.description) || (isIncomeTransaction(t) ? 'Gelir' : 'Gider'),
+        amount: t.amount,
+        type: t.type,
+        accountId: t.accountId,
+        source: 'transaction'
+      }))
+
+    const recurringOccurrences = getRecurringOccurrencesForRange(startDate, endDate, userId)
+    const items = [...realTransactions, ...recurringOccurrences].sort((a, b) => a.date.localeCompare(b.date))
+    const income = items.filter(isIncomeTransaction).reduce((sum, item) => sum + item.amount, 0)
+    const expenses = items.filter(isExpenseTransaction).reduce((sum, item) => sum + item.amount, 0)
+
+    return {
+      startDate,
+      endDate,
+      income,
+      expenses,
+      net: income - expenses,
+      items
+    }
+  }
+
+  const getCashFlowForDays = (days, userId = 'all') => {
+    const startDate = getIstanbulToday()
+    const endDate = addDays(startDate, days)
+    return getCashFlowForRange(startDate, endDate, userId)
+  }
+
+  const cashFlowWindows = [
+    { key: 'short', label: 'Kisa Vade', days: 7 },
+    { key: 'medium', label: 'Orta Vade', days: 30 },
+    { key: 'long', label: 'Uzun Vade', days: 90 }
+  ].map(item => ({ ...item, ...getCashFlowForDays(item.days, cashFlowUser) }))
+
+  const cashFlowSelectedRange = (() => {
+    const start = cashFlowStartDate ? parseDateKey(cashFlowStartDate) : getIstanbulToday()
+    const end = cashFlowEndDate ? parseDateKey(cashFlowEndDate) : addDays(start, 30)
+    const normalizedStart = start <= end ? start : end
+    const normalizedEnd = start <= end ? end : start
+    return getCashFlowForRange(normalizedStart, normalizedEnd, cashFlowUser)
+  })()
+
   const getDebtByUser = (userId) => {
     const userAccountIds = activeAccounts.filter(acc => acc.userId === userId).map(acc => acc.id)
     return activeTransactions
       .filter(t => userAccountIds.includes(t.accountId))
+      .filter(isExpenseTransaction)
       .reduce((acc, curr) => acc + curr.amount, 0)
   }
 
@@ -776,7 +1057,7 @@ function App() {
     if (userAccs.length > 0) setSubscriptionAccount(userAccs[0].id)
   }
 
-  const handleAddSubscription = (e) => {
+  const handleAddSubscription = async (e) => {
     e.preventDefault()
 
     const amountVal = parseMoneyInput(subscriptionAmount)
@@ -793,24 +1074,43 @@ function App() {
       return
     }
 
-    setSubscriptions(prev => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        name: subscriptionName.trim(),
-        amount: amountVal,
-        userId: subscriptionUser,
-        accountId: subscriptionAccount,
-        status: 1
-      }
-    ])
+    const totalInstallments = parseInt(subscriptionTotalInstallments, 10)
+    const paidInstallments = parseInt(subscriptionPaidInstallments || '0', 10)
+    if (subscriptionPaymentType === 'debt' && (!totalInstallments || totalInstallments <= 0)) {
+      alert("Kredi/borc icin toplam taksit sayisi giriniz.")
+      return
+    }
+    if (subscriptionPaymentType === 'debt' && paidInstallments > totalInstallments) {
+      alert("Odenen taksit toplam taksitten buyuk olamaz.")
+      return
+    }
+
+    const payment = {
+      id: Date.now().toString(),
+      name: subscriptionName.trim(),
+      amount: amountVal,
+      userId: subscriptionUser,
+      accountId: subscriptionAccount,
+      paymentType: subscriptionPaymentType,
+      totalInstallments: subscriptionPaymentType === 'debt' ? totalInstallments : null,
+      paidInstallments: subscriptionPaymentType === 'debt' ? paidInstallments : null,
+      dueDay: Math.min(Math.max(parseInt(subscriptionDueDay, 10) || 15, 1), 28),
+      status: 1
+    }
+
+    await saveRecurringPaymentToSupabase(payment)
+    setSubscriptions(prev => [...prev.filter(item => item.id !== payment.id), payment])
     setSubscriptionName('')
     setSubscriptionAmount('')
+    setSubscriptionTotalInstallments('')
+    setSubscriptionPaidInstallments('')
+    setSubscriptionDueDay('15')
     setSuccessMessage('Abonelik kaydedildi. Bu ayın gideri otomatik oluşturulacak.')
     setShowSuccessModal(true)
   }
 
-  const handleDeleteSubscription = (subscriptionId) => {
+  const handleDeleteSubscription = async (subscriptionId) => {
+    await deleteRecurringPaymentFromSupabase(subscriptionId)
     setSubscriptions(prev => prev.map(item => item.id === subscriptionId ? { ...item, status: 0 } : item))
   }
 
@@ -880,7 +1180,7 @@ function App() {
 
     const monthLabel = new Date(currentMonth + '-01').toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
     const userLabel = extractFilterUser ? activeUsers.find(u => u.id === extractFilterUser)?.name : 'Tümü';
-    const totalAmount = filteredTransactions.reduce((acc, curr) => acc + curr.amount, 0);
+    const totalAmount = filteredTransactions.reduce((acc, curr) => acc + getSignedTransactionAmount(curr), 0);
 
     let message = `*AIEkonomi - İşlem Ekstresi*\n`;
     message += `📅 Dönem: ${monthLabel}\n`;
@@ -889,7 +1189,7 @@ function App() {
 
     filteredTransactions.forEach(t => {
       const date = new Date(t.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
-      const amount = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount);
+      const amount = formatTransactionAmount(t);
       const acc = activeAccounts.find(a => a.id === t.accountId)?.name || 'Bilinmiyor';
       message += `▫️ *${date}* | ${amount}\n`;
       message += `   ${getDisplayDescription(t.description)} (${acc})\n\n`;
@@ -939,7 +1239,9 @@ function App() {
       return;
     }
 
-    if (isInstallment && (!installmentCount || installmentCount <= 0)) {
+    const shouldCreateInstallments = isInstallment
+
+    if (shouldCreateInstallments && (!installmentCount || installmentCount <= 0)) {
       alert("Geçerli bir taksit sayısı giriniz.");
       return;
     }
@@ -978,7 +1280,7 @@ function App() {
         status: 1
       }
 
-      if (isInstallment) {
+      if (shouldCreateInstallments) {
         const transactionsToAdd = []
         const [y, m, d] = date.split('-').map(Number)
 
@@ -1029,6 +1331,112 @@ function App() {
       setSuccessMessage('İşlem başarıyla kaydedildi.')
     }
     setShowSuccessModal(true)
+  }
+
+  const handleIncomeUserChange = (uId) => {
+    setIncomeUser(uId)
+    const userAccs = activeAccounts.filter(a => a.userId === uId)
+    if (userAccs.length > 0) setIncomeAccount(userAccs[0].id)
+  }
+
+  const handleAddIncome = (e) => {
+    e.preventDefault()
+
+    const amountVal = parseMoneyInput(incomeAmount)
+    if (isNaN(amountVal) || amountVal <= 0) {
+      alert("Gecerli bir gelir tutari giriniz.")
+      return
+    }
+    if (!incomeDescription.trim()) {
+      alert("Lutfen gelir aciklamasi giriniz.")
+      return
+    }
+    if (!incomeAccount) {
+      alert("Lutfen gelirin yazilacagi hesap seciniz.")
+      return
+    }
+
+    const newIncome = {
+      id: `income-${Date.now()}`,
+      accountId: incomeAccount,
+      amount: amountVal,
+      date: incomeDate,
+      description: incomeDescription.trim(),
+      type: 'gelir',
+      status: 1
+    }
+
+    setData(prev => ({
+      ...prev,
+      transactions: [...prev.transactions, newIncome]
+    }))
+
+    setIncomeAmount('')
+    setIncomeDescription('')
+    setIncomeDate(new Date().toISOString().split('T')[0])
+    setShowIncomeModal(false)
+    setSuccessMessage('Gelir basariyla kaydedildi.')
+    setShowSuccessModal(true)
+  }
+
+  const renderIncomeModal = () => {
+    if (!showIncomeModal) return null
+
+    const selectableAccounts = activeAccounts.filter(a => a.userId === incomeUser)
+
+    return (
+      <div className="absolute inset-0 z-[90] flex items-end sm:items-center justify-center pointer-events-none">
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowIncomeModal(false)}></div>
+        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] max-h-[90vh] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+          <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Gelir Girisi</h3>
+              <p className="text-sm text-gray-500 font-medium">Kisi bazli gelir kaydi olustur</p>
+            </div>
+            <button onClick={() => setShowIncomeModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
+          </div>
+
+          <form onSubmit={handleAddIncome} className="space-y-4 overflow-y-auto custom-scrollbar pr-1">
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Gelir Tutari</label>
+              <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder="0" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} autoFocus />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Aciklama</label>
+              <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder="Maas, prim, ek gelir..." value={incomeDescription} onChange={e => setIncomeDescription(e.target.value)} />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Tarih</label>
+              <input type="date" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} />
+            </div>
+
+            <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
+              {authorizedUsers.map(u => (
+                <button key={u.id} type="button" onClick={() => handleIncomeUserChange(u.id)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${incomeUser === u.id ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>{u.name}</button>
+              ))}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Hesap</label>
+              <select className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 appearance-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all cursor-pointer" value={incomeAccount} onChange={e => setIncomeAccount(e.target.value)}>
+                {selectableAccounts.length === 0 && <option value="">Once hesap ekleyin</option>}
+                {selectableAccounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold shadow-xl shadow-green-200 dark:shadow-green-900/30 active:scale-[0.98] transition-all hover:bg-green-700 flex items-center justify-center gap-2">
+              <Plus size={18} />
+              <span>Gelir Kaydet</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    )
   }
 
   const handleAddCard = () => {
@@ -1147,6 +1555,7 @@ function App() {
         await supabase.from('accounts').delete().neq('id', 'temp')
         await supabase.from('users').delete().neq('id', 'temp')
         await supabase.from('user_limits').delete().neq('user_id', 'temp')
+        await supabase.from('recurring_payments').delete().neq('id', 'temp')
       } catch (error) {
         console.error('Error resetting Supabase:', error)
       }
@@ -1154,6 +1563,7 @@ function App() {
 
     setData({ users: [], accounts: [], transactions: [] })
     setUserLimits({})
+    setSubscriptions([])
     alert('Bütün veriler başarıyla sıfırlandı.')
     window.location.reload()
   }
@@ -1364,8 +1774,10 @@ function App() {
           onOpenUsers={() => { setShowUserModal(true); setIsMenuOpen(false); }}
           onOpenCards={() => setShowCardsModal(true)}
           onOpenLimit={() => { setShowLimitModal(true); setIsMenuOpen(false); }}
+          onOpenIncome={() => setShowIncomeModal(true)}
           onResetAll={handleResetAllData}
         />
+        {renderIncomeModal()}
 
         <FamilyModal
           isOpen={showFamilyModal}
@@ -1500,6 +1912,202 @@ function App() {
     )
   }
 
+  if (currentView === 'cashflow') {
+    return (
+      <div className="fixed inset-0 bg-[#F2F4F8] dark:bg-slate-950 z-[100] flex flex-col animate-in slide-in-from-right duration-300">
+        <header className="px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-4 flex items-center gap-4 bg-[#F2F4F8] dark:bg-slate-950 border-b border-gray-100 dark:border-slate-800 sticky top-0 z-20 transition-colors">
+          <button
+            onClick={() => setCurrentView('economy')}
+            className="w-10 h-10 bg-white dark:bg-slate-800 shadow-sm rounded-xl flex items-center justify-center border border-gray-100 dark:border-slate-700 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all active:scale-95"
+          >
+            <ArrowLeft size={20} strokeWidth={2.5} />
+          </button>
+          <div>
+            <h3 className="text-xl font-black text-gray-800 dark:text-white tracking-tight">Nakit Akisi</h3>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kisa, orta ve uzun vadeli gorunum</p>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+          <div className="bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-gray-100 dark:border-slate-800 shadow-sm space-y-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Kisi Filtresi</p>
+              <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setCashFlowUser('all')}
+                  className={`flex-1 py-3 px-3 rounded-xl text-xs font-bold transition-all ${cashFlowUser === 'all' ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                >
+                  Genel
+                </button>
+                {activeUsers.map(user => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => setCashFlowUser(user.id)}
+                    className={`flex-1 py-3 px-3 rounded-xl text-xs font-bold transition-all ${cashFlowUser === user.id ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                  >
+                    {user.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest pl-1">Baslangic</label>
+                <input
+                  type="date"
+                  value={cashFlowStartDate}
+                  onChange={e => setCashFlowStartDate(e.target.value)}
+                  className="w-full p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest pl-1">Bitis</label>
+                <input
+                  type="date"
+                  value={cashFlowEndDate}
+                  onChange={e => setCashFlowEndDate(e.target.value)}
+                  className="w-full p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {cashFlowWindows.map(flow => (
+                <button
+                  key={`preset-${flow.key}`}
+                  type="button"
+                  onClick={() => {
+                    const start = getIstanbulToday()
+                    setCashFlowStartDate(formatDateKey(start))
+                    setCashFlowEndDate(formatDateKey(addDays(start, flow.days)))
+                  }}
+                  className="py-3 rounded-2xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-xs font-black border border-green-100 dark:border-green-900/30 active:scale-95 transition-all"
+                >
+                  {flow.days} Gun
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-gray-100 dark:border-slate-800 shadow-sm">
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Secili Aralik</p>
+                <h4 className="text-lg font-black text-slate-800 dark:text-white">
+                  {formatDateKey(cashFlowSelectedRange.startDate)} - {formatDateKey(cashFlowSelectedRange.endDate)}
+                </h4>
+              </div>
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${cashFlowSelectedRange.net >= 0 ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400'}`}>
+                <BarChart3 size={20} />
+              </div>
+            </div>
+
+            <p className={`text-3xl font-black mb-4 ${cashFlowSelectedRange.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+              {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(cashFlowSelectedRange.net)}
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-green-500 mb-1">Gelir</p>
+                <p className="font-black text-green-700 dark:text-green-300">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(cashFlowSelectedRange.income)}</p>
+              </div>
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">Gider</p>
+                <p className="font-black text-indigo-700 dark:text-indigo-300">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(cashFlowSelectedRange.expenses)}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {cashFlowWindows.map(flow => {
+              const isPositive = flow.net >= 0
+              return (
+                <div key={flow.key} className="bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-gray-100 dark:border-slate-800 shadow-sm">
+                  <div className="flex items-start justify-between gap-3 mb-5">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{flow.label}</p>
+                      <h4 className="text-lg font-black text-slate-800 dark:text-white">{flow.days} Gun</h4>
+                    </div>
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isPositive ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400'}`}>
+                      <BarChart3 size={20} />
+                    </div>
+                  </div>
+
+                  <p className={`text-2xl font-black mb-4 ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(flow.net)}
+                  </p>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-gray-400">Gelir</span>
+                      <span className="text-green-600 dark:text-green-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(flow.income)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-gray-400">Gider</span>
+                      <span className="text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(flow.expenses)}</span>
+                    </div>
+                    <div className="h-2 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`${isPositive ? 'bg-green-500' : 'bg-red-500'} h-full rounded-full`}
+                        style={{ width: `${Math.min(Math.abs(flow.net) / Math.max(flow.income, flow.expenses, 1) * 100, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="space-y-5">
+              <section className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h4 className="text-sm font-black text-slate-700 dark:text-slate-200">Secili Aralik Hareketleri</h4>
+                  <span className="text-[10px] font-bold text-gray-400">
+                    {cashFlowSelectedRange.items.length} kayit
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {cashFlowSelectedRange.items.map(item => {
+                    const account = activeAccounts.find(acc => acc.id === item.accountId)
+                    const isIncome = isIncomeTransaction(item)
+                    return (
+                      <div key={item.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <p className="font-black text-slate-800 dark:text-white truncate">{item.description}</p>
+                            {item.source === 'recurring' && (
+                              <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide">Planli</span>
+                            )}
+                            {isIncome && (
+                              <span className="px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-[9px] font-black uppercase tracking-wide">Gelir</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] font-bold text-gray-400">{new Date(item.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })} - {account?.name || 'Hesap yok'}</p>
+                        </div>
+                        <p className={`font-black text-sm shrink-0 ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                          {isIncome ? '+' : '-'}{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.amount)}
+                        </p>
+                      </div>
+                    )
+                  })}
+
+                  {cashFlowSelectedRange.items.length === 0 && (
+                    <div className="bg-white/70 dark:bg-slate-900/70 rounded-2xl p-5 border border-gray-100 dark:border-slate-800 text-center">
+                      <p className="text-sm font-bold text-gray-400">Bu tarih araliginda beklenen nakit hareketi yok.</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   // Render Budget Detail View
   if (currentView === 'budgetDetail') {
     return (
@@ -1584,6 +2192,7 @@ function App() {
                           const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
                           const userMonthTotal = activeTransactions
                             .filter(t => t.status === 1 && t.date.startsWith(item.date) && userAccs.includes(t.accountId))
+                            .filter(isExpenseTransaction)
                             .reduce((acc, curr) => acc + curr.amount, 0);
 
                           if (userMonthTotal === 0) return null;
@@ -1623,11 +2232,13 @@ function App() {
             // Transaction Detail View
             <>
               {/* Person Filter Tabs */}
+              {activeUsers.length > 1 && (
               <div className="flex flex-wrap gap-2 mb-6 transition-colors">
                 {activeUsers.map(u => {
                   const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
                   const userMonthTotal = activeTransactions
                     .filter(t => t.status === 1 && t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
+                    .filter(isExpenseTransaction)
                     .reduce((acc, curr) => acc + curr.amount, 0);
 
                   const isSelected = selectedMonthDetail.selectedUserId === u.id;
@@ -1651,6 +2262,7 @@ function App() {
                   )
                 })}
               </div>
+              )}
 
               {/* Quick Add Button */}
               {isAuthorized(selectedMonthDetail.selectedUserId) && (
@@ -1706,14 +2318,17 @@ function App() {
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="font-bold text-gray-800 dark:text-white text-sm">{getDisplayDescription(t.description)}</p>
-                              {t.type === 'abonelik' && (
-                                <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">Abonelik</span>
+                              {getRecurringTransactionLabel(t.type) && (
+                                <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">{getRecurringTransactionLabel(t.type)}</span>
+                              )}
+                              {isIncomeTransaction(t) && (
+                                <span className="px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-[9px] font-black uppercase tracking-wide border border-green-100 dark:border-green-800/50">Gelir</span>
                               )}
                             </div>
                             <p className="text-xs text-gray-400 mt-1">{account?.name}</p>
                           </div>
-                          <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg ml-3">
-                            {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
+                          <p className={`font-black text-lg ml-3 ${getTransactionAmountClass(t)}`}>
+                            {formatTransactionAmount(t)}
                           </p>
                         </div>
                         <div className="flex items-center justify-between mt-2">
@@ -1759,24 +2374,48 @@ function App() {
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Abonelikler</h3>
-                  <p className="text-sm text-gray-500 font-medium">Aylik sabit giderleri otomatik yaz</p>
+                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Tekrarlayan Odemeler</h3>
+                  <p className="text-sm text-gray-500 font-medium">Abonelik, kredi ve sabit giderleri otomatik yaz</p>
                 </div>
                 <button onClick={() => setShowSubscriptionModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
               </div>
 
               <div className="overflow-y-auto custom-scrollbar pr-1">
-                <form onSubmit={handleAddSubscription} className="space-y-4 mb-6">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Abonelik Adi</label>
-                      <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="Netflix, YouTube..." value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Tutar</label>
-                      <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionAmount} onChange={e => setSubscriptionAmount(e.target.value)} />
-                    </div>
+              <form onSubmit={handleAddSubscription} className="space-y-4 mb-6">
+                <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl grid grid-cols-3 gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
+                  {Object.entries(recurringPaymentTypes).map(([key, item]) => (
+                    <button key={key} type="button" onClick={() => setSubscriptionPaymentType(key)} className={`py-3 px-2 rounded-xl text-[11px] font-bold transition-all duration-300 ${subscriptionPaymentType === key ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+                      {item.shortLabel}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-400 font-bold px-2 -mt-2">{recurringPaymentTypes[subscriptionPaymentType].helper}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odeme Adi</label>
+                    <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder={subscriptionPaymentType === 'debt' ? 'Ev kredisi, arac kredisi...' : 'Netflix, kira, aidat...'} value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
                   </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Aylik Tutar</label>
+                    <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionAmount} onChange={e => setSubscriptionAmount(e.target.value)} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odeme Gunu</label>
+                    <input type="number" min="1" max="28" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="15" value={subscriptionDueDay} onChange={e => setSubscriptionDueDay(e.target.value)} />
+                  </div>
+                  {subscriptionPaymentType === 'debt' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Toplam Taksit</label>
+                        <input type="number" min="1" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="120" value={subscriptionTotalInstallments} onChange={e => setSubscriptionTotalInstallments(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odenen</label>
+                        <input type="number" min="0" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionPaidInstallments} onChange={e => setSubscriptionPaidInstallments(e.target.value)} />
+                      </div>
+                    </>
+                  )}
+                </div>
 
                   <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
                     {authorizedUsers.map(u => (
@@ -1796,18 +2435,25 @@ function App() {
 
                   <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2">
                     <Plus size={18} />
-                    <span>Abonelik Ekle</span>
+                    <span>Odeme Ekle</span>
                   </button>
                 </form>
 
                 <div className="space-y-3">
                   {subscriptions.filter(item => item.status !== 0).map(item => {
                     const account = activeAccounts.find(acc => acc.id === item.accountId)
+                    const paymentType = getRecurringPaymentType(item)
+                    const installmentInfo = getRecurringInstallmentInfo(item)
                     return (
                       <div key={item.id} className="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="font-black text-gray-800 dark:text-white truncate">{item.name}</p>
-                          <p className="text-[11px] font-bold text-gray-400">{account?.name || 'Hesap yok'}</p>
+                          <p className="text-[11px] font-bold text-gray-400">{paymentType.label} - {account?.name || 'Hesap yok'} - Her ay {item.dueDay || 15}</p>
+                          {installmentInfo && (
+                            <p className="text-[11px] font-bold text-gray-500 dark:text-gray-300 mt-1">
+                              {installmentInfo.nextInstallment}/{installmentInfo.total} taksit - Kalan {installmentInfo.remainingAfterThisMonth} - {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(installmentInfo.remainingDebt)}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.amount)}</span>
@@ -1820,7 +2466,7 @@ function App() {
                   })}
                   {subscriptions.filter(item => item.status !== 0).length === 0 && (
                     <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-5 border border-indigo-100 dark:border-indigo-900/40 text-center">
-                      <p className="text-sm font-bold text-indigo-600 dark:text-indigo-300">Netflix, YouTube, Spotify gibi aylik giderleri buraya ekleyebilirsin.</p>
+                      <p className="text-sm font-bold text-indigo-600 dark:text-indigo-300">Netflix, ev kredisi, kira, aidat gibi duzenli odemeleri buraya ekleyebilirsin.</p>
                     </div>
                   )}
                 </div>
@@ -2197,6 +2843,7 @@ function App() {
                       switch (itemId) {
                         case 'limit': setLimitModalUser(activeUsers[0]?.id); setShowLimitModal(true); break;
                         case 'future': setSelectedMonthDetail(null); setCurrentView('budgetDetail'); break;
+                        case 'cashflow': setCurrentView('cashflow'); break;
                         case 'subscriptions': setShowSubscriptionModal(true); break;
                         case 'cards': setShowCardsModal(true); break;
                         case 'users': setShowUserModal(true); break;
@@ -2213,7 +2860,8 @@ function App() {
                   switch (itemId) {
                     case 'limit': label = 'Limit'; IconComponent = Gauge; break;
                     case 'future': label = 'Dönemler'; IconComponent = Calendar; break;
-                    case 'subscriptions': label = 'Abonelik'; IconComponent = Repeat; break;
+                    case 'cashflow': label = 'Nakit'; IconComponent = BarChart3; colorClass = 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'; borderColorClass = 'border-green-100 dark:border-green-900/30'; break;
+                    case 'subscriptions': label = 'Odemeler'; IconComponent = Repeat; break;
                     case 'cards': label = 'Kartlar'; IconComponent = CreditCard; break;
                     case 'users': label = 'Kişiler'; IconComponent = Users; break;
                     case 'feedback': label = 'İstekler'; IconComponent = MessageSquare; break;
@@ -2250,6 +2898,7 @@ function App() {
                 const userAccountIds = activeAccounts.filter(acc => acc.userId === user.id).map(acc => acc.id)
                 const userSpending = activeTransactions
                   .filter(t => t.date.startsWith(currentMonth) && userAccountIds.includes(t.accountId))
+                  .filter(isExpenseTransaction)
                   .reduce((acc, curr) => acc + curr.amount, 0)
 
                 const userLimit = userLimits[user.id] || 0
@@ -2382,23 +3031,47 @@ function App() {
             <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Abonelikler</h3>
-                <p className="text-sm text-gray-500 font-medium">Aylik sabit giderleri otomatik yaz</p>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Tekrarlayan Odemeler</h3>
+                <p className="text-sm text-gray-500 font-medium">Abonelik, kredi ve sabit giderleri otomatik yaz</p>
               </div>
               <button onClick={() => setShowSubscriptionModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
             </div>
 
             <div className="overflow-y-auto custom-scrollbar pr-1">
               <form onSubmit={handleAddSubscription} className="space-y-4 mb-6">
+                <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl grid grid-cols-3 gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
+                  {Object.entries(recurringPaymentTypes).map(([key, item]) => (
+                    <button key={key} type="button" onClick={() => setSubscriptionPaymentType(key)} className={`py-3 px-2 rounded-xl text-[11px] font-bold transition-all duration-300 ${subscriptionPaymentType === key ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
+                      {item.shortLabel}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-400 font-bold px-2 -mt-2">{recurringPaymentTypes[subscriptionPaymentType].helper}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Abonelik Adi</label>
-                    <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="Netflix, YouTube..." value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odeme Adi</label>
+                    <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder={subscriptionPaymentType === 'debt' ? 'Ev kredisi, arac kredisi...' : 'Netflix, kira, aidat...'} value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Tutar</label>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Aylik Tutar</label>
                     <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionAmount} onChange={e => setSubscriptionAmount(e.target.value)} />
                   </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odeme Gunu</label>
+                    <input type="number" min="1" max="28" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="15" value={subscriptionDueDay} onChange={e => setSubscriptionDueDay(e.target.value)} />
+                  </div>
+                  {subscriptionPaymentType === 'debt' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Toplam Taksit</label>
+                        <input type="number" min="1" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="120" value={subscriptionTotalInstallments} onChange={e => setSubscriptionTotalInstallments(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odenen</label>
+                        <input type="number" min="0" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionPaidInstallments} onChange={e => setSubscriptionPaidInstallments(e.target.value)} />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
@@ -2419,18 +3092,25 @@ function App() {
 
                 <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2">
                   <Plus size={18} />
-                  <span>Abonelik Ekle</span>
+                  <span>Odeme Ekle</span>
                 </button>
               </form>
 
               <div className="space-y-3">
                 {subscriptions.filter(item => item.status !== 0).map(item => {
                   const account = activeAccounts.find(acc => acc.id === item.accountId)
+                  const paymentType = getRecurringPaymentType(item)
+                  const installmentInfo = getRecurringInstallmentInfo(item)
                   return (
                     <div key={item.id} className="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-black text-gray-800 dark:text-white truncate">{item.name}</p>
-                        <p className="text-[11px] font-bold text-gray-400">{account?.name || 'Hesap yok'}</p>
+                        <p className="text-[11px] font-bold text-gray-400">{paymentType.label} - {account?.name || 'Hesap yok'} - Her ay {item.dueDay || 15}</p>
+                        {installmentInfo && (
+                          <p className="text-[11px] font-bold text-gray-500 dark:text-gray-300 mt-1">
+                            {installmentInfo.nextInstallment}/{installmentInfo.total} taksit - Kalan {installmentInfo.remainingAfterThisMonth} - {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(installmentInfo.remainingDebt)}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.amount)}</span>
@@ -2443,7 +3123,7 @@ function App() {
                 })}
                 {subscriptions.filter(item => item.status !== 0).length === 0 && (
                   <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-5 border border-indigo-100 dark:border-indigo-900/40 text-center">
-                    <p className="text-sm font-bold text-indigo-600 dark:text-indigo-300">Netflix, YouTube, Spotify gibi aylik giderleri buraya ekleyebilirsin.</p>
+                    <p className="text-sm font-bold text-indigo-600 dark:text-indigo-300">Netflix, ev kredisi, kira, aidat gibi duzenli odemeleri buraya ekleyebilirsin.</p>
                   </div>
                 )}
               </div>
@@ -2742,6 +3422,7 @@ function App() {
                   .map(acc => {
                     const accountDebt = activeTransactions
                       .filter(t => t.accountId === acc.id)
+                      .filter(isExpenseTransaction)
                       .reduce((acc, curr) => acc + curr.amount, 0)
 
                     if (accountDebt === 0) return null
@@ -2767,7 +3448,7 @@ function App() {
                 {
                   activeAccounts
                     .filter(acc => acc.userId === selectedUserSummary)
-                    .every(acc => activeTransactions.filter(t => t.accountId === acc.id).reduce((a, c) => a + c.amount, 0) === 0) && (
+                    .every(acc => activeTransactions.filter(t => t.accountId === acc.id).filter(isExpenseTransaction).reduce((a, c) => a + c.amount, 0) === 0) && (
                     <div className="text-center py-10 text-gray-400">
                       <p className="text-sm">Bu kullanıcı için aktif borç bulunamadı.</p>
                     </div>
@@ -3105,6 +3786,7 @@ function App() {
                       {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(
                         activeTransactions
                           .filter(t => t.status === 1 && t.date.startsWith(currentMonth))
+                          .filter(isExpenseTransaction)
                           .reduce((acc, curr) => acc + curr.amount, 0)
                       )}
                     </span>
@@ -3114,6 +3796,7 @@ function App() {
                   const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
                   const userTotal = activeTransactions
                     .filter(t => t.status === 1 && t.date.startsWith(currentMonth) && userAccs.includes(t.accountId))
+                    .filter(isExpenseTransaction)
                     .reduce((acc, curr) => acc + curr.amount, 0);
 
                   return (
@@ -3152,14 +3835,17 @@ function App() {
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="font-bold text-gray-800 dark:text-white text-sm">{getDisplayDescription(t.description) || 'İşlem'}</p>
-                              {t.type === 'abonelik' && (
-                                <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">Abonelik</span>
+                              {getRecurringTransactionLabel(t.type) && (
+                                <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">{getRecurringTransactionLabel(t.type)}</span>
+                              )}
+                              {isIncomeTransaction(t) && (
+                                <span className="px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-[9px] font-black uppercase tracking-wide border border-green-100 dark:border-green-800/50">Gelir</span>
                               )}
                             </div>
                             <p className="text-xs text-gray-400">{account?.name} • {user?.name}</p>
                           </div>
-                          <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg">
-                            {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(t.amount)}
+                          <p className={`font-black text-lg ${getTransactionAmountClass(t)}`}>
+                            {formatTransactionAmount(t)}
                           </p>
                         </div>
                         <p className="text-xs text-gray-400">{new Date(t.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
@@ -3194,6 +3880,7 @@ function App() {
                             const isStatus1 = t.status === 1;
                             return matchesUser && isMevcutAy && isStatus1;
                           })
+                          .filter(isExpenseTransaction)
                           .reduce((acc, curr) => acc + curr.amount, 0)
                       )}
                     </div>
@@ -3384,9 +4071,11 @@ function App() {
         onOpenUsers={() => { setShowUserModal(true); setIsMenuOpen(false); }}
         onOpenCards={() => setShowCardsModal(true)}
         onOpenLimit={() => { setShowLimitModal(true); setIsMenuOpen(false); }}
+        onOpenIncome={() => setShowIncomeModal(true)}
         onResetAll={handleResetAllData}
         isFamilyAdmin={isFamilyAdmin}
       />
+      {renderIncomeModal()}
 
       <FamilyModal
         isOpen={showFamilyModal}
