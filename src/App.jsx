@@ -201,6 +201,7 @@ function App() {
   const [cashFlowUser, setCashFlowUser] = useState('all')
   const [cashFlowStartDate, setCashFlowStartDate] = useState('')
   const [cashFlowEndDate, setCashFlowEndDate] = useState('')
+  const [showCashFlowCustomDates, setShowCashFlowCustomDates] = useState(false)
 
   // Reset Password Modal
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -808,11 +809,11 @@ function App() {
   const saveRecurringPaymentToSupabase = async (payment) => {
     if (!isSupabaseConfigured) {
       console.error('Recurring payment was not saved: Supabase is not configured.')
-      return false
+      return { ok: false, message: 'Supabase bağlantısı yapılandırılmamış.' }
     }
     if (!profile?.family_id) {
       console.error('Recurring payment was not saved: profile.family_id is missing.')
-      return false
+      return { ok: false, message: 'Aile/profil bağlantısı bulunamadı.' }
     }
 
     const payload = buildRecurringPaymentPayload(payment, profile.family_id)
@@ -820,9 +821,9 @@ function App() {
     const { error } = await supabase.from('recurring_payments').upsert(payload)
     if (error) {
       console.error('Error saving recurring payment:', error)
-      return false
+      return { ok: false, code: error.code, message: error.message }
     }
-    return true
+    return { ok: true }
   }
 
   const deleteRecurringPaymentFromSupabase = async (paymentId) => {
@@ -1155,7 +1156,7 @@ function App() {
     }
 
     const savedToSupabase = await saveRecurringPaymentToSupabase(payment)
-    if (!savedToSupabase) {
+    if (!savedToSupabase.ok) {
       if (isLocalRuntime || profile?.family_id === '11111111-1111-1111-1111-111111111111') {
         setSubscriptions(prev => [...prev.filter(item => item.id !== payment.id), payment])
         setSubscriptionName('')
@@ -1167,7 +1168,10 @@ function App() {
         setShowSuccessModal(true)
         return
       }
-      alert("Kayit ekranda olusturulmadi. Supabase'e yazilamadi; lutfen aile/profil baglantisini ve recurring_payments tablosunu kontrol edin.")
+      const rlsHint = savedToSupabase.code === '42501'
+        ? ' recurring_payments tablo yetkisi/RLS policy eksik görünüyor.'
+        : ''
+      alert(`Kayıt DB'ye yazılamadı.${rlsHint} Hata: ${savedToSupabase.message || 'Bilinmeyen Supabase hatası'}`)
       return
     }
 
@@ -2116,6 +2120,25 @@ function App() {
       groups[item.date].push(item)
       return groups
     }, {})
+    const renderCashFlowDatePicker = (label, value, onChange) => (
+      <label className="min-w-0">
+        <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">{label}</span>
+        <div className="relative">
+          <input
+            type="date"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            className="absolute inset-0 h-full w-full opacity-0 cursor-pointer"
+          />
+          <div className="min-h-[46px] w-full px-2.5 py-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white rounded-2xl border border-gray-200 dark:border-slate-700 flex items-center justify-between gap-1.5 pointer-events-none">
+            <span className="min-w-0 text-[14px] min-[390px]:text-[15px] sm:text-base font-black leading-none tracking-normal truncate">
+              {formatCashFlowDate(value)}
+            </span>
+            <Calendar size={15} className="shrink-0 text-gray-400" strokeWidth={2.5} />
+          </div>
+        </div>
+      </label>
+    )
 
     return (
       <div className="fixed inset-0 bg-[#F2F4F8] dark:bg-slate-950 z-[100] flex flex-col animate-in slide-in-from-right duration-300">
@@ -2154,27 +2177,28 @@ function App() {
                     const start = getIstanbulToday()
                     setCashFlowStartDate(formatDateKey(start))
                     setCashFlowEndDate(formatDateKey(addDays(start, days)))
+                    setShowCashFlowCustomDates(false)
                   }}
-                  className={`py-3 rounded-2xl text-xs font-black transition-all ${cashFlowPeriodDays === days ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'}`}
+                  className={`py-3 rounded-2xl text-xs font-black transition-all ${!showCashFlowCustomDates && cashFlowPeriodDays === days ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'}`}
                 >
                   {days} Gün
                 </button>
               ))}
-              <button type="button" className="py-3 rounded-2xl text-xs font-black bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-300">
+              <button
+                type="button"
+                onClick={() => setShowCashFlowCustomDates(prev => !prev)}
+                className={`py-3 rounded-2xl text-xs font-black transition-all ${showCashFlowCustomDates ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-300'}`}
+              >
                 Özel
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:gap-3 overflow-hidden">
-              <label className="min-w-0">
-                <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">Başlangıç</span>
-                <input type="date" value={cashFlowStartDate} onChange={e => setCashFlowStartDate(e.target.value)} className="block w-full min-w-0 max-w-full px-1.5 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-[12px] min-[390px]:text-[13px] sm:text-sm font-bold leading-none rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none [appearance:textfield] [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-calendar-picker-indicator]:w-3.5 [&::-webkit-calendar-picker-indicator]:h-3.5" />
-              </label>
-              <label className="min-w-0">
-                <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">Bitiş</span>
-                <input type="date" value={cashFlowEndDate} onChange={e => setCashFlowEndDate(e.target.value)} className="block w-full min-w-0 max-w-full px-1.5 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-[12px] min-[390px]:text-[13px] sm:text-sm font-bold leading-none rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none [appearance:textfield] [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-calendar-picker-indicator]:w-3.5 [&::-webkit-calendar-picker-indicator]:h-3.5" />
-              </label>
-            </div>
+            {showCashFlowCustomDates && (
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 overflow-hidden">
+                {renderCashFlowDatePicker('Başlangıç', cashFlowStartDate, setCashFlowStartDate)}
+                {renderCashFlowDatePicker('Bitiş', cashFlowEndDate, setCashFlowEndDate)}
+              </div>
+            )}
           </section>
 
           <section className="bg-white dark:bg-slate-900 rounded-[32px] p-6 border border-gray-100 dark:border-slate-800 shadow-sm">
@@ -2876,10 +2900,10 @@ function App() {
 
         <div
           ref={scrollContainerRef}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          className="relative z-10 flex-1 flex flex-col overflow-y-auto custom-scrollbar"
+          onTouchStart={showUpcomingPaymentsModal ? undefined : handleTouchStart}
+          onTouchMove={showUpcomingPaymentsModal ? undefined : handleTouchMove}
+          onTouchEnd={showUpcomingPaymentsModal ? undefined : handleTouchEnd}
+          className={`relative z-10 flex-1 flex flex-col custom-scrollbar ${showUpcomingPaymentsModal ? 'overflow-hidden' : 'overflow-y-auto'}`}
           style={{
             transform: isRefreshing ? 'translateY(60px)' : (pullMoveY > 0 ? `translateY(${Math.min(pullMoveY * 0.4, 80)}px)` : 'translateY(0)'),
             transition: isRefreshing ? 'transform 0.3s ease-out' : 'transform 0.1s linear',
@@ -3041,7 +3065,7 @@ function App() {
 
           {showUpcomingPaymentsModal && (
             <div
-              className="fixed inset-0 z-[70] flex items-center justify-center p-5 overscroll-none touch-none"
+              className="absolute inset-0 z-[90] flex items-center justify-center p-5 overscroll-none touch-none"
               onWheel={e => e.stopPropagation()}
               onTouchMove={e => {
                 e.preventDefault()
@@ -3058,7 +3082,7 @@ function App() {
                   <button onClick={() => setShowUpcomingPaymentsModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
                 </div>
 
-                <div className="space-y-3 max-h-[55dvh] overflow-y-auto overscroll-contain pr-1 custom-scrollbar">
+                <div className="space-y-3 max-h-[55dvh] overflow-y-auto overscroll-contain touch-auto pr-1 custom-scrollbar">
                   {upcomingPayments.map(item => (
                     <div key={item.id} className="bg-amber-50/70 dark:bg-amber-900/20 rounded-2xl p-4 border border-amber-100 dark:border-amber-900/30 flex items-center justify-between gap-4">
                       <div className="min-w-0">
