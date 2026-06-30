@@ -192,6 +192,7 @@ function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showFamilyModal, setShowFamilyModal] = useState(false)
   const [showIncomeModal, setShowIncomeModal] = useState(false)
+  const [showUpcomingPaymentsModal, setShowUpcomingPaymentsModal] = useState(false)
   const [incomeAmount, setIncomeAmount] = useState('')
   const [incomeDescription, setIncomeDescription] = useState('')
   const [incomeDate, setIncomeDate] = useState(new Date().toISOString().split('T')[0])
@@ -1026,6 +1027,23 @@ function App() {
     const endDate = addDays(startDate, days)
     return getCashFlowForRange(startDate, endDate, userId)
   }
+
+  const getUpcomingPayments = (days = 5) => {
+    const today = getIstanbulToday()
+    const endDate = addDays(today, days)
+
+    return getRecurringOccurrencesForRange(today, endDate, 'all')
+      .map(item => {
+        const dueDate = parseDateKey(item.date)
+        const daysLeft = Math.max(Math.round((dueDate - today) / (1000 * 60 * 60 * 24)), 0)
+        const account = activeAccounts.find(acc => acc.id === item.accountId)
+        const user = activeUsers.find(u => u.id === account?.userId)
+        return { ...item, daysLeft, account, user }
+      })
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  const upcomingPayments = getUpcomingPayments(5)
 
   const cashFlowWindows = [
     { key: 'short', label: 'Kısa Vade', days: 7 },
@@ -2782,6 +2800,17 @@ function App() {
                   <Plus size={16} strokeWidth={3} />
                   <span className="text-[10px] font-black uppercase tracking-tight">Harcama Ekle</span>
                 </button>
+
+                {upcomingPayments.length > 0 && (
+                  <button
+                    onClick={() => setShowUpcomingPaymentsModal(true)}
+                    className="h-9 min-w-9 px-2 shrink-0 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 border border-amber-100 dark:border-amber-800/50 shadow-sm rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                    title="Yaklaşan Ödemeler"
+                  >
+                    <Bell size={15} strokeWidth={2.8} />
+                    <span className="text-[10px] font-black">{upcomingPayments.length}</span>
+                  </button>
+                )}
               </div>
 
 
@@ -2889,6 +2918,40 @@ function App() {
             </div>
           )}
 
+
+          {showUpcomingPaymentsModal && (
+            <div className="absolute inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4">
+              <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-all" onClick={() => setShowUpcomingPaymentsModal(false)}></div>
+              <div className="bg-white dark:bg-slate-900 w-full sm:max-w-[380px] rounded-t-[36px] sm:rounded-[36px] p-6 relative z-10 animate-slide-up sm:animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-800 dark:text-white tracking-tight">Yaklaşan Ödemeler</h3>
+                    <p className="text-xs text-gray-400 font-bold">Önümüzdeki 5 gün</p>
+                  </div>
+                  <button onClick={() => setShowUpcomingPaymentsModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
+                </div>
+
+                <div className="space-y-3">
+                  {upcomingPayments.map(item => (
+                    <div key={item.id} className="bg-amber-50/70 dark:bg-amber-900/20 rounded-2xl p-4 border border-amber-100 dark:border-amber-900/30 flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-black text-gray-800 dark:text-white truncate">{item.description}</p>
+                          <span className="px-2 py-0.5 rounded-full bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-300 text-[9px] font-black uppercase">
+                            {item.daysLeft === 0 ? 'Bugün' : item.daysLeft === 1 ? 'Yarın' : `${item.daysLeft} gün`}
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-bold text-gray-400">{item.user?.name || 'Genel'} - {item.account?.name || 'Hesap yok'}</p>
+                      </div>
+                      <p className="font-black text-amber-700 dark:text-amber-300 shrink-0">
+                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.amount)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
 
           <div className="mx-6 mb-4">
@@ -3811,8 +3874,9 @@ function App() {
                 })}
               </div>
 
-              <div className="bg-white dark:bg-slate-800 rounded-[28px] p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-5">
-                <div className="flex items-start justify-between gap-3 mb-5">
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                <div className="bg-white dark:bg-slate-800 rounded-[28px] p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-5">
+                  <div className="flex items-start justify-between gap-3 mb-5">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Aylık Rapor</p>
                     <h4 className="text-lg font-black text-gray-800 dark:text-white capitalize">
@@ -3884,8 +3948,8 @@ function App() {
                 </div>
               </div>
 
-              {/* Transactions List */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                {/* Transactions List */}
+                <div className="space-y-3">
                 {activeTransactions
                   .filter(t => {
                     const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
@@ -3953,6 +4017,7 @@ function App() {
                       )}
                     </div>
                   )}
+                </div>
               </div>
             </div>
           </div>
