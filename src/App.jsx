@@ -407,7 +407,7 @@ function App() {
       }
 
       if (recurringPaymentsError) {
-        console.warn('Tekrarlayan odemeler tablosu hazir degil. SQL scriptini calistirdiktan sonra DB senkronu aktif olacak.', recurringPaymentsError)
+        console.warn('Tekrarlayan ödemeler tablosu hazır değil. SQL scriptini çalıştırdıktan sonra DB senkronu aktif olacak.', recurringPaymentsError)
       }
 
       if (users && accounts && transactions) {
@@ -749,15 +749,19 @@ function App() {
 
   const recurringPaymentTypes = {
     subscription: { label: 'Abonelik', shortLabel: 'Abonelik', helper: 'Netflix, Spotify, internet gibi iptal edilebilir servisler' },
-    debt: { label: 'Kredi / Borc', shortLabel: 'Borc', helper: 'Ev kredisi, arac kredisi, ihtiyac kredisi gibi bitisi olan odemeler' },
-    fixed: { label: 'Sabit Gider', shortLabel: 'Sabit', helper: 'Kira, aidat, okul, sigorta gibi duzenli odemeler' }
+    debt: { label: 'Kredi / Borç', shortLabel: 'Borç', helper: 'Ev kredisi, araç kredisi, ihtiyaç kredisi gibi bitişi olan ödemeler' }
   }
 
-  const getRecurringPaymentType = (item) => recurringPaymentTypes[item?.paymentType || 'subscription'] || recurringPaymentTypes.subscription
+  const getRecurringPaymentType = (item) => {
+    if (item?.paymentType === 'fixed') {
+      return { label: 'Sabit Gider', shortLabel: 'Sabit' }
+    }
+    return recurringPaymentTypes[item?.paymentType || 'subscription'] || recurringPaymentTypes.subscription
+  }
 
   const getRecurringTransactionLabel = (type) => {
     if (type === 'debt') return recurringPaymentTypes.debt.shortLabel
-    if (type === 'fixed') return recurringPaymentTypes.fixed.shortLabel
+    if (type === 'fixed') return 'Sabit'
     if (type === 'subscription' || type === 'abonelik') return recurringPaymentTypes.subscription.shortLabel
     return null
   }
@@ -1024,7 +1028,7 @@ function App() {
   }
 
   const cashFlowWindows = [
-    { key: 'short', label: 'Kisa Vade', days: 7 },
+    { key: 'short', label: 'Kısa Vade', days: 7 },
     { key: 'medium', label: 'Orta Vade', days: 30 },
     { key: 'long', label: 'Uzun Vade', days: 90 }
   ].map(item => ({ ...item, ...getCashFlowForDays(item.days, cashFlowUser) }))
@@ -1077,11 +1081,11 @@ function App() {
     const totalInstallments = parseInt(subscriptionTotalInstallments, 10)
     const paidInstallments = parseInt(subscriptionPaidInstallments || '0', 10)
     if (subscriptionPaymentType === 'debt' && (!totalInstallments || totalInstallments <= 0)) {
-      alert("Kredi/borc icin toplam taksit sayisi giriniz.")
+      alert("Kredi/borç için toplam taksit sayısı giriniz.")
       return
     }
     if (subscriptionPaymentType === 'debt' && paidInstallments > totalInstallments) {
-      alert("Odenen taksit toplam taksitten buyuk olamaz.")
+      alert("Ödenen taksit toplam taksitten büyük olamaz.")
       return
     }
 
@@ -1163,8 +1167,8 @@ function App() {
     }))
   }
 
-  const handleShareWhatsApp = () => {
-    const filteredTransactions = activeTransactions
+  const getExtractTransactions = () => {
+    return activeTransactions
       .filter(t => {
         const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
         const isMevcutAy = t.date.startsWith(currentMonth);
@@ -1172,6 +1176,43 @@ function App() {
         return matchesUser && isMevcutAy && isStatus1;
       })
       .sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
+
+  const getMonthlyReport = () => {
+    const transactions = getExtractTransactions()
+    const income = transactions.filter(isIncomeTransaction).reduce((sum, item) => sum + item.amount, 0)
+    const expenses = transactions.filter(isExpenseTransaction).reduce((sum, item) => sum + item.amount, 0)
+    const recurringExpenses = transactions
+      .filter(item => getRecurringTransactionLabel(item.type))
+      .filter(isExpenseTransaction)
+      .reduce((sum, item) => sum + item.amount, 0)
+    const net = income - expenses
+
+    const userBreakdown = activeUsers
+      .map(user => {
+        const accountIds = activeAccounts.filter(account => account.userId === user.id).map(account => account.id)
+        const total = transactions
+          .filter(item => accountIds.includes(item.accountId))
+          .filter(isExpenseTransaction)
+          .reduce((sum, item) => sum + item.amount, 0)
+        return { user, total }
+      })
+      .filter(item => extractFilterUser === null || item.user.id === extractFilterUser)
+      .filter(item => item.total > 0)
+      .sort((a, b) => b.total - a.total)
+
+    const topTransactions = transactions
+      .filter(isExpenseTransaction)
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+
+    return { transactions, income, expenses, recurringExpenses, net, userBreakdown, topTransactions }
+  }
+
+  const monthlyReport = getMonthlyReport()
+
+  const handleShareWhatsApp = () => {
+    const filteredTransactions = getExtractTransactions();
 
     if (filteredTransactions.length === 0) {
       alert("Paylaşılacak işlem bulunamadı.");
@@ -1391,8 +1432,8 @@ function App() {
           <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Gelir Girisi</h3>
-              <p className="text-sm text-gray-500 font-medium">Kisi bazli gelir kaydi olustur</p>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Gelir Girişi</h3>
+              <p className="text-sm text-gray-500 font-medium">Kişi bazlı gelir kaydı oluştur</p>
             </div>
             <button onClick={() => setShowIncomeModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
           </div>
@@ -1404,8 +1445,8 @@ function App() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Aciklama</label>
-              <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder="Maas, prim, ek gelir..." value={incomeDescription} onChange={e => setIncomeDescription(e.target.value)} />
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Açıklama</label>
+              <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder="Maaş, prim, ek gelir..." value={incomeDescription} onChange={e => setIncomeDescription(e.target.value)} />
             </div>
 
             <div>
@@ -1422,7 +1463,7 @@ function App() {
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Hesap</label>
               <select className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 appearance-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all cursor-pointer" value={incomeAccount} onChange={e => setIncomeAccount(e.target.value)}>
-                {selectableAccounts.length === 0 && <option value="">Once hesap ekleyin</option>}
+                {selectableAccounts.length === 0 && <option value="">Önce hesap ekleyin</option>}
                 {selectableAccounts.map(acc => (
                   <option key={acc.id} value={acc.id}>{acc.name}</option>
                 ))}
@@ -1913,6 +1954,34 @@ function App() {
   }
 
   if (currentView === 'cashflow') {
+    const formatCurrencyCompact = (value) => new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: 'TRY',
+      maximumFractionDigits: 0
+    }).format(value)
+
+    const formatCashFlowDate = (dateKey) => {
+      const date = parseDateKey(dateKey)
+      const today = getIstanbulToday()
+      const tomorrow = addDays(today, 1)
+      if (dateKey === formatDateKey(today)) return 'Bugün'
+      if (dateKey === formatDateKey(tomorrow)) return 'Yarın'
+      return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
+    }
+
+    const cashFlowPeriodDays = Math.max(
+      Math.round((cashFlowSelectedRange.endDate - cashFlowSelectedRange.startDate) / (1000 * 60 * 60 * 24)),
+      0
+    )
+    const cashFlowStatus = cashFlowSelectedRange.net >= 0
+      ? { label: 'Rahat', className: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' }
+      : { label: 'Açık var', className: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300' }
+    const cashFlowGroupedItems = cashFlowSelectedRange.items.reduce((groups, item) => {
+      if (!groups[item.date]) groups[item.date] = []
+      groups[item.date].push(item)
+      return groups
+    }, {})
+
     return (
       <div className="fixed inset-0 bg-[#F2F4F8] dark:bg-slate-950 z-[100] flex flex-col animate-in slide-in-from-right duration-300">
         <header className="px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-4 flex items-center gap-4 bg-[#F2F4F8] dark:bg-slate-950 border-b border-gray-100 dark:border-slate-800 sticky top-0 z-20 transition-colors">
@@ -1923,186 +1992,122 @@ function App() {
             <ArrowLeft size={20} strokeWidth={2.5} />
           </button>
           <div>
-            <h3 className="text-xl font-black text-gray-800 dark:text-white tracking-tight">Nakit Akisi</h3>
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kisa, orta ve uzun vadeli gorunum</p>
+            <h3 className="text-xl font-black text-gray-800 dark:text-white tracking-tight">Nakit Akışı</h3>
+            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Kısa, orta ve uzun vadeli görünüm</p>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-gray-100 dark:border-slate-800 shadow-sm space-y-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Kisi Filtresi</p>
-              <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700">
-                <button
-                  type="button"
-                  onClick={() => setCashFlowUser('all')}
-                  className={`flex-1 py-3 px-3 rounded-xl text-xs font-bold transition-all ${cashFlowUser === 'all' ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
-                >
-                  Genel
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-5">
+          <section className="bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-gray-100 dark:border-slate-800 shadow-sm space-y-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setCashFlowUser('all')} className={`px-4 py-2 rounded-2xl text-xs font-black transition-all ${cashFlowUser === 'all' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-300'}`}>
+                Tümü
+              </button>
+              {activeUsers.map(user => (
+                <button key={user.id} type="button" onClick={() => setCashFlowUser(user.id)} className={`px-4 py-2 rounded-2xl text-xs font-black transition-all ${cashFlowUser === user.id ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-300'}`}>
+                  {user.name}
                 </button>
-                {activeUsers.map(user => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    onClick={() => setCashFlowUser(user.id)}
-                    className={`flex-1 py-3 px-3 rounded-xl text-xs font-bold transition-all ${cashFlowUser === user.id ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
-                  >
-                    {user.name}
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest pl-1">Baslangic</label>
-                <input
-                  type="date"
-                  value={cashFlowStartDate}
-                  onChange={e => setCashFlowStartDate(e.target.value)}
-                  className="w-full p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest pl-1">Bitis</label>
-                <input
-                  type="date"
-                  value={cashFlowEndDate}
-                  onChange={e => setCashFlowEndDate(e.target.value)}
-                  className="w-full p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {cashFlowWindows.map(flow => (
+            <div className="grid grid-cols-4 gap-2">
+              {[7, 30, 90].map(days => (
                 <button
-                  key={`preset-${flow.key}`}
+                  key={`cashflow-days-${days}`}
                   type="button"
                   onClick={() => {
                     const start = getIstanbulToday()
                     setCashFlowStartDate(formatDateKey(start))
-                    setCashFlowEndDate(formatDateKey(addDays(start, flow.days)))
+                    setCashFlowEndDate(formatDateKey(addDays(start, days)))
                   }}
-                  className="py-3 rounded-2xl bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-xs font-black border border-green-100 dark:border-green-900/30 active:scale-95 transition-all"
+                  className={`py-3 rounded-2xl text-xs font-black transition-all ${cashFlowPeriodDays === days ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'}`}
                 >
-                  {flow.days} Gun
+                  {days} Gün
                 </button>
               ))}
+              <button type="button" className="py-3 rounded-2xl text-xs font-black bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-300">
+                Özel
+              </button>
             </div>
-          </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-gray-100 dark:border-slate-800 shadow-sm">
-            <div className="flex items-start justify-between gap-3 mb-5">
+            <div className="grid grid-cols-2 gap-3">
+              <input type="date" value={cashFlowStartDate} onChange={e => setCashFlowStartDate(e.target.value)} className="w-full p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none" />
+              <input type="date" value={cashFlowEndDate} onChange={e => setCashFlowEndDate(e.target.value)} className="w-full p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none" />
+            </div>
+          </section>
+
+          <section className="bg-white dark:bg-slate-900 rounded-[32px] p-6 border border-gray-100 dark:border-slate-800 shadow-sm">
+            <div className="flex items-start justify-between gap-4 mb-6">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Secili Aralik</p>
-                <h4 className="text-lg font-black text-slate-800 dark:text-white">
-                  {formatDateKey(cashFlowSelectedRange.startDate)} - {formatDateKey(cashFlowSelectedRange.endDate)}
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Seçili dönem</p>
+                <h4 className="text-lg font-black text-slate-800 dark:text-white mt-1">
+                  {formatCashFlowDate(formatDateKey(cashFlowSelectedRange.startDate))} - {formatCashFlowDate(formatDateKey(cashFlowSelectedRange.endDate))}
                 </h4>
               </div>
-              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${cashFlowSelectedRange.net >= 0 ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400'}`}>
-                <BarChart3 size={20} />
-              </div>
+              <span className={`px-3 py-1.5 rounded-2xl text-[10px] font-black ${cashFlowStatus.className}`}>
+                {cashFlowStatus.label}
+              </span>
             </div>
 
-            <p className={`text-3xl font-black mb-4 ${cashFlowSelectedRange.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-              {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(cashFlowSelectedRange.net)}
+            <p className={`text-4xl font-black tracking-tight mb-6 ${cashFlowSelectedRange.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+              {formatCurrencyCompact(cashFlowSelectedRange.net)}
             </p>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-green-500 mb-1">Gelir</p>
-                <p className="font-black text-green-700 dark:text-green-300">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(cashFlowSelectedRange.income)}</p>
+              <div className="rounded-3xl bg-green-50 dark:bg-green-900/20 p-4 border border-green-100 dark:border-green-900/30">
+                <p className="text-[10px] font-black uppercase tracking-widest text-green-500 dark:text-green-400 mb-1">Gelir</p>
+                <p className="font-black text-green-700 dark:text-green-300">{formatCurrencyCompact(cashFlowSelectedRange.income)}</p>
               </div>
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">Gider</p>
-                <p className="font-black text-indigo-700 dark:text-indigo-300">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(cashFlowSelectedRange.expenses)}</p>
+              <div className="rounded-3xl bg-red-50 dark:bg-red-900/20 p-4 border border-red-100 dark:border-red-900/30">
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-400 dark:text-red-300 mb-1">Gider</p>
+                <p className="font-black text-red-600 dark:text-red-300">{formatCurrencyCompact(cashFlowSelectedRange.expenses)}</p>
               </div>
             </div>
-          </div>
+          </section>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {cashFlowWindows.map(flow => {
-              const isPositive = flow.net >= 0
-              return (
-                <div key={flow.key} className="bg-white dark:bg-slate-900 rounded-[28px] p-5 border border-gray-100 dark:border-slate-800 shadow-sm">
-                  <div className="flex items-start justify-between gap-3 mb-5">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">{flow.label}</p>
-                      <h4 className="text-lg font-black text-slate-800 dark:text-white">{flow.days} Gun</h4>
-                    </div>
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${isPositive ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400'}`}>
-                      <BarChart3 size={20} />
-                    </div>
-                  </div>
+          <section className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h4 className="text-sm font-black text-slate-700 dark:text-slate-200">Hareketler</h4>
+              <span className="text-[10px] font-bold text-gray-400">{cashFlowSelectedRange.items.length} kayıt</span>
+            </div>
 
-                  <p className={`text-2xl font-black mb-4 ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(flow.net)}
-                  </p>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-gray-400">Gelir</span>
-                      <span className="text-green-600 dark:text-green-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(flow.income)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-gray-400">Gider</span>
-                      <span className="text-indigo-600 dark:text-indigo-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(flow.expenses)}</span>
-                    </div>
-                    <div className="h-2 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className={`${isPositive ? 'bg-green-500' : 'bg-red-500'} h-full rounded-full`}
-                        style={{ width: `${Math.min(Math.abs(flow.net) / Math.max(flow.income, flow.expenses, 1) * 100, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
+            {Object.entries(cashFlowGroupedItems).map(([dateKey, items]) => (
+              <div key={dateKey} className="space-y-2">
+                <div className="sticky top-[74px] z-10 -mx-1 px-1 py-1 bg-[#F2F4F8]/95 dark:bg-slate-950/95 backdrop-blur">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-gray-400">{formatCashFlowDate(dateKey)}</p>
                 </div>
-              )
-            })}
-          </div>
-
-          <div className="space-y-5">
-              <section className="space-y-3">
-                <div className="flex items-center justify-between px-1">
-                  <h4 className="text-sm font-black text-slate-700 dark:text-slate-200">Secili Aralik Hareketleri</h4>
-                  <span className="text-[10px] font-bold text-gray-400">
-                    {cashFlowSelectedRange.items.length} kayit
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  {cashFlowSelectedRange.items.map(item => {
-                    const account = activeAccounts.find(acc => acc.id === item.accountId)
-                    const isIncome = isIncomeTransaction(item)
-                    return (
-                      <div key={item.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <p className="font-black text-slate-800 dark:text-white truncate">{item.description}</p>
-                            {item.source === 'recurring' && (
-                              <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide">Planli</span>
-                            )}
-                            {isIncome && (
-                              <span className="px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-[9px] font-black uppercase tracking-wide">Gelir</span>
-                            )}
-                          </div>
-                          <p className="text-[11px] font-bold text-gray-400">{new Date(item.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })} - {account?.name || 'Hesap yok'}</p>
+                {items.map(item => {
+                  const account = activeAccounts.find(acc => acc.id === item.accountId)
+                  const isIncome = isIncomeTransaction(item)
+                  return (
+                    <div key={item.id} className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4 shadow-sm">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <p className="font-black text-slate-800 dark:text-white truncate">{item.description}</p>
+                          {item.source === 'recurring' && (
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide">Planlı</span>
+                          )}
+                          {isIncome && (
+                            <span className="px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-[9px] font-black uppercase tracking-wide">Gelir</span>
+                          )}
                         </div>
-                        <p className={`font-black text-sm shrink-0 ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                          {isIncome ? '+' : '-'}{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.amount)}
-                        </p>
+                        <p className="text-[11px] font-bold text-gray-400">{account?.name || 'Hesap yok'}</p>
                       </div>
-                    )
-                  })}
-
-                  {cashFlowSelectedRange.items.length === 0 && (
-                    <div className="bg-white/70 dark:bg-slate-900/70 rounded-2xl p-5 border border-gray-100 dark:border-slate-800 text-center">
-                      <p className="text-sm font-bold text-gray-400">Bu tarih araliginda beklenen nakit hareketi yok.</p>
+                      <p className={`font-black text-sm shrink-0 ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {isIncome ? '+' : '-'}{formatCurrencyCompact(item.amount)}
+                      </p>
                     </div>
-                  )}
-                </div>
-              </section>
-          </div>
+                  )
+                })}
+              </div>
+            ))}
+
+            {cashFlowSelectedRange.items.length === 0 && (
+              <div className="bg-white/70 dark:bg-slate-900/70 rounded-3xl p-6 border border-gray-100 dark:border-slate-800 text-center">
+                <p className="text-sm font-bold text-gray-400">Bu tarih aralığında beklenen nakit hareketi yok.</p>
+              </div>
+            )}
+          </section>
         </main>
       </div>
     )
@@ -2374,7 +2379,7 @@ function App() {
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Tekrarlayan Odemeler</h3>
+                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Tekrarlayan Ödemeler</h3>
                   <p className="text-sm text-gray-500 font-medium">Abonelik, kredi ve sabit giderleri otomatik yaz</p>
                 </div>
                 <button onClick={() => setShowSubscriptionModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
@@ -2382,25 +2387,24 @@ function App() {
 
               <div className="overflow-y-auto custom-scrollbar pr-1">
               <form onSubmit={handleAddSubscription} className="space-y-4 mb-6">
-                <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl grid grid-cols-3 gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
+                <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl grid grid-cols-2 gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
                   {Object.entries(recurringPaymentTypes).map(([key, item]) => (
                     <button key={key} type="button" onClick={() => setSubscriptionPaymentType(key)} className={`py-3 px-2 rounded-xl text-[11px] font-bold transition-all duration-300 ${subscriptionPaymentType === key ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
                       {item.shortLabel}
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-gray-400 font-bold px-2 -mt-2">{recurringPaymentTypes[subscriptionPaymentType].helper}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odeme Adi</label>
-                    <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder={subscriptionPaymentType === 'debt' ? 'Ev kredisi, arac kredisi...' : 'Netflix, kira, aidat...'} value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Ödeme Adı</label>
+                    <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder={subscriptionPaymentType === 'debt' ? 'Ev kredisi, araç kredisi...' : 'Netflix, kira, aidat...'} value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Aylik Tutar</label>
                     <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionAmount} onChange={e => setSubscriptionAmount(e.target.value)} />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odeme Gunu</label>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Ödeme Günü</label>
                     <input type="number" min="1" max="28" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="15" value={subscriptionDueDay} onChange={e => setSubscriptionDueDay(e.target.value)} />
                   </div>
                   {subscriptionPaymentType === 'debt' && (
@@ -2410,7 +2414,7 @@ function App() {
                         <input type="number" min="1" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="120" value={subscriptionTotalInstallments} onChange={e => setSubscriptionTotalInstallments(e.target.value)} />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odenen</label>
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Ödenen</label>
                         <input type="number" min="0" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionPaidInstallments} onChange={e => setSubscriptionPaidInstallments(e.target.value)} />
                       </div>
                     </>
@@ -2435,7 +2439,7 @@ function App() {
 
                   <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2">
                     <Plus size={18} />
-                    <span>Odeme Ekle</span>
+                    <span>Ödeme ekle</span>
                   </button>
                 </form>
 
@@ -2464,11 +2468,7 @@ function App() {
                       </div>
                     )
                   })}
-                  {subscriptions.filter(item => item.status !== 0).length === 0 && (
-                    <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-5 border border-indigo-100 dark:border-indigo-900/40 text-center">
-                      <p className="text-sm font-bold text-indigo-600 dark:text-indigo-300">Netflix, ev kredisi, kira, aidat gibi duzenli odemeleri buraya ekleyebilirsin.</p>
-                    </div>
-                  )}
+                  {subscriptions.filter(item => item.status !== 0).length === 0 && null}
                 </div>
               </div>
             </div>
@@ -2860,8 +2860,8 @@ function App() {
                   switch (itemId) {
                     case 'limit': label = 'Limit'; IconComponent = Gauge; break;
                     case 'future': label = 'Dönemler'; IconComponent = Calendar; break;
-                    case 'cashflow': label = 'Nakit'; IconComponent = BarChart3; colorClass = 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'; borderColorClass = 'border-green-100 dark:border-green-900/30'; break;
-                    case 'subscriptions': label = 'Odemeler'; IconComponent = Repeat; break;
+                    case 'cashflow': label = 'Nakit Akışı'; IconComponent = BarChart3; colorClass = 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'; borderColorClass = 'border-green-100 dark:border-green-900/30'; break;
+                    case 'subscriptions': label = 'Tekrarlayan Ödemeler'; IconComponent = Repeat; break;
                     case 'cards': label = 'Kartlar'; IconComponent = CreditCard; break;
                     case 'users': label = 'Kişiler'; IconComponent = Users; break;
                     case 'feedback': label = 'İstekler'; IconComponent = MessageSquare; break;
@@ -3031,7 +3031,7 @@ function App() {
             <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Tekrarlayan Odemeler</h3>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Tekrarlayan Ödemeler</h3>
                 <p className="text-sm text-gray-500 font-medium">Abonelik, kredi ve sabit giderleri otomatik yaz</p>
               </div>
               <button onClick={() => setShowSubscriptionModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
@@ -3039,25 +3039,24 @@ function App() {
 
             <div className="overflow-y-auto custom-scrollbar pr-1">
               <form onSubmit={handleAddSubscription} className="space-y-4 mb-6">
-                <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl grid grid-cols-3 gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
+                <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl grid grid-cols-2 gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
                   {Object.entries(recurringPaymentTypes).map(([key, item]) => (
                     <button key={key} type="button" onClick={() => setSubscriptionPaymentType(key)} className={`py-3 px-2 rounded-xl text-[11px] font-bold transition-all duration-300 ${subscriptionPaymentType === key ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>
                       {item.shortLabel}
                     </button>
                   ))}
                 </div>
-                <p className="text-[11px] text-gray-400 font-bold px-2 -mt-2">{recurringPaymentTypes[subscriptionPaymentType].helper}</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
-                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odeme Adi</label>
-                    <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder={subscriptionPaymentType === 'debt' ? 'Ev kredisi, arac kredisi...' : 'Netflix, kira, aidat...'} value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Ödeme Adı</label>
+                    <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder={subscriptionPaymentType === 'debt' ? 'Ev kredisi, araç kredisi...' : 'Netflix, kira, aidat...'} value={subscriptionName} onChange={e => setSubscriptionName(e.target.value)} />
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Aylik Tutar</label>
                     <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionAmount} onChange={e => setSubscriptionAmount(e.target.value)} />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odeme Gunu</label>
+                    <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Ödeme Günü</label>
                     <input type="number" min="1" max="28" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="15" value={subscriptionDueDay} onChange={e => setSubscriptionDueDay(e.target.value)} />
                   </div>
                   {subscriptionPaymentType === 'debt' && (
@@ -3067,7 +3066,7 @@ function App() {
                         <input type="number" min="1" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="120" value={subscriptionTotalInstallments} onChange={e => setSubscriptionTotalInstallments(e.target.value)} />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Odenen</label>
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Ödenen</label>
                         <input type="number" min="0" inputMode="numeric" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all" placeholder="0" value={subscriptionPaidInstallments} onChange={e => setSubscriptionPaidInstallments(e.target.value)} />
                       </div>
                     </>
@@ -3092,7 +3091,7 @@ function App() {
 
                 <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2">
                   <Plus size={18} />
-                  <span>Odeme Ekle</span>
+                  <span>Ödeme ekle</span>
                 </button>
               </form>
 
@@ -3121,11 +3120,7 @@ function App() {
                     </div>
                   )
                 })}
-                {subscriptions.filter(item => item.status !== 0).length === 0 && (
-                  <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-5 border border-indigo-100 dark:border-indigo-900/40 text-center">
-                    <p className="text-sm font-bold text-indigo-600 dark:text-indigo-300">Netflix, ev kredisi, kira, aidat gibi duzenli odemeleri buraya ekleyebilirsin.</p>
-                  </div>
-                )}
+                {subscriptions.filter(item => item.status !== 0).length === 0 && null}
               </div>
             </div>
           </div>
@@ -3814,6 +3809,79 @@ function App() {
                     </button>
                   )
                 })}
+              </div>
+
+              <div className="bg-white dark:bg-slate-800 rounded-[28px] p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-5">
+                <div className="flex items-start justify-between gap-3 mb-5">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Aylık Rapor</p>
+                    <h4 className="text-lg font-black text-gray-800 dark:text-white capitalize">
+                      {new Date(currentMonth + '-01').toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                    </h4>
+                  </div>
+                  <span className={`px-3 py-1.5 rounded-2xl text-[10px] font-black ${monthlyReport.net >= 0 ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300'}`}>
+                    {monthlyReport.net >= 0 ? 'Artı' : 'Açık'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mb-5">
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-3 border border-green-100 dark:border-green-900/30">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-green-500 mb-1">Gelir</p>
+                    <p className="text-sm font-black text-green-700 dark:text-green-300">{new Intl.NumberFormat('tr-TR', { notation: 'compact', style: 'currency', currency: 'TRY' }).format(monthlyReport.income)}</p>
+                  </div>
+                  <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-3 border border-red-100 dark:border-red-900/30">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-red-400 mb-1">Gider</p>
+                    <p className="text-sm font-black text-red-600 dark:text-red-300">{new Intl.NumberFormat('tr-TR', { notation: 'compact', style: 'currency', currency: 'TRY' }).format(monthlyReport.expenses)}</p>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-700">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Net</p>
+                    <p className={`text-sm font-black ${monthlyReport.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>{new Intl.NumberFormat('tr-TR', { notation: 'compact', style: 'currency', currency: 'TRY' }).format(monthlyReport.net)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {monthlyReport.userBreakdown.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Kişi Dağılımı</p>
+                        <p className="text-[10px] font-bold text-gray-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(monthlyReport.recurringExpenses)} planlı</p>
+                      </div>
+                      <div className="space-y-2">
+                        {monthlyReport.userBreakdown.map(item => {
+                          const width = Math.min((item.total / Math.max(monthlyReport.expenses, 1)) * 100, 100)
+                          return (
+                            <div key={item.user.id} className="space-y-1">
+                              <div className="flex justify-between text-xs font-bold">
+                                <span className="text-gray-600 dark:text-gray-300">{item.user.name}</span>
+                                <span className="text-gray-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.total)}</span>
+                              </div>
+                              <div className="h-2 bg-gray-100 dark:bg-slate-900 rounded-full overflow-hidden">
+                                <div className="h-full rounded-full bg-indigo-500" style={{ width: `${width}%` }}></div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {monthlyReport.topTransactions.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">En Büyük İşlemler</p>
+                      <div className="space-y-2">
+                        {monthlyReport.topTransactions.map(item => {
+                          const account = activeAccounts.find(a => a.id === item.accountId)
+                          return (
+                            <div key={`top-${item.id}`} className="flex items-center justify-between gap-3 text-xs">
+                              <span className="font-bold text-gray-600 dark:text-gray-300 truncate">{getDisplayDescription(item.description) || 'İşlem'}</span>
+                              <span className="font-black text-red-500 dark:text-red-400 shrink-0">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.amount)}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Transactions List */}

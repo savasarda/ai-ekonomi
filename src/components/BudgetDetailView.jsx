@@ -21,7 +21,7 @@ const BudgetDetailView = ({
     };
 
     const getRecurringTransactionLabel = (type) => {
-        if (type === 'debt') return 'Borc';
+        if (type === 'debt') return 'Borç';
         if (type === 'fixed') return 'Sabit';
         if (type === 'subscription' || type === 'abonelik') return 'Abonelik';
         return null;

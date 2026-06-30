@@ -150,7 +150,7 @@ export default function SettingsModal({
                             </div>
                             <div className="text-left">
                                 <p className="font-bold text-gray-800 dark:text-white">Gelirler</p>
-                                <p className="text-[10px] text-gray-400 font-bold">Kisi bazli gelir girisi</p>
+                                <p className="text-[10px] text-gray-400 font-bold">Kişi bazlı gelir girişi</p>
                             </div>
                         </div>
                         <ChevronRight size={18} className="text-gray-300 group-hover:text-green-500 transition-colors" />
