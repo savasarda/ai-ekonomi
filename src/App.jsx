@@ -776,7 +776,14 @@ function App() {
     : 'text-indigo-600 dark:text-indigo-400'
 
   const saveRecurringPaymentToSupabase = async (payment) => {
-    if (!isSupabaseConfigured || !profile?.family_id) return false
+    if (!isSupabaseConfigured) {
+      console.error('Recurring payment was not saved: Supabase is not configured.')
+      return false
+    }
+    if (!profile?.family_id) {
+      console.error('Recurring payment was not saved: profile.family_id is missing.')
+      return false
+    }
 
     const payload = {
       ...toSnakeCase([payment])[0],
@@ -1120,7 +1127,12 @@ function App() {
       status: 1
     }
 
-    await saveRecurringPaymentToSupabase(payment)
+    const savedToSupabase = await saveRecurringPaymentToSupabase(payment)
+    if (!savedToSupabase) {
+      alert("Kayit ekranda olusturulmadi. Supabase'e yazilamadi; lutfen aile/profil baglantisini ve recurring_payments tablosunu kontrol edin.")
+      return
+    }
+
     setSubscriptions(prev => [...prev.filter(item => item.id !== payment.id), payment])
     setSubscriptionName('')
     setSubscriptionAmount('')
@@ -1137,6 +1149,18 @@ function App() {
   }
 
   const handleEditTransaction = (t) => {
+    if (isIncomeTransaction(t)) {
+      const acc = activeAccounts.find(a => a.id === t.accountId)
+      setEditingTransaction(t)
+      setIncomeAmount(t.amount.toString())
+      setIncomeDescription(getDisplayDescription(t.description))
+      setIncomeDate(t.date)
+      setIncomeAccount(t.accountId)
+      if (acc) setIncomeUser(acc.userId)
+      setShowIncomeModal(true)
+      return
+    }
+
     setEditingTransaction(t)
     setAmount(t.amount.toString())
     setDescription(getDisplayDescription(t.description).replace(/ \(\d+\/\d+\)$/, '').replace(/ \(\d+ Taksit\)$/, '')) // Strip installment info for pure edit if possible, or just strict edit
@@ -1415,26 +1439,41 @@ function App() {
       return
     }
 
-    const newIncome = {
-      id: `income-${Date.now()}`,
-      accountId: incomeAccount,
-      amount: amountVal,
-      date: incomeDate,
-      description: incomeDescription.trim(),
-      type: 'gelir',
-      status: 1
-    }
+    if (editingTransaction && isIncomeTransaction(editingTransaction)) {
+      setData(prev => ({
+        ...prev,
+        transactions: prev.transactions.map(t => t.id === editingTransaction.id ? {
+          ...t,
+          accountId: incomeAccount,
+          amount: amountVal,
+          date: incomeDate,
+          description: incomeDescription.trim(),
+          type: 'gelir'
+        } : t)
+      }))
+    } else {
+      const newIncome = {
+        id: `income-${Date.now()}`,
+        accountId: incomeAccount,
+        amount: amountVal,
+        date: incomeDate,
+        description: incomeDescription.trim(),
+        type: 'gelir',
+        status: 1
+      }
 
-    setData(prev => ({
-      ...prev,
-      transactions: [...prev.transactions, newIncome]
-    }))
+      setData(prev => ({
+        ...prev,
+        transactions: [...prev.transactions, newIncome]
+      }))
+    }
 
     setIncomeAmount('')
     setIncomeDescription('')
     setIncomeDate(new Date().toISOString().split('T')[0])
+    setEditingTransaction(null)
     setShowIncomeModal(false)
-    setSuccessMessage('Gelir basariyla kaydedildi.')
+    setSuccessMessage(editingTransaction ? 'Gelir basariyla guncellendi.' : 'Gelir basariyla kaydedildi.')
     setShowSuccessModal(true)
   }
 
@@ -1444,19 +1483,19 @@ function App() {
     const selectableAccounts = activeAccounts.filter(a => a.userId === incomeUser)
 
     return (
-      <div className="absolute inset-0 z-[90] flex items-end sm:items-center justify-center pointer-events-none">
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowIncomeModal(false)}></div>
-        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] max-h-[90vh] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+      <div className="absolute inset-0 z-[90] flex items-end sm:items-center justify-center pointer-events-none overflow-x-hidden">
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowIncomeModal(false); setEditingTransaction(null); }}></div>
+        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-full sm:w-[420px] max-h-[90vh] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors overflow-x-hidden">
           <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Gelir Girişi</h3>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{editingTransaction && isIncomeTransaction(editingTransaction) ? 'Geliri Düzenle' : 'Gelir Girişi'}</h3>
               <p className="text-sm text-gray-500 font-medium">Kişi bazlı gelir kaydı oluştur</p>
             </div>
-            <button onClick={() => setShowIncomeModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
+            <button onClick={() => { setShowIncomeModal(false); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
           </div>
 
-          <form onSubmit={handleAddIncome} className="space-y-4 overflow-y-auto custom-scrollbar pr-1">
+          <form onSubmit={handleAddIncome} className="space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar pr-1 min-w-0">
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Gelir Tutari</label>
               <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder="0" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} autoFocus />
@@ -1490,7 +1529,7 @@ function App() {
 
             <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold shadow-xl shadow-green-200 dark:shadow-green-900/30 active:scale-[0.98] transition-all hover:bg-green-700 flex items-center justify-center gap-2">
               <Plus size={18} />
-              <span>Gelir Kaydet</span>
+              <span>{editingTransaction && isIncomeTransaction(editingTransaction) ? 'Geliri Güncelle' : 'Gelir Kaydet'}</span>
             </button>
           </form>
         </div>
@@ -1833,7 +1872,7 @@ function App() {
           onOpenUsers={() => { setShowUserModal(true); setIsMenuOpen(false); }}
           onOpenCards={() => setShowCardsModal(true)}
           onOpenLimit={() => { setShowLimitModal(true); setIsMenuOpen(false); }}
-          onOpenIncome={() => setShowIncomeModal(true)}
+          onOpenIncome={() => { setEditingTransaction(null); setShowIncomeModal(true); }}
           onResetAll={handleResetAllData}
         />
         {renderIncomeModal()}
@@ -2048,14 +2087,14 @@ function App() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 overflow-hidden">
               <label className="min-w-0">
                 <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">Başlangıç</span>
-                <input type="date" value={cashFlowStartDate} onChange={e => setCashFlowStartDate(e.target.value)} className="w-full min-w-0 px-2 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-xs sm:text-sm font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none" />
+                <input type="date" value={cashFlowStartDate} onChange={e => setCashFlowStartDate(e.target.value)} className="block w-full min-w-0 max-w-full px-2 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-[11px] sm:text-sm font-bold leading-none rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none [appearance:textfield] [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:p-0" />
               </label>
               <label className="min-w-0">
                 <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">Bitiş</span>
-                <input type="date" value={cashFlowEndDate} onChange={e => setCashFlowEndDate(e.target.value)} className="w-full min-w-0 px-2 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-xs sm:text-sm font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none" />
+                <input type="date" value={cashFlowEndDate} onChange={e => setCashFlowEndDate(e.target.value)} className="block w-full min-w-0 max-w-full px-2 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-[11px] sm:text-sm font-bold leading-none rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none [appearance:textfield] [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:p-0" />
               </label>
             </div>
           </section>
@@ -2926,12 +2965,15 @@ function App() {
 
           {showUpcomingPaymentsModal && (
             <div
-              className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-contain"
+              className="fixed inset-0 z-[70] flex items-center justify-center p-5 overscroll-none touch-none"
               onWheel={e => e.stopPropagation()}
-              onTouchMove={e => e.stopPropagation()}
+              onTouchMove={e => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
             >
               <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-all touch-none" onClick={() => setShowUpcomingPaymentsModal(false)}></div>
-              <div className="bg-white dark:bg-slate-900 w-full sm:max-w-[380px] rounded-t-[36px] sm:rounded-[36px] p-6 relative z-10 animate-slide-up sm:animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+              <div className="bg-white dark:bg-slate-900 w-full max-w-[380px] max-h-[calc(100dvh-2.5rem)] rounded-[32px] sm:rounded-[36px] p-6 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50 overflow-hidden">
                 <div className="flex items-center justify-between mb-5">
                   <div>
                     <h3 className="text-xl font-black text-gray-800 dark:text-white tracking-tight">Yaklaşan Ödemeler</h3>
@@ -2940,7 +2982,7 @@ function App() {
                   <button onClick={() => setShowUpcomingPaymentsModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[55dvh] overflow-y-auto overscroll-contain pr-1 custom-scrollbar">
                   {upcomingPayments.map(item => (
                     <div key={item.id} className="bg-amber-50/70 dark:bg-amber-900/20 rounded-2xl p-4 border border-amber-100 dark:border-amber-900/30 flex items-center justify-between gap-4">
                       <div className="min-w-0">
@@ -4213,7 +4255,7 @@ function App() {
         onOpenUsers={() => { setShowUserModal(true); setIsMenuOpen(false); }}
         onOpenCards={() => setShowCardsModal(true)}
         onOpenLimit={() => { setShowLimitModal(true); setIsMenuOpen(false); }}
-        onOpenIncome={() => setShowIncomeModal(true)}
+        onOpenIncome={() => { setEditingTransaction(null); setShowIncomeModal(true); }}
         onResetAll={handleResetAllData}
         isFamilyAdmin={isFamilyAdmin}
       />
