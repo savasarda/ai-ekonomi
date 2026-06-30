@@ -2048,9 +2048,15 @@ function App() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <input type="date" value={cashFlowStartDate} onChange={e => setCashFlowStartDate(e.target.value)} className="w-full p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none" />
-              <input type="date" value={cashFlowEndDate} onChange={e => setCashFlowEndDate(e.target.value)} className="w-full p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none" />
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <label className="min-w-0">
+                <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">Başlangıç</span>
+                <input type="date" value={cashFlowStartDate} onChange={e => setCashFlowStartDate(e.target.value)} className="w-full min-w-0 px-2 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-xs sm:text-sm font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none" />
+              </label>
+              <label className="min-w-0">
+                <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">Bitiş</span>
+                <input type="date" value={cashFlowEndDate} onChange={e => setCashFlowEndDate(e.target.value)} className="w-full min-w-0 px-2 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-xs sm:text-sm font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none" />
+              </label>
             </div>
           </section>
 
@@ -2091,7 +2097,7 @@ function App() {
 
             {Object.entries(cashFlowGroupedItems).map(([dateKey, items]) => (
               <div key={dateKey} className="space-y-2">
-                <div className="sticky top-[74px] z-10 -mx-1 px-1 py-1 bg-[#F2F4F8]/95 dark:bg-slate-950/95 backdrop-blur">
+                <div className="px-1 py-1">
                   <p className="text-[11px] font-black uppercase tracking-widest text-gray-400">{formatCashFlowDate(dateKey)}</p>
                 </div>
                 {items.map(item => {
@@ -2800,17 +2806,6 @@ function App() {
                   <Plus size={16} strokeWidth={3} />
                   <span className="text-[10px] font-black uppercase tracking-tight">Harcama Ekle</span>
                 </button>
-
-                {upcomingPayments.length > 0 && (
-                  <button
-                    onClick={() => setShowUpcomingPaymentsModal(true)}
-                    className="h-9 min-w-9 px-2 shrink-0 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 border border-amber-100 dark:border-amber-800/50 shadow-sm rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                    title="Yaklaşan Ödemeler"
-                  >
-                    <Bell size={15} strokeWidth={2.8} />
-                    <span className="text-[10px] font-black">{upcomingPayments.length}</span>
-                  </button>
-                )}
               </div>
 
 
@@ -2819,7 +2814,17 @@ function App() {
                 const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 const daysLeft = lastDay.getDate() - now.getDate();
                 return (
-                  <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 md:px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm shrink-0">
+                  <div className="relative bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 md:px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm shrink-0">
+                    {upcomingPayments.length > 0 && (
+                      <button
+                        onClick={() => setShowUpcomingPaymentsModal(true)}
+                        className="absolute -left-2 -top-2 w-6 h-6 rounded-full bg-amber-400 text-white shadow-md border-2 border-[#F2F4F8] dark:border-slate-900 flex items-center justify-center active:scale-95 transition-all"
+                        title="Yaklaşan Ödemeler"
+                      >
+                        <Bell size={12} strokeWidth={3} />
+                        <span className="absolute -right-1 -bottom-1 min-w-4 h-4 px-1 rounded-full bg-amber-600 text-[9px] leading-4 font-black text-white">{upcomingPayments.length}</span>
+                      </button>
+                    )}
                     <span className="text-[8px] font-black uppercase mb-0.5 tracking-wider">Yeni Döneme</span>
                     <span className="text-xs font-black leading-none">{daysLeft === 0 ? "Yarın" : `${daysLeft} Gün`}</span>
                   </div>
@@ -2889,7 +2894,7 @@ function App() {
                   switch (itemId) {
                     case 'limit': label = 'Limit'; IconComponent = Gauge; break;
                     case 'future': label = 'Dönemler'; IconComponent = Calendar; break;
-                    case 'cashflow': label = 'Nakit Akışı'; IconComponent = BarChart3; colorClass = 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'; borderColorClass = 'border-green-100 dark:border-green-900/30'; break;
+                    case 'cashflow': label = 'Nakit Akışı'; IconComponent = BarChart3; break;
                     case 'subscriptions': label = 'Tekrarlayan Ödemeler'; IconComponent = Repeat; break;
                     case 'cards': label = 'Kartlar'; IconComponent = CreditCard; break;
                     case 'users': label = 'Kişiler'; IconComponent = Users; break;
@@ -2920,8 +2925,12 @@ function App() {
 
 
           {showUpcomingPaymentsModal && (
-            <div className="absolute inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4">
-              <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-all" onClick={() => setShowUpcomingPaymentsModal(false)}></div>
+            <div
+              className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 overscroll-contain"
+              onWheel={e => e.stopPropagation()}
+              onTouchMove={e => e.stopPropagation()}
+            >
+              <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-all touch-none" onClick={() => setShowUpcomingPaymentsModal(false)}></div>
               <div className="bg-white dark:bg-slate-900 w-full sm:max-w-[380px] rounded-t-[36px] sm:rounded-[36px] p-6 relative z-10 animate-slide-up sm:animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
                 <div className="flex items-center justify-between mb-5">
                   <div>
