@@ -286,6 +286,11 @@ function App() {
 
   // Supabase Sync Logic
   const isSupabaseConfigured = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
+  const isLocalRuntime = typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.startsWith('192.168.') ||
+      window.location.hostname.endsWith('.local'))
 
   // Swipe and Pull Logic
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -295,6 +300,7 @@ function App() {
   const [touchEndX, setTouchEndX] = useState(0)
 
   const scrollContainerRef = useRef(null)
+  const budgetDetailScrollRef = useRef(null)
   const futureDebtsListRef = useRef(null)
   const currentMonthRef = useRef(null)
   const futureDebtsScrollTimeoutRef = useRef(null)
@@ -320,6 +326,12 @@ function App() {
       }
     }
   }, [showFutureDebtsModal, currentView, selectedMonthDetail])
+
+  useEffect(() => {
+    if (currentView === 'budgetDetail' && selectedMonthDetail && budgetDetailScrollRef.current) {
+      budgetDetailScrollRef.current.scrollTo({ top: 0, behavior: 'auto' })
+    }
+  }, [currentView, selectedMonthDetail?.monthKey, selectedMonthDetail?.selectedUserId])
 
   // Reminder State
   const [showReminderModal, setShowReminderModal] = useState(false)
@@ -384,6 +396,7 @@ function App() {
 
     try {
       const familyId = profile.family_id
+      const isLocalDevFamily = familyId === '11111111-1111-1111-1111-111111111111'
 
       const [
         { data: users, error: uErr },
@@ -434,18 +447,13 @@ function App() {
         const migrationKey = `recurring_payments_migrated_${familyId}`
         const localSubscriptions = JSON.parse(localStorage.getItem('subscriptions') || '[]')
 
-        if (recurringPaymentsData.length === 0 && localSubscriptions.length > 0 && localStorage.getItem(migrationKey) !== 'true') {
+        if ((isLocalRuntime || isLocalDevFamily) && recurringPaymentsData.length === 0 && localSubscriptions.length > 0) {
+          setSubscriptions(localSubscriptions)
+        } else if (!isLocalRuntime && !isLocalDevFamily && recurringPaymentsData.length === 0 && localSubscriptions.length > 0 && localStorage.getItem(migrationKey) !== 'true') {
           const migratedPayments = localSubscriptions
             .filter(item => item.status !== 0)
-            .map(item => ({
-              ...toSnakeCase([{
-                ...item,
-                paymentType: item.paymentType || 'subscription',
-                dueDay: item.dueDay || 15,
-                status: item.status ?? 1
-              }])[0],
-              family_id: familyId
-            }))
+            .map(item => buildRecurringPaymentPayload(item, familyId))
+            .filter(item => item.amount > 0)
 
           if (migratedPayments.length > 0) {
             const { error: migrationError } = await supabase.from('recurring_payments').upsert(migratedPayments)
@@ -495,7 +503,7 @@ function App() {
     } catch (error) {
       logger.error('App.fetchInitialData error', { error: error.message, stack: error.stack })
     }
-  }, [isSupabaseConfigured, profile?.family_id])
+  }, [isSupabaseConfigured, isLocalRuntime, profile?.family_id])
 
   useEffect(() => {
     fetchInitialData()
@@ -775,6 +783,28 @@ function App() {
     ? 'text-green-600 dark:text-green-400'
     : 'text-indigo-600 dark:text-indigo-400'
 
+  const normalizeRecurringPaymentType = (type) => {
+    if (type === 'debt' || type === 'fixed' || type === 'subscription') return type
+    if (type === 'abonelik') return 'subscription'
+    return 'subscription'
+  }
+
+  const buildRecurringPaymentPayload = (payment, familyId) => ({
+    id: String(payment.id || `recurring-${Date.now()}`),
+    family_id: familyId,
+    user_id: payment.userId || payment.user_id || null,
+    account_id: payment.accountId || payment.account_id || null,
+    payment_type: normalizeRecurringPaymentType(payment.paymentType || payment.payment_type || payment.type),
+    name: payment.name || payment.description || 'Tekrarlayan ödeme',
+    amount: Number(payment.amount) || 0,
+    due_day: Math.min(Math.max(parseInt(payment.dueDay || payment.due_day || 15, 10) || 15, 1), 28),
+    total_installments: payment.totalInstallments ?? payment.total_installments ?? null,
+    paid_installments: payment.paidInstallments ?? payment.paid_installments ?? null,
+    start_date: payment.startDate || payment.start_date || null,
+    end_date: payment.endDate || payment.end_date || null,
+    status: payment.status ?? 1
+  })
+
   const saveRecurringPaymentToSupabase = async (payment) => {
     if (!isSupabaseConfigured) {
       console.error('Recurring payment was not saved: Supabase is not configured.')
@@ -785,10 +815,7 @@ function App() {
       return false
     }
 
-    const payload = {
-      ...toSnakeCase([payment])[0],
-      family_id: profile.family_id
-    }
+    const payload = buildRecurringPaymentPayload(payment, profile.family_id)
 
     const { error } = await supabase.from('recurring_payments').upsert(payload)
     if (error) {
@@ -1129,6 +1156,17 @@ function App() {
 
     const savedToSupabase = await saveRecurringPaymentToSupabase(payment)
     if (!savedToSupabase) {
+      if (isLocalRuntime || profile?.family_id === '11111111-1111-1111-1111-111111111111') {
+        setSubscriptions(prev => [...prev.filter(item => item.id !== payment.id), payment])
+        setSubscriptionName('')
+        setSubscriptionAmount('')
+        setSubscriptionTotalInstallments('')
+        setSubscriptionPaidInstallments('')
+        setSubscriptionDueDay('15')
+        setSuccessMessage('Yerelde kaydedildi. Supabase RLS nedeniyle DB kaydi atlanmis olabilir.')
+        setShowSuccessModal(true)
+        return
+      }
       alert("Kayit ekranda olusturulmadi. Supabase'e yazilamadi; lutfen aile/profil baglantisini ve recurring_payments tablosunu kontrol edin.")
       return
     }
@@ -1481,6 +1519,9 @@ function App() {
     if (!showIncomeModal) return null
 
     const selectableAccounts = activeAccounts.filter(a => a.userId === incomeUser)
+    const incomeTransactions = activeTransactions
+      .filter(isIncomeTransaction)
+      .sort((a, b) => b.date.localeCompare(a.date))
 
     return (
       <div className="absolute inset-0 z-[90] flex items-end sm:items-center justify-center pointer-events-none overflow-x-hidden">
@@ -1495,7 +1536,8 @@ function App() {
             <button onClick={() => { setShowIncomeModal(false); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
           </div>
 
-          <form onSubmit={handleAddIncome} className="space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar pr-1 min-w-0">
+          <div className="overflow-y-auto overflow-x-hidden custom-scrollbar pr-1 min-w-0">
+          <form onSubmit={handleAddIncome} className="space-y-4 mb-6">
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">Gelir Tutari</label>
               <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder="0" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} autoFocus />
@@ -1532,6 +1574,42 @@ function App() {
               <span>{editingTransaction && isIncomeTransaction(editingTransaction) ? 'Geliri Güncelle' : 'Gelir Kaydet'}</span>
             </button>
           </form>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between px-1">
+                <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Gelirler</h4>
+                <span className="text-[10px] font-bold text-gray-400">{incomeTransactions.length} kayıt</span>
+              </div>
+              {incomeTransactions.map(item => {
+                const account = activeAccounts.find(acc => acc.id === item.accountId)
+                const user = activeUsers.find(u => u.id === account?.userId)
+                return (
+                  <div key={item.id} className="bg-green-50/70 dark:bg-green-900/20 rounded-2xl p-4 border border-green-100 dark:border-green-900/30 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-black text-gray-800 dark:text-white truncate">{getDisplayDescription(item.description) || 'Gelir'}</p>
+                      <p className="text-[11px] font-bold text-gray-400">
+                        {user?.name || 'Genel'} - {account?.name || 'Hesap yok'} - {new Date(item.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-sm font-black text-green-600 dark:text-green-400">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(item.amount)}</span>
+                      <button type="button" onClick={() => handleEditTransaction(item)} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 text-green-600 dark:text-green-300 flex items-center justify-center hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+                        <Edit2 size={16} />
+                      </button>
+                      <button type="button" onClick={() => handleDeleteTransaction(item.id)} className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+              {incomeTransactions.length === 0 && (
+                <div className="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 text-center">
+                  <p className="text-sm font-bold text-gray-400">Henüz gelir kaydı yok.</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -2090,11 +2168,11 @@ function App() {
             <div className="grid grid-cols-2 gap-2 sm:gap-3 overflow-hidden">
               <label className="min-w-0">
                 <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">Başlangıç</span>
-                <input type="date" value={cashFlowStartDate} onChange={e => setCashFlowStartDate(e.target.value)} className="block w-full min-w-0 max-w-full px-2 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-[11px] sm:text-sm font-bold leading-none rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none [appearance:textfield] [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:p-0" />
+                <input type="date" value={cashFlowStartDate} onChange={e => setCashFlowStartDate(e.target.value)} className="block w-full min-w-0 max-w-full px-1.5 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-[12px] min-[390px]:text-[13px] sm:text-sm font-bold leading-none rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none [appearance:textfield] [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-calendar-picker-indicator]:w-3.5 [&::-webkit-calendar-picker-indicator]:h-3.5" />
               </label>
               <label className="min-w-0">
                 <span className="block text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5 px-1">Bitiş</span>
-                <input type="date" value={cashFlowEndDate} onChange={e => setCashFlowEndDate(e.target.value)} className="block w-full min-w-0 max-w-full px-2 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-[11px] sm:text-sm font-bold leading-none rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none [appearance:textfield] [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:p-0" />
+                <input type="date" value={cashFlowEndDate} onChange={e => setCashFlowEndDate(e.target.value)} className="block w-full min-w-0 max-w-full px-1.5 py-3 sm:p-3 bg-gray-50/70 dark:bg-slate-800 text-gray-800 dark:text-white text-[12px] min-[390px]:text-[13px] sm:text-sm font-bold leading-none rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none [appearance:textfield] [&::-webkit-date-and-time-value]:min-w-0 [&::-webkit-date-and-time-value]:text-left [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:p-0 [&::-webkit-calendar-picker-indicator]:w-3.5 [&::-webkit-calendar-picker-indicator]:h-3.5" />
               </label>
             </div>
           </section>
@@ -2208,7 +2286,7 @@ function App() {
 
         </header>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
+        <div ref={budgetDetailScrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
           {!selectedMonthDetail ? (
             // Month List View
             <>
@@ -2368,6 +2446,7 @@ function App() {
                   const userAccs = activeAccounts.filter(a => a.userId === selectedMonthDetail.selectedUserId).map(a => a.id);
                   const transactions = activeTransactions
                     .filter(t => t.status === 1 && t.date.startsWith(selectedMonthDetail.monthKey) && userAccs.includes(t.accountId))
+                    .filter(isExpenseTransaction)
                     .sort((a, b) => b.date.localeCompare(a.date));
 
                   if (transactions.length === 0) {
@@ -2389,13 +2468,10 @@ function App() {
                               {getRecurringTransactionLabel(t.type) && (
                                 <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">{getRecurringTransactionLabel(t.type)}</span>
                               )}
-                              {isIncomeTransaction(t) && (
-                                <span className="px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-[9px] font-black uppercase tracking-wide border border-green-100 dark:border-green-800/50">Gelir</span>
-                              )}
                             </div>
                             <p className="text-xs text-gray-400 mt-1">{account?.name}</p>
                           </div>
-                          <p className={`font-black text-lg ml-3 ${getTransactionAmountClass(t)}`}>
+                          <p className="font-black text-lg ml-3 text-indigo-600 dark:text-indigo-400">
                             {formatTransactionAmount(t)}
                           </p>
                         </div>
@@ -4006,7 +4082,7 @@ function App() {
                     const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
                     const isMevcutAy = t.date.startsWith(currentMonth);
                     const isStatus1 = t.status === 1;
-                    return matchesUser && isMevcutAy && isStatus1;
+                    return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
                   })
                   .sort((a, b) => new Date(b.date) - new Date(a.date))
                   .map(t => {
@@ -4021,13 +4097,10 @@ function App() {
                               {getRecurringTransactionLabel(t.type) && (
                                 <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-[9px] font-black uppercase tracking-wide border border-indigo-100 dark:border-indigo-800/50">{getRecurringTransactionLabel(t.type)}</span>
                               )}
-                              {isIncomeTransaction(t) && (
-                                <span className="px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-[9px] font-black uppercase tracking-wide border border-green-100 dark:border-green-800/50">Gelir</span>
-                              )}
                             </div>
                             <p className="text-xs text-gray-400">{account?.name} • {user?.name}</p>
                           </div>
-                          <p className={`font-black text-lg ${getTransactionAmountClass(t)}`}>
+                          <p className="font-black text-lg text-indigo-600 dark:text-indigo-400">
                             {formatTransactionAmount(t)}
                           </p>
                         </div>
@@ -4039,7 +4112,7 @@ function App() {
                   const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
                   const isMevcutAy = t.date.startsWith(currentMonth);
                   const isStatus1 = t.status === 1;
-                  return matchesUser && isMevcutAy && isStatus1;
+                  return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
                 }).length === 0 && (
                     <div className="text-center py-20 text-gray-400">
                       <div className="text-6xl mb-4 opacity-50">📄</div>
@@ -4052,7 +4125,7 @@ function App() {
                   const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
                   const isMevcutAy = t.date.startsWith(currentMonth);
                   const isStatus1 = t.status === 1;
-                  return matchesUser && isMevcutAy && isStatus1;
+                  return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
                 }).length > 0 && (
                     <div className="print-total hidden mt-6 pt-6 border-t font-black text-xl text-indigo-900 text-right">
                       TOPLAM: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(
@@ -4061,7 +4134,7 @@ function App() {
                             const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
                             const isMevcutAy = t.date.startsWith(currentMonth);
                             const isStatus1 = t.status === 1;
-                            return matchesUser && isMevcutAy && isStatus1;
+                            return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
                           })
                           .filter(isExpenseTransaction)
                           .reduce((acc, curr) => acc + curr.amount, 0)
