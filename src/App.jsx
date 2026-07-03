@@ -1845,7 +1845,12 @@ function App() {
 
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">{t.date}</label>
-              <input type="date" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} />
+              <input
+                type="date"
+                className="block w-full min-w-0 max-w-full box-border p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white text-base font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all appearance-none [&::-webkit-date-and-time-value]:text-left [&::-webkit-date-and-time-value]:min-w-0"
+                value={incomeDate}
+                onChange={e => setIncomeDate(e.target.value)}
+              />
             </div>
 
             <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
@@ -4378,7 +4383,7 @@ function App() {
         showExtractModal && (
           <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowExtractModal(false)}></div>
-            <div id="print-area" className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[92vh] md:h-[90vh] md:max-h-[900px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+            <div id="print-area" className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[92vh] md:h-[90vh] md:max-h-[900px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col overflow-y-auto custom-scrollbar pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden no-print"></div>
 
               {/* Print Only Header */}
@@ -4478,7 +4483,7 @@ function App() {
                 })}
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+              <div className="space-y-3 pr-2">
                 <div className="bg-white dark:bg-slate-800 rounded-[28px] p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-5">
                   <div className="flex items-start justify-between gap-3 mb-5">
                   <div>
