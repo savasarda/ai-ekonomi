@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { Calendar, X, Info, Clock, Bell } from 'lucide-react';
+import { formatDate } from '../../i18n';
 
-const ReminderModal = ({ events, onClose }) => {
+const ReminderModal = ({ events, onClose, language = 'tr' }) => {
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div
@@ -49,7 +50,7 @@ const ReminderModal = ({ events, onClose }) => {
                                             <div>
                                                 <h4 className="font-bold text-slate-800 dark:text-white leading-tight">{event.title}</h4>
                                                 <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">
-                                                    <span>{new Date(event.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}</span>
+                                                    <span>{formatDate(event.date, { language, day: 'numeric', month: 'long' })}</span>
                                                     {event.time && (
                                                         <>
                                                             <span>•</span>

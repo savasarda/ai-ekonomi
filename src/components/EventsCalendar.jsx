@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Trash2, Calendar as CalendarIcon, Clock, MapPin, AlignLeft, Edit2, AlertTriangle, X } from 'lucide-react';
+import { translations } from '../i18n';
 
-const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEvent }) => {
+const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEvent, language = 'tr' }) => {
+    const t = translations.events[language] || translations.events.tr;
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null); // 'YYYY-MM-DD'
     const [showEventModal, setShowEventModal] = useState(false);
@@ -96,8 +98,8 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
         // Keep modal open to see the change
     };
 
-    const currentMonthName = currentDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
-    const weekDays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+    const currentMonthName = currentDate.toLocaleDateString(t.locale, { month: 'long', year: 'numeric' });
+    const weekDays = t.weekdays;
 
     // Filter events for current month (for dots)
     const getEventsForDay = (day) => {
@@ -118,13 +120,13 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
                         <button
                             onClick={onBack}
                             className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 border border-gray-100 dark:border-slate-700 shadow-sm transition-all active:scale-95"
-                            title="Geri Dön"
+                            title={t.back}
                         >
                             <ArrowLeft size={22} strokeWidth={2} />
                         </button>
                         <div className="text-center">
-                            <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter leading-none mb-1">Etkinlik Ajandası</h1>
-                            <p className="text-[10px] font-extrabold text-indigo-500/80 uppercase tracking-[0.2em]">{events.length} Kayıtlı Etkinlik</p>
+                            <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter leading-none mb-1">{t.title}</h1>
+                            <p className="text-[10px] font-extrabold text-indigo-500/80 uppercase tracking-[0.2em]">{events.length} {t.registered}</p>
                         </div>
                         <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center text-gray-400 border border-gray-100 dark:border-slate-700 shadow-sm">
                             <CalendarIcon size={22} strokeWidth={2} />
@@ -209,9 +211,9 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
                             <div className="flex justify-between items-center mb-6">
                                 <div>
                                     <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight first-letter:uppercase">
-                                        {new Date(selectedDate).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
+                                        {new Date(selectedDate).toLocaleDateString(t.locale, { day: 'numeric', month: 'long', weekday: 'long' })}
                                     </h3>
-                                    <p className="text-sm text-gray-500 font-medium">{events.filter(e => e.date === selectedDate).length} Etkinlik</p>
+                                    <p className="text-sm text-gray-500 font-medium">{events.filter(e => e.date === selectedDate).length} {t.event}</p>
                                 </div>
                                 <button onClick={() => setShowEventModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
                             </div>
@@ -224,8 +226,8 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
                                             <div className="w-14 h-14 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-3 text-gray-300 dark:text-gray-600">
                                                 <CalendarIcon size={28} />
                                             </div>
-                                            <p className="text-sm font-bold text-gray-500 dark:text-gray-400">Bugün için plan yok</p>
-                                            <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-widest font-bold">Yeni bir kayıt oluştur</p>
+                                            <p className="text-sm font-bold text-gray-500 dark:text-gray-400">{t.noPlan}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-widest font-bold">{t.createNew}</p>
                                         </div>
                                     ) : (
                                         events.filter(e => e.date === selectedDate).map(event => (
@@ -271,11 +273,11 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
                                             <span className={`w-6 h-6 rounded-full flex items-center justify-center ${editingEventId ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-600'} transition-colors`}>
                                                 {editingEventId ? <Edit2 size={12} /> : <Plus size={14} strokeWidth={3} />}
                                             </span>
-                                            {editingEventId ? 'DÜZENLE' : 'YENİ KAYIT'}
+                                            {editingEventId ? t.edit : t.newRecord}
                                         </span>
                                         {editingEventId && (
                                             <button onClick={resetForm} className="text-[10px] font-black text-gray-400 hover:text-rose-500 bg-gray-50 dark:bg-slate-700 px-3 py-1 rounded-lg border border-gray-100 dark:border-slate-600 transition-colors">
-                                                VAZGEÇ
+                                                {t.cancel}
                                             </button>
                                         )}
                                     </h4>
@@ -283,7 +285,7 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
                                     <div className="space-y-3">
                                         <input
                                             type="text"
-                                            placeholder="Etkinlik Başlığı"
+                                            placeholder={t.titlePlaceholder}
                                             className="w-full p-3.5 bg-gray-50 dark:bg-slate-900 rounded-2xl text-sm font-bold outline-none border border-transparent focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 transition-all placeholder-gray-300 dark:placeholder-gray-500 text-gray-800 dark:text-white"
                                             value={newEventTitle}
                                             onChange={e => setNewEventTitle(e.target.value)}
@@ -302,7 +304,7 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
                                         </div>
 
                                         <textarea
-                                            placeholder="Notlar (opsiyonel)"
+                                            placeholder={t.notesPlaceholder}
                                             rows="2"
                                             className="w-full p-3.5 bg-gray-50 dark:bg-slate-900 rounded-2xl text-sm font-bold outline-none border border-transparent focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 transition-all placeholder-gray-300 dark:placeholder-gray-500 text-gray-800 dark:text-white resize-none"
                                             value={newEventDesc}
@@ -319,11 +321,11 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
                                         >
                                             {editingEventId ? (
                                                 <>
-                                                    <Edit2 size={16} /> GÜNCELLE
+                                                    <Edit2 size={16} /> {t.update}
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Plus size={18} strokeWidth={3} /> EKLE
+                                                    <Plus size={18} strokeWidth={3} /> {t.add}
                                                 </>
                                             )}
                                         </button>
@@ -342,9 +344,9 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
                             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500 dark:text-red-400">
                                 <Trash2 size={32} />
                             </div>
-                            <h3 className="text-xl font-black text-center text-gray-800 dark:text-white mb-2">Emin misiniz?</h3>
+                            <h3 className="text-xl font-black text-center text-gray-800 dark:text-white mb-2">{t.confirmTitle}</h3>
                             <p className="text-center text-gray-500 dark:text-gray-400 font-medium mb-6 text-sm">
-                                "<span className="text-gray-800 dark:text-white font-bold">{eventToDelete?.title}</span>" etkinliği silinecek. Bu işlem geri alınamaz.
+                                "<span className="text-gray-800 dark:text-white font-bold">{eventToDelete?.title}</span>"{t.confirmSuffix}
                             </p>
 
                             <div className="flex gap-3">
@@ -352,13 +354,13 @@ const EventsCalendar = ({ onBack, events, onAddEvent, onDeleteEvent, onUpdateEve
                                     onClick={() => setShowDeleteConfirm(false)}
                                     className="flex-1 py-3.5 rounded-xl font-bold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
                                 >
-                                    Vazgeç
+                                    {t.cancel}
                                 </button>
                                 <button
                                     onClick={confirmDelete}
                                     className="flex-1 py-3.5 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-200 dark:shadow-red-900/30 transition-transform active:scale-95"
                                 >
-                                    Sil
+                                    {t.delete}
                                 </button>
                             </div>
                         </div>

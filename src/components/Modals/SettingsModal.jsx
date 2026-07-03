@@ -1,7 +1,8 @@
-import { X, Users, CreditCard, Trash2, ChevronRight, Settings, Gauge, LogOut, Share2, MessageCircle, Check, Bell, Loader2, Wallet } from 'lucide-react'
+import { X, Users, CreditCard, Trash2, ChevronRight, Settings, Gauge, LogOut, Share2, MessageCircle, Check, Bell, Loader2, Wallet, ShieldCheck, FileText, Download, Mail } from 'lucide-react'
 import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
+import { translations, translateFamilyName } from '../../i18n'
 
 export default function SettingsModal({
     isOpen,
@@ -11,7 +12,12 @@ export default function SettingsModal({
     onOpenLimit,
     onOpenIncome,
     onResetAll,
-    isFamilyAdmin
+    isFamilyAdmin,
+    language = 'tr',
+    setLanguage,
+    currency = 'TRY',
+    setCurrency,
+    onExportData
 }) {
     const { signOut, profile } = useAuth();
     const [copied, setCopied] = useState(false);
@@ -19,6 +25,9 @@ export default function SettingsModal({
     const [showAnnouncement, setShowAnnouncement] = useState(false);
     const [announcementText, setAnnouncementText] = useState('');
     const [success, setSuccess] = useState(false);
+    const [showTrustCenter, setShowTrustCenter] = useState(false);
+    const t = translations.settings[language] || translations.settings.tr;
+    const familyName = translateFamilyName(profile?.families?.name, language, t.fallbackFamily);
 
     const handleSendAnnouncement = async () => {
         if (!announcementText.trim() || isSending) return;
@@ -68,6 +77,41 @@ export default function SettingsModal({
         }
     };
 
+    const trustCopy = {
+        tr: {
+            title: 'Gizlilik ve Güven',
+            subtitle: 'Veri, gizlilik ve hesap kontrolleri',
+            privacyTitle: 'Gizlilik Politikası',
+            privacyText: 'Finans verileriniz yalnızca bütçe, aile paylaşımı, bildirim ve raporlama özellikleri için kullanılır. Harcama verileri reklam amacıyla satılmaz veya paylaşılmaz.',
+            termsTitle: 'Kullanım Koşulları',
+            termsText: 'AIEkonomi kişisel finans takip aracıdır. Uygulama yatırım, kredi veya resmi finans danışmanlığı vermez.',
+            dataTitle: 'Veri Kontrolü',
+            dataText: 'Verilerinizi dışa aktarabilir veya tüm yerel/aile finans kayıtlarınızı silme akışını başlatabilirsiniz.',
+            export: 'Verilerimi Dışa Aktar',
+            delete: 'Verilerimi Sil',
+            support: 'Destek',
+            supportText: 'Sorun ve gizlilik talepleri için destek kanalını kullanabilirsiniz.',
+            supportMail: 'Destek Maili',
+            close: 'Kapat'
+        },
+        en: {
+            title: 'Privacy & Trust',
+            subtitle: 'Data, privacy, and account controls',
+            privacyTitle: 'Privacy Policy',
+            privacyText: 'Your finance data is used only for budgeting, family sharing, reminders, and reporting. Spending data is not sold or shared for advertising.',
+            termsTitle: 'Terms of Use',
+            termsText: 'AIEkonomi is a personal finance tracking tool. It does not provide investment, credit, or official financial advice.',
+            dataTitle: 'Data Control',
+            dataText: 'You can export your data or start the flow to delete your local/family finance records.',
+            export: 'Export My Data',
+            delete: 'Delete My Data',
+            support: 'Support',
+            supportText: 'Use the support channel for issues and privacy requests.',
+            supportMail: 'Support Email',
+            close: 'Close'
+        }
+    }[language] || {};
+
     return (
         <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-all" onClick={onClose}></div>
@@ -79,9 +123,9 @@ export default function SettingsModal({
                            <Settings size={28} />
                         </div>
                         <div>
-                            <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Yönetim</h3>
+                            <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">{t.management}</h3>
                             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">
-                                {profile?.families?.name || 'Sistem ve Veri Yönetimi'}
+                                {familyName}
                             </p>
                         </div>
                     </div>
@@ -91,6 +135,61 @@ export default function SettingsModal({
                 </div>
 
                 <div className="space-y-4 overflow-y-auto custom-scrollbar pr-1 pb-3">
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="text-left">
+                                <p className="font-bold text-gray-800 dark:text-white">{t.languageTitle}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{t.languageSub}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 bg-gray-100 dark:bg-slate-900 p-1 rounded-2xl">
+                                {['tr', 'en'].map(item => (
+                                    <button
+                                        key={item}
+                                        type="button"
+                                        onClick={() => setLanguage?.(item)}
+                                        className={`px-3 py-2 rounded-xl text-xs font-black transition-all ${language === item ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-400'}`}
+                                    >
+                                        {item.toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        onClick={() => setShowTrustCenter(true)}
+                        className="w-full bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700 flex items-center justify-between group hover:border-emerald-500 transition-all hover:shadow-lg active:scale-[0.98]"
+                    >
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                <ShieldCheck size={24} />
+                            </div>
+                            <div className="text-left">
+                                <p className="font-bold text-gray-800 dark:text-white">{trustCopy.title}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{trustCopy.subtitle}</p>
+                            </div>
+                        </div>
+                        <ChevronRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                    </button>
+
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="text-left">
+                                <p className="font-bold text-gray-800 dark:text-white">{t.currencyTitle}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{t.currencySub}</p>
+                            </div>
+                            <select
+                                value={currency}
+                                onChange={(event) => setCurrency?.(event.target.value)}
+                                className="bg-gray-100 dark:bg-slate-900 text-gray-800 dark:text-white rounded-2xl px-3 py-2 text-xs font-black outline-none"
+                            >
+                                <option value="TRY">TRY ₺</option>
+                                <option value="USD">USD $</option>
+                                <option value="EUR">EUR €</option>
+                                <option value="GBP">GBP £</option>
+                            </select>
+                        </div>
+                    </div>
 
                     <button 
                         onClick={() => { onOpenUsers(); onClose(); }}
@@ -271,6 +370,78 @@ export default function SettingsModal({
                     <p className="text-[10px] text-gray-400 font-black uppercase tracking-[0.2em] opacity-50">AIEKONOMI PREMIUM v3.1</p>
                 </div>
             </div>
+
+            {showTrustCenter && (
+                <div className="absolute inset-0 z-[80] flex items-end sm:items-center justify-center sm:p-4">
+                    <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={() => setShowTrustCenter(false)}></div>
+                    <div className="bg-[#F8FAFC] dark:bg-slate-900 w-full sm:max-w-[420px] max-h-[92dvh] rounded-t-[40px] sm:rounded-[40px] p-6 relative z-10 animate-slide-up sm:animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50 overflow-y-auto custom-scrollbar">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                    <ShieldCheck size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">{trustCopy.title}</h3>
+                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{trustCopy.subtitle}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowTrustCenter(false)} className="w-10 h-10 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-gray-500">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {[
+                            { icon: FileText, title: trustCopy.privacyTitle, text: trustCopy.privacyText },
+                            { icon: Check, title: trustCopy.termsTitle, text: trustCopy.termsText },
+                            { icon: ShieldCheck, title: trustCopy.dataTitle, text: trustCopy.dataText },
+                            { icon: Mail, title: trustCopy.support, text: trustCopy.supportText }
+                        ].map(item => {
+                            const Icon = item.icon;
+                            return (
+                                <div key={item.title} className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700 mb-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 bg-gray-50 dark:bg-slate-900 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                                            <Icon size={19} />
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-gray-800 dark:text-white text-sm">{item.title}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium leading-relaxed mt-1">{item.text}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        <div className="grid grid-cols-1 gap-3 mt-5">
+                            <button
+                                onClick={onExportData}
+                                className="w-full h-14 rounded-2xl bg-emerald-600 text-white font-black flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                            >
+                                <Download size={18} />
+                                {trustCopy.export}
+                            </button>
+                            <a
+                                href="mailto:support@aiekonomi.app?subject=AIEkonomi%20Support"
+                                className="w-full h-14 rounded-2xl bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-200 font-black flex items-center justify-center gap-2 border border-gray-100 dark:border-slate-700"
+                            >
+                                <Mail size={18} />
+                                {trustCopy.supportMail}
+                            </a>
+                            <button
+                                onClick={() => {
+                                    setShowTrustCenter(false);
+                                    onResetAll?.();
+                                    onClose?.();
+                                }}
+                                className="w-full h-14 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 font-black flex items-center justify-center gap-2 border border-red-100 dark:border-red-900/30 active:scale-[0.98] transition-all"
+                            >
+                                <Trash2 size={18} />
+                                {trustCopy.delete}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

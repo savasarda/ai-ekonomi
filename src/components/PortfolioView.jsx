@@ -7,6 +7,7 @@ import {
     RotateCcw, Trash2, ArrowLeft, Wallet, Coins, 
     BarChart3, Calendar, List, Edit3, Package, PlusCircle, Star
 } from 'lucide-react';
+import { formatDate, formatMoney } from '../i18n';
 
 export default function PortfolioView({
     onBack,
@@ -17,7 +18,10 @@ export default function PortfolioView({
     fetchGoldPrices,
     lastUpdateTime,
     isSupabaseConfigured,
-    profile
+    profile,
+    money = (value, options = {}) => formatMoney(value, { language, ...options }),
+    currencySymbol = '\u20ba',
+    language = 'tr'
 }) {
     const familyId = profile?.family_id;
     const [showHistory, setShowHistory] = useState(false);
@@ -162,7 +166,7 @@ export default function PortfolioView({
                                     <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Portföyüm</h1>
                                     <p className="text-sm text-gray-400 font-medium">
                                         {portfolio.lastUpdated ? (
-                                            <>Son Kayıt: <span className="text-indigo-500 font-bold">{new Date(portfolio.lastUpdated).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></>
+                                            <>Son Kayıt: <span className="text-indigo-500 font-bold">{new Date(portfolio.lastUpdated).toLocaleString(language === 'en' ? 'en-US' : 'tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></>
                                         ) : (
                                             'Varlıklarını yönet ve kazancını takip et'
                                         )}
@@ -201,7 +205,7 @@ export default function PortfolioView({
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-slate-800 dark:text-white text-sm">
-                                                        {new Date(log.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                                                        {formatDate(log.created_at, { language, day: 'numeric', month: 'long' })}
                                                     </p>
                                                     <p className="text-[10px] text-gray-400 font-bold uppercase">
                                                         {new Date(log.created_at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
@@ -211,12 +215,12 @@ export default function PortfolioView({
                                             <div className="flex items-center gap-4">
                                                 <div className="text-right">
                                                     <p className="font-black text-slate-800 dark:text-white">
-                                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(log.total_value)}
+                                                        {money(log.total_value, { maximumFractionDigits: 0 })}
                                                     </p>
                                                     {prevLog && (
                                                         <p className={`text-[10px] font-bold ${isPos ? 'text-green-500' : 'text-red-500'} flex items-center justify-end gap-0.5`}>
                                                             {isPos ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                                                            {isPos ? '+' : ''}{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(change)}
+                                                            {isPos ? '+' : ''}{money(change, { maximumFractionDigits: 0 })}
                                                         </p>
                                                     )}
                                                 </div>
@@ -291,12 +295,12 @@ export default function PortfolioView({
                                                                 {prevLog && hasDiff && (
                                                                     <div className={`flex items-center gap-1 text-[10px] font-black ${diff > 0 ? 'text-green-500' : 'text-red-500'}`}>
                                                                         {diff > 0 ? <Plus size={10} /> : <Minus size={10} />}
-                                                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(Math.abs(diff))}
+                                                                        {money(Math.abs(diff, { maximumFractionDigits: 0 }))}
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             <span className="text-sm font-black text-slate-700 dark:text-slate-200">
-                                                                {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(c.value)}
+                                                                {money(c.value, { maximumFractionDigits: 0 })}
                                                             </span>
                                                         </div>
                                                     )
@@ -328,7 +332,7 @@ export default function PortfolioView({
                                 <div>
                                     <p className="text-yellow-100 text-[10px] font-black uppercase tracking-[0.2em] mb-1">TOPLAM PORTFÖY DEĞERİ</p>
                                     <h2 className="text-5xl font-black tracking-tighter">
-                                        {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(currentTotal)}
+                                        {money(currentTotal, { maximumFractionDigits: 0 })}
                                     </h2>
                                 </div>
                                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/30">
@@ -341,7 +345,7 @@ export default function PortfolioView({
                                     {isProfit ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                                     <div className="flex flex-col">
                                         <span className="text-[8px] font-black uppercase opacity-60">DEĞİŞİM</span>
-                                        <span className="text-xs font-black">{isProfit ? '+' : ''}{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(dayDiff)}</span>
+                                        <span className="text-xs font-black">{isProfit ? '+' : ''}{money(dayDiff, { maximumFractionDigits: 0 })}</span>
                                     </div>
                                 </div>
                                 
@@ -429,7 +433,7 @@ export default function PortfolioView({
                                                         )}
                                                     </div>
                                                     <p className="text-[10px] text-gray-400 font-bold flex items-center gap-1">
-                                                        {isManual ? 'Sabit Kur:' : 'Canlı Kur:'} {price ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(price) : '-'}
+                                                        {isManual ? 'Sabit Kur:' : 'Canlı Kur:'} {price ? money(price) : '-'}
                                                         {isManual && (
                                                             <button 
                                                                 onClick={() => {
@@ -509,7 +513,7 @@ export default function PortfolioView({
                                                 }}
                                                 className="w-24 text-right font-black text-slate-800 dark:text-white bg-transparent outline-none focus:text-indigo-600"
                                             />
-                                            <span className="text-gray-300 font-bold">₺</span>
+                                            <span className="text-gray-300 font-bold">{currencySymbol}</span>
                                             <button 
                                                 onClick={() => setDeleteCustomModal({ isOpen: true, item })}
                                                 className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 opacity-40 hover:opacity-100 hover:scale-110 active:scale-95 transition-all outline-none"
@@ -598,7 +602,7 @@ export default function PortfolioView({
 
                         <div className="space-y-6 mb-8">
                             <div className="relative">
-                                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-xl font-black">₺</span>
+                                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-xl font-black">{currencySymbol}</span>
                                 <input 
                                     type="number"
                                     step="0.01"
@@ -663,7 +667,7 @@ export default function PortfolioView({
                             <div>
                                 <label className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1 block">TL DEĞERİ</label>
                                 <div className="relative">
-                                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₺</span>
+                                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">{currencySymbol}</span>
                                     <input 
                                         type="number"
                                         inputMode="decimal"
@@ -756,4 +760,3 @@ export default function PortfolioView({
         </div>
     );
 }
-

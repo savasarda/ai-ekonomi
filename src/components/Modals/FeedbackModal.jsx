@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { X, Send, MessageSquare, Trash2, CheckCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
+import { formatDate } from '../../i18n'
 
-export default function FeedbackModal({ isOpen, onClose }) {
+export default function FeedbackModal({ isOpen, onClose, language = 'tr' }) {
     const [message, setMessage] = useState('')
     const [loading, setLoading] = useState(false)
     const [sent, setSent] = useState(false)
@@ -184,7 +185,7 @@ export default function FeedbackModal({ isOpen, onClose }) {
                                     <div key={fb.id} className={`p-4 rounded-2xl border text-left transition-colors relative group flex flex-col ${fb.type === 'done' ? 'bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30' : 'bg-gray-50 dark:bg-slate-800 border-gray-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-900/50'}`}>
                                         <div className="flex justify-between items-start mb-2">
                                             <p className={`text-[10px] font-bold uppercase tracking-wider ${fb.type === 'done' ? 'text-green-500/70' : 'text-gray-400'}`}>
-                                                {new Date(fb.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                {formatDate(fb.created_at, { language, day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                             <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity relative z-0">
                                                 <button

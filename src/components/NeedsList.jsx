@@ -1,34 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, Trash2, Check, Sparkles, AlertCircle, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Check, ShoppingBag } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { translations } from '../i18n';
 
-// Smart suggestions based on common shopping items
-const commonItems = [
-    { name: 'Süt', icon: '🥛' },
-    { name: 'Ekmek', icon: '🍞' },
-    { name: 'Yumurta', icon: '🥚' },
-    { name: 'Peynir', icon: '🧀' },
-    { name: 'Domates', icon: '🍅' },
-    { name: 'Meyve', icon: '🍎' },
-    { name: 'Kahve', icon: '☕' },
-    { name: 'Deterjan', icon: '🧼' },
-    { name: 'Tuvalet Kağıdı', icon: '🧻' },
-    { name: 'Su', icon: '💧' }
-];
-
-const NeedsList = ({ onBack, isSupabaseConfigured }) => {
+const NeedsList = ({ onBack, isSupabaseConfigured, language = 'tr' }) => {
+    const t = translations.needs.copy[language] || translations.needs.copy.tr;
+    const commonItems = translations.needs.commonItems[language] || translations.needs.commonItems.tr;
     const { profile } = useAuth();
     const [needs, setNeeds] = useState([]);
     const [newItem, setNewItem] = useState('');
-    const [suggestions, setSuggestions] = useState(commonItems); // Show all by default
+    const [suggestions, setSuggestions] = useState(commonItems);
     const [isLoading, setIsLoading] = useState(false);
     const listRef = useRef(null);
 
-    // Fetch Needs
+    useEffect(() => {
+        setSuggestions(commonItems);
+    }, [language]);
+
     const fetchNeeds = async () => {
         if (!isSupabaseConfigured) {
-            // Local fallback
             const saved = localStorage.getItem('needs_list');
             if (saved) setNeeds(JSON.parse(saved));
             return;
@@ -54,15 +45,14 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
     useEffect(() => {
         fetchNeeds();
 
-        // Subscription
         if (isSupabaseConfigured && profile?.family_id) {
             const sub = supabase
                 .channel(`public:needs_list:${profile.family_id}`)
-                .on('postgres_changes', { 
-                    event: '*', 
-                    schema: 'public', 
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
                     table: 'needs_list',
-                    filter: `family_id=eq.${profile.family_id}` 
+                    filter: `family_id=eq.${profile.family_id}`
                 }, fetchNeeds)
                 .subscribe();
 
@@ -77,13 +67,12 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
 
         const tempId = Date.now().toString();
         const newItemObj = {
-            id: tempId, // temp id
+            id: tempId,
             text: text.trim(),
             completed: false,
             created_at: new Date().toISOString()
         };
 
-        // Optimistic Update
         const updatedNeeds = [newItemObj, ...needs];
         setNeeds(updatedNeeds);
         setNewItem('');
@@ -91,36 +80,34 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
 
         if (isSupabaseConfigured) {
             if (!profile?.family_id) {
-                alert("Hata: Aile kimliği bulunamadı. Lütfen sayfayı yenileyin.");
+                alert(t.familyMissing);
                 setNeeds(needs);
                 return;
             }
 
             try {
-                // Insert and return the record to get the real UUID
                 const { data, error } = await supabase
                     .from('needs_list')
-                    .insert([{ 
-                        text: newItemObj.text, 
+                    .insert([{
+                        text: newItemObj.text,
                         completed: false,
-                        family_id: profile.family_id 
+                        family_id: profile.family_id
                     }])
                     .select()
                     .single();
 
                 if (error) {
-                    setNeeds(needs); // Revert
+                    setNeeds(needs);
                     throw error;
                 }
 
-                // Update the local item with the REAL UUID from DB
                 if (data) {
                     setNeeds(prev => prev.map(item => item.id === tempId ? data : item));
                 }
             } catch (e) {
-                console.error("Error adding need:", e);
-                setNeeds(needs); // Revert
-                alert("Hata (Kaydetme): " + (e.message || "Bilinmeyen hata") + "\n\nVeritabanında 'needs_list' tablosu eksik olabilir.");
+                console.error('Error adding need:', e);
+                setNeeds(needs);
+                alert(t.saveError + (e.message || t.unknownError) + t.tableMissing);
             }
         } else {
             localStorage.setItem('needs_list', JSON.stringify(updatedNeeds));
@@ -128,7 +115,6 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
     };
 
     const handleToggle = async (id, currentStatus) => {
-        // Optimistic
         const originalNeeds = [...needs];
         const updated = needs.map(n => n.id === id ? { ...n, completed: !currentStatus } : n);
         setNeeds(updated);
@@ -138,9 +124,9 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
                 const { error } = await supabase.from('needs_list').update({ completed: !currentStatus }).eq('id', id);
                 if (error) throw error;
             } catch (e) {
-                console.error("Error toggling:", e);
-                setNeeds(originalNeeds); // Revert
-                alert("Hata: " + e.message);
+                console.error('Error toggling:', e);
+                setNeeds(originalNeeds);
+                alert(t.error + e.message);
             }
         } else {
             localStorage.setItem('needs_list', JSON.stringify(updated));
@@ -148,7 +134,6 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
     };
 
     const handleDelete = async (id) => {
-        // Optimistic
         const originalNeeds = [...needs];
         const updated = needs.filter(n => n.id !== id);
         setNeeds(updated);
@@ -158,16 +143,15 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
                 const { error } = await supabase.from('needs_list').delete().eq('id', id);
                 if (error) throw error;
             } catch (e) {
-                console.error("Error deleting:", e);
-                setNeeds(originalNeeds); // Revert
-                alert("Hata: " + e.message);
+                console.error('Error deleting:', e);
+                setNeeds(originalNeeds);
+                alert(t.error + e.message);
             }
         } else {
             localStorage.setItem('needs_list', JSON.stringify(updated));
         }
     };
 
-    // Smart Suggestions Logic
     const handleInput = (e) => {
         const val = e.target.value;
         setNewItem(val);
@@ -181,32 +165,27 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
 
     return (
         <div className="min-h-screen bg-[#F2F4F8] dark:bg-slate-950 transition-colors duration-300 flex items-center justify-center p-0 sm:p-8 font-sans relative overflow-hidden">
-
-            {/* Background Blobs */}
             <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-300/30 dark:bg-purple-900/20 rounded-full blur-[100px] animate-fade-in"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-300/30 dark:bg-indigo-900/20 rounded-full blur-[100px] animate-fade-in delay-100"></div>
 
             <div className="w-full max-w-[480px] md:max-w-[760px] bg-[#F8FAFC] dark:bg-slate-900 h-screen md:h-[92vh] md:max-h-[1000px] md:rounded-[40px] shadow-2xl overflow-hidden relative flex flex-col md:border-[8px] md:border-white dark:md:border-slate-800 ring-1 ring-black/5 z-10 transition-colors duration-300">
-
-                {/* Header */}
                 <header className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 px-6 pt-[calc(1.5rem+var(--safe-area-inset-top))] pb-4 sticky top-0 z-20 shadow-sm flex items-center gap-4 transition-colors">
                     <button onClick={onBack} className="p-2 rounded-xl bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors">
                         <ArrowLeft size={20} />
                     </button>
                     <h1 className="text-xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2">
                         <ShoppingBag className="text-pink-500" size={24} />
-                        İhtiyaç Listesi
+                        {t.title}
                     </h1>
                 </header>
 
-                {/* Input Area */}
                 <div className="p-4 bg-white dark:bg-slate-900 shadow-sm relative z-10 transition-colors">
                     <div className="flex gap-2 mb-2">
                         <input
                             type="text"
                             value={newItem}
                             onChange={handleInput}
-                            placeholder="Ne lazım? (Örn: Süt)"
+                            placeholder={t.placeholder}
                             className="flex-1 bg-gray-100 dark:bg-slate-800 border-0 rounded-2xl px-5 py-4 font-bold text-gray-800 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-pink-500 transition-all"
                             onKeyDown={(e) => e.key === 'Enter' && handleAddItem(newItem)}
                         />
@@ -218,7 +197,6 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
                         </button>
                     </div>
 
-                    {/* Suggestions Pills */}
                     {suggestions.length > 0 && (
                         <div className="flex gap-2 overflow-x-auto pb-2 animate-fade-in-up custom-scrollbar">
                             {suggestions.map(s => (
@@ -241,12 +219,11 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
                     )}
                 </div>
 
-                {/* List */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24 custom-scrollbar" ref={listRef}>
                     {needs.length === 0 && !isLoading && (
                         <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-600 opacity-50">
                             <ShoppingBag size={48} className="mb-2 stroke-1" />
-                            <p className="text-sm font-medium">Listeniz boş.</p>
+                            <p className="text-sm font-medium">{t.empty}</p>
                         </div>
                     )}
 
@@ -261,7 +238,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
 
                     {needs.some(n => n.completed) && (
                         <div className="mt-8">
-                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-3">Tamamlananlar</h3>
+                            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-3">{t.completed}</h3>
                             <div className="space-y-2 opacity-60">
                                 {needs.filter(n => n.completed).map(item => (
                                     <NeedItem
@@ -280,21 +257,14 @@ const NeedsList = ({ onBack, isSupabaseConfigured }) => {
     );
 };
 
-// Swipeable Item Component
 const NeedItem = ({ item, onToggle, onDelete }) => {
-    // Simple implementation for desktop/touch - can be enhanced with real gesture lib usually
-    // For now, standard button approach but styled nicely
     return (
         <div className="group relative overflow-hidden rounded-2xl">
-            {/* Background / Delete Action */}
             <div className="absolute inset-0 bg-red-500 flex items-center justify-end px-5 text-white">
                 <Trash2 size={20} />
             </div>
 
-            {/* Content Content (Sliding Part - simulated with simple grid for now or just overlay) */}
-            {/* Real swipe requires complex event handling. Let's use a delete button for reliability in this MVP */}
-
-            <div className={`relative bg-white dark:bg-slate-800 p-4 transition-transform flex items-center gap-3 border border-gray-100 dark:border-slate-700`}>
+            <div className="relative bg-white dark:bg-slate-800 p-4 transition-transform flex items-center gap-3 border border-gray-100 dark:border-slate-700">
                 <button
                     onClick={onToggle}
                     className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${item.completed ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 dark:border-gray-600'}`}

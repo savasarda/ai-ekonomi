@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { X, Clock, TrendingUp, TrendingDown, ChevronDown, Plus, Minus, AlertTriangle, RefreshCw, Sparkles, RotateCcw, Trash2, Eye, EyeOff } from 'lucide-react'
+import { formatDate } from '../../i18n'
 
 export default function PortfolioModal({
     isOpen,
@@ -161,13 +162,13 @@ export default function PortfolioModal({
                                         <div className="flex justify-between items-center">
                                             <div>
                                                 <p className="font-bold text-gray-800 dark:text-white text-sm">
-                                                    {new Date(log.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    {formatDate(log.created_at, { language, day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                 </p>
                                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Tarih</p>
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <p className="font-black text-indigo-600 dark:text-indigo-400 text-lg">
-                                                    {isBalanceHidden ? '•••••' : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(log.total_value)}
+                                                    {isBalanceHidden ? '•••••' : money(log.total_value, { maximumFractionDigits: 0 })}
                                                 </p>
                                                 <button
                                                     onClick={(e) => requestDeleteLog(log.id, e)}
@@ -218,7 +219,7 @@ export default function PortfolioModal({
                                                                 <div key={i} className="flex justify-between bg-gray-50 dark:bg-slate-950 px-3 py-2 rounded-lg">
                                                                     <span className="text-gray-500 dark:text-gray-400">{c.name}</span>
                                                                     <span className="font-bold text-gray-800 dark:text-white">
-                                                                        {isBalanceHidden ? '•••••' : new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(parseFloat(c.value) || ((parseFloat(c.qty) || 0) * (parseFloat(c.price) || 0)))}
+                                                                        {isBalanceHidden ? '•••••' : money(parseFloat(c.value, { maximumFractionDigits: 0 }) || ((parseFloat(c.qty) || 0) * (parseFloat(c.price) || 0)))}
                                                                     </span>
                                                                 </div>
                                                             ))}
@@ -253,11 +254,7 @@ export default function PortfolioModal({
                                 <div className="flex items-baseline gap-2 mb-4">
                                     <h2 className="text-4xl font-black tracking-tight">
                                         {isBalanceHidden ? '••••••' : (
-                                            goldPrices ?
-                                                new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(
-                                                    calculateTotal(portfolio.items, goldPrices)
-                                                )
-                                                : '...'
+                                            goldPrices ? money(calculateTotal(portfolio.items, goldPrices), { maximumFractionDigits: 0 }) : '...'
                                         )}
                                     </h2>
                                 </div>
@@ -283,7 +280,7 @@ export default function PortfolioModal({
                                                 <div>
                                                     <p className="text-[10px] font-bold text-yellow-50 uppercase">Son Kontrolden Beri</p>
                                                     <p className="font-bold text-sm">
-                                                        {isProfit ? '+' : ''}{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(diff)}
+                                                        {isProfit ? '+' : ''}{money(diff, { maximumFractionDigits: 0 })}
                                                     </p>
                                                 </div>
                                             </div>
@@ -318,7 +315,7 @@ export default function PortfolioModal({
                                             <div>
                                                 <p className="font-bold text-gray-800 dark:text-white">{item.label}</p>
                                                 <p className="text-xs text-gray-400 font-bold">
-                                                    Birim: {price ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(price) : '-'}
+                                                    Birim: {price ? money(price) : '-'}
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-3">
@@ -412,7 +409,7 @@ export default function PortfolioModal({
                                                             placeholder="TL Değeri"
                                                             className="w-32 text-center font-black text-lg text-gray-800 dark:text-white bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 rounded-xl py-1 px-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm"
                                                         />
-                                                        <span className="font-bold text-gray-400">₺</span>
+                                                        <span className="font-bold text-gray-400">{currencySymbol}</span>
                                                     </div>
                                                 </div>
 
@@ -618,7 +615,7 @@ export default function PortfolioModal({
                                 <div>
                                     <label className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1 block">TL DEĞERİ</label>
                                     <div className="relative">
-                                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">₺</span>
+                                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">{currencySymbol}</span>
                                         <input 
                                             type="number"
                                             inputMode="decimal"

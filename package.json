@@ -8,6 +8,8 @@
     "dev": "vite --host",
     "build": "vite build",
     "lint": "eslint .",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check:i18n:update": "node scripts/check-i18n.mjs --update-baseline",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"

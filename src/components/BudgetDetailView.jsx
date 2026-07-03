@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Calendar, User, CreditCard, ChevronDown, Trash2, Filter, Receipt, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
+import { formatDate, formatMoney } from '../i18n';
 
 const BudgetDetailView = ({ 
     onBack, 
@@ -12,7 +13,9 @@ const BudgetDetailView = ({
     userLimits,
     currentMonth,
     onDeleteTransaction,
-    onUpdateTransaction
+    onUpdateTransaction,
+    language = 'tr',
+    money = (value, options = {}) => formatMoney(value, { language, ...options })
 }) => {
     const [touchStart, setTouchStart] = useState(null);
     const [touchEnd, setTouchEnd] = useState(null);
@@ -29,7 +32,7 @@ const BudgetDetailView = ({
 
     const isIncomeTransaction = (transaction) => transaction?.type === 'gelir';
     const isExpenseTransaction = (transaction) => !isIncomeTransaction(transaction);
-    const formatTransactionAmount = (transaction) => `${isIncomeTransaction(transaction) ? '+' : ''}${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(transaction.amount)}`;
+    const formatTransactionAmount = (transaction) => `${isIncomeTransaction(transaction) ? '+' : ''}${money(transaction.amount)}`;
 
     // Swipe back logic
     const handleTouchStart = (e) => setTouchStart(e.targetTouches[0].clientX);
@@ -86,7 +89,7 @@ const BudgetDetailView = ({
                             .sort((a, b) => b.date.localeCompare(a.date))
                             .map(item => {
                                 const dateObj = new Date(item.date + '-01');
-                                const monthName = dateObj.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' });
+                                const monthName = formatDate(dateObj, { language, month: 'long', year: 'numeric' });
                                 const totalLimit = Object.values(userLimits).reduce((a, b) => a + b, 0);
                                 const isOverLimit = item.total > totalLimit;
                                 const isCurrent = item.date === currentMonth;
@@ -107,7 +110,7 @@ const BudgetDetailView = ({
                                             </div>
                                             <div className="text-right">
                                                 <p className={`text-2xl font-black ${isOverLimit ? 'text-red-400' : (isCurrent ? 'text-white' : 'text-indigo-600 dark:text-indigo-400')}`}>
-                                                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(item.total)}
+                                                    {money(item.total, { maximumFractionDigits: 0 })}
                                                 </p>
                                                 <p className={`text-[10px] font-bold ${isCurrent ? 'text-white/60' : 'text-gray-400'}`}>TOPLAM HARCAMA</p>
                                             </div>
@@ -136,7 +139,7 @@ const BudgetDetailView = ({
                                                             {u.name.charAt(0)}
                                                         </div>
                                                         <span className={`text-[10px] font-bold ${isCurrent ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>
-                                                            {new Intl.NumberFormat('tr-TR', { notation: "compact", style: 'currency', currency: 'TRY' }).format(userMonthTotal)}
+                                                            {money(userMonthTotal, { compact: true })}
                                                         </span>
                                                     </div>
                                                 )
@@ -172,7 +175,7 @@ const BudgetDetailView = ({
                                         <div className="flex flex-col items-center">
                                             <span className="text-[10px] font-black uppercase tracking-widest leading-none mb-1">{u.name}</span>
                                             <span className={`text-xs font-black ${isSelected ? 'text-white' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                                                {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(userMonthTotal)}
+                                                {money(userMonthTotal, { maximumFractionDigits: 0 })}
                                             </span>
                                         </div>
                                     </button>
@@ -216,7 +219,7 @@ const BudgetDetailView = ({
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">{new Date(t.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}</span>
+                                                        <span className="text-[10px] font-bold text-gray-400 uppercase">{formatDate(t.date, { language, day: '2-digit', month: 'short' })}</span>
                                                         <span className="w-1 h-1 bg-gray-200 dark:bg-slate-700 rounded-full"></span>
                                                         <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 uppercase">{account?.name || 'Bilinmeyen Kart'}</span>
                                                     </div>
