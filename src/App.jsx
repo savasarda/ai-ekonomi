@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from './lib/supabaseClient'
 import { logger } from './lib/logger'
 import { toCamelCase, toSnakeCase } from './lib/dataTransformers'
+import packageJson from '../package.json'
 import { useGoldPrices } from './hooks/useGoldPrices'
 import PortfolioModal from './components/Modals/PortfolioModal'
 import MoneyTipModal from './components/Modals/MoneyTipModal'
@@ -23,6 +24,8 @@ import { useAuth } from './contexts/AuthContext'
 import LoginScreen from './components/Auth/LoginScreen'
 import FamilySetup from './components/Auth/FamilySetup'
 import FamilyModal from './components/Modals/FamilyModal'
+
+const appVersion = packageJson.version
 
 function App() {
   // DEBUG İÇİN EKLENDİ - SİLECEĞİZ
@@ -1877,8 +1880,33 @@ function App() {
   // Auth & Loading Gates
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+      <div className="min-h-[100dvh] overflow-hidden flex items-center justify-center bg-[#F2F4F8] dark:bg-[#111827] px-6 text-slate-900 dark:text-white">
+        <div className="relative flex flex-col items-center justify-center text-center animate-fade-in">
+          <div className="absolute -top-24 left-1/2 h-44 w-44 -translate-x-1/2 rounded-full bg-emerald-300/25 blur-3xl dark:bg-emerald-400/15"></div>
+          <div className="absolute top-12 -left-20 h-32 w-32 rounded-full bg-amber-300/25 blur-3xl dark:bg-amber-300/10"></div>
+          <div className="absolute top-20 -right-20 h-36 w-36 rounded-full bg-sky-300/25 blur-3xl dark:bg-sky-300/10"></div>
+
+          <div className="splash-orbit mb-7">
+            <div className="splash-orbit-dot"></div>
+            <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-[28px] bg-white shadow-2xl shadow-slate-300/50 ring-1 ring-slate-200 dark:bg-slate-900 dark:shadow-black/30 dark:ring-slate-700">
+              <Wallet className="h-11 w-11 text-emerald-600 dark:text-emerald-400" strokeWidth={2.2} />
+              <Coins className="absolute -right-3 -bottom-3 h-10 w-10 rounded-2xl bg-amber-100 p-2 text-amber-600 shadow-lg dark:bg-amber-900/50 dark:text-amber-300" strokeWidth={2.3} />
+            </div>
+          </div>
+
+          <h1 className="text-3xl font-black tracking-normal">AIEkonomi</h1>
+          <p className="mt-2 text-sm font-bold text-slate-500 dark:text-slate-400">Veriler hazırlanıyor...</p>
+          <span className="mt-3 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-[11px] font-black text-slate-400 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-500">
+            v{appVersion}
+          </span>
+
+          <div className="mt-7 flex items-end gap-2" aria-hidden="true">
+            <span className="splash-bar h-5 bg-emerald-500"></span>
+            <span className="splash-bar h-8 bg-sky-500"></span>
+            <span className="splash-bar h-6 bg-amber-500"></span>
+            <span className="splash-bar h-10 bg-indigo-500"></span>
+          </div>
+        </div>
       </div>
     )
   }
