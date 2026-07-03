@@ -1120,20 +1120,23 @@ function App() {
       .filter(transaction => transaction.status === 1)
       .filter(isIncomeTransaction)
       .filter(transaction => accountIds.includes(transaction.accountId))
-      .filter(transaction => transaction.date && transaction.date <= monthEndKey)
       .sort((a, b) => {
-        const dateCompare = b.date.localeCompare(a.date)
+        const dateCompare = a.date.localeCompare(b.date)
         if (dateCompare !== 0) return dateCompare
-        return String(b.id).localeCompare(String(a.id))
+        return String(a.id).localeCompare(String(b.id))
       })
 
-    const latestByIncome = new Map()
+    const incomeLogsByKey = new Map()
     incomeLogs.forEach(transaction => {
       const key = getIncomeLogKey(transaction)
-      if (!latestByIncome.has(key)) latestByIncome.set(key, transaction)
+      if (!incomeLogsByKey.has(key)) incomeLogsByKey.set(key, [])
+      incomeLogsByKey.get(key).push(transaction)
     })
 
-    return Array.from(latestByIncome.values())
+    return Array.from(incomeLogsByKey.values()).map(logs => {
+      const previousOrCurrentLogs = logs.filter(transaction => transaction.date && transaction.date <= monthEndKey)
+      return previousOrCurrentLogs[previousOrCurrentLogs.length - 1] || logs[0]
+    })
   }
 
   const saveTransactionToSupabase = async (transaction) => {
