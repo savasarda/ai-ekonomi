@@ -201,6 +201,7 @@ function App() {
   const [showUpcomingPaymentsModal, setShowUpcomingPaymentsModal] = useState(false)
   const [incomeAmount, setIncomeAmount] = useState('')
   const [incomeDescription, setIncomeDescription] = useState('')
+  const [incomeDate, setIncomeDate] = useState(() => new Date().toISOString().split('T')[0])
   const [incomeUser, setIncomeUser] = useState(activeUsers[0]?.id || '')
   const [incomeAccount, setIncomeAccount] = useState(activeAccounts[0]?.id || '')
   const [cashFlowUser, setCashFlowUser] = useState('all')
@@ -1102,6 +1103,77 @@ function App() {
     return activeAccounts.filter(account => account.userId === userId).map(account => account.id)
   }
 
+  const getIncomeLogKey = (transaction) => {
+    const descriptionKey = (getDisplayDescription(transaction.description) || '').trim().toLocaleLowerCase('tr-TR')
+    return `${transaction.accountId || 'no-account'}::${descriptionKey}`
+  }
+
+  const getMonthEndKey = (monthKey) => {
+    const [year, month] = monthKey.split('-').map(Number)
+    return formatDateKey(new Date(year, month, 0))
+  }
+
+  const getEffectiveIncomeTransactionsForMonth = (monthKey, userId = 'all') => {
+    const accountIds = getCashFlowAccountIds(userId)
+    const monthEndKey = getMonthEndKey(monthKey)
+    const incomeLogs = activeTransactions
+      .filter(transaction => transaction.status === 1)
+      .filter(isIncomeTransaction)
+      .filter(transaction => accountIds.includes(transaction.accountId))
+      .filter(transaction => transaction.date && transaction.date <= monthEndKey)
+      .sort((a, b) => {
+        const dateCompare = b.date.localeCompare(a.date)
+        if (dateCompare !== 0) return dateCompare
+        return String(b.id).localeCompare(String(a.id))
+      })
+
+    const latestByIncome = new Map()
+    incomeLogs.forEach(transaction => {
+      const key = getIncomeLogKey(transaction)
+      if (!latestByIncome.has(key)) latestByIncome.set(key, transaction)
+    })
+
+    return Array.from(latestByIncome.values())
+  }
+
+  const saveTransactionToSupabase = async (transaction) => {
+    if (!isSupabaseConfigured || !profile?.family_id) return { ok: true }
+    if (isLocalRuntime || profile.family_id === '11111111-1111-1111-1111-111111111111') return { ok: true }
+
+    const payload = {
+      ...toSnakeCase(transaction),
+      family_id: profile.family_id
+    }
+    delete payload.category
+    delete payload.source
+
+    const { error } = await supabase.from('transactions').upsert(payload)
+    if (error) {
+      console.error('Error saving transaction:', error)
+      return { ok: false, message: error.message }
+    }
+
+    return { ok: true }
+  }
+
+  const softDeleteTransactionFromSupabase = async (transactionId) => {
+    if (!isSupabaseConfigured || !profile?.family_id) return { ok: true }
+    if (isLocalRuntime || profile.family_id === '11111111-1111-1111-1111-111111111111') return { ok: true }
+
+    const { error } = await supabase
+      .from('transactions')
+      .update({ status: 0 })
+      .eq('id', transactionId)
+      .eq('family_id', profile.family_id)
+
+    if (error) {
+      console.error('Error deleting transaction:', error)
+      return { ok: false, message: error.message }
+    }
+
+    return { ok: true }
+  }
+
   const getRecurringOccurrencesForRange = (startDate, endDate, userId = 'all') => {
     const occurrences = []
     const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
@@ -1145,14 +1217,10 @@ function App() {
     const occurrences = []
     const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
     const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
-    const accountIds = getCashFlowAccountIds(userId)
-    const monthlyIncomes = activeTransactions
-      .filter(transaction => transaction.status === 1)
-      .filter(isIncomeTransaction)
-      .filter(transaction => accountIds.includes(transaction.accountId))
 
     while (cursor <= lastMonth) {
       const monthKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+      const monthlyIncomes = getEffectiveIncomeTransactionsForMonth(monthKey, userId)
 
       monthlyIncomes.forEach(item => {
         const monthStartKey = `${monthKey}-01`
@@ -1351,6 +1419,7 @@ function App() {
       setEditingTransaction(t)
       setIncomeAmount(t.amount.toString())
       setIncomeDescription(getDisplayDescription(t.description))
+      setIncomeDate(t.date || formatDateKey(getIstanbulToday()))
       setIncomeAccount(t.accountId)
       if (acc) setIncomeUser(acc.userId)
       setShowIncomeModal(true)
@@ -1383,8 +1452,23 @@ function App() {
     setShowDeleteConfirmModal(true)
   }
 
-  const confirmDeleteTransaction = () => {
+  const closeIncomeModal = () => {
+    setShowIncomeModal(false)
+    setEditingTransaction(null)
+    setIncomeDate(formatDateKey(getIstanbulToday()))
+    if (showDeleteConfirmModal) {
+      setShowDeleteConfirmModal(false)
+      setTransactionToDelete(null)
+    }
+  }
+
+  const confirmDeleteTransaction = async () => {
     if (transactionToDelete) {
+      const deleted = await softDeleteTransactionFromSupabase(transactionToDelete)
+      if (!deleted.ok) {
+        alert(`İşlem silinemedi: ${deleted.message || 'Bilinmeyen hata'}`)
+        return
+      }
       setData(prev => ({
         ...prev,
         transactions: prev.transactions.map(t => t.id === transactionToDelete ? { ...t, status: 0 } : t)
@@ -1409,13 +1493,24 @@ function App() {
   }
 
   const getExtractTransactions = () => {
-    return activeTransactions
+    const monthIncomeTransactions = getEffectiveIncomeTransactionsForMonth(extractMonth, extractFilterUser)
+      .map(item => ({
+        ...item,
+        id: `income-statement-${item.id}-${extractMonth}`,
+        date: `${extractMonth}-01`,
+        description: getDisplayDescription(item.description) || (language === 'en' ? 'Income' : 'Gelir'),
+        source: 'monthly-income'
+      }))
+
+    const monthExpenseTransactions = activeTransactions
       .filter(t => {
         const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
         const isMevcutAy = t.date.startsWith(extractMonth);
         const isStatus1 = t.status === 1;
-        return matchesUser && isMevcutAy && isStatus1;
+        return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
       })
+
+    return [...monthExpenseTransactions, ...monthIncomeTransactions]
       .sort((a, b) => new Date(b.date) - new Date(a.date));
   }
 
@@ -1639,7 +1734,7 @@ function App() {
     if (userAccs.length > 0) setIncomeAccount(userAccs[0].id)
   }
 
-  const handleAddIncome = (e) => {
+  const handleAddIncome = async (e) => {
     e.preventDefault()
 
     const amountVal = parseMoneyInput(incomeAmount)
@@ -1655,22 +1750,31 @@ function App() {
       alert("Lutfen gelirin yazilacagi hesap seciniz.")
       return
     }
+    if (!incomeDate) {
+      alert(language === 'en' ? 'Please select an income date.' : 'Lutfen gelir tarihini seciniz.')
+      return
+    }
 
     if (editingTransaction && isIncomeTransaction(editingTransaction)) {
-      const incomeDate = editingTransaction.date || `${currentMonth}-01`
+      const updatedIncome = {
+        ...editingTransaction,
+        accountId: incomeAccount,
+        amount: amountVal,
+        date: incomeDate,
+        description: incomeDescription.trim(),
+        type: 'gelir',
+        status: editingTransaction.status ?? 1
+      }
+      const saved = await saveTransactionToSupabase(updatedIncome)
+      if (!saved.ok) {
+        alert(`Gelir kaydedilemedi: ${saved.message || 'Bilinmeyen hata'}`)
+        return
+      }
       setData(prev => ({
         ...prev,
-        transactions: prev.transactions.map(t => t.id === editingTransaction.id ? {
-          ...t,
-          accountId: incomeAccount,
-          amount: amountVal,
-          date: incomeDate,
-          description: incomeDescription.trim(),
-          type: 'gelir'
-        } : t)
+        transactions: prev.transactions.map(t => t.id === editingTransaction.id ? updatedIncome : t)
       }))
     } else {
-      const incomeDate = `${currentMonth}-01`
       const newIncome = {
         id: `income-${Date.now()}`,
         accountId: incomeAccount,
@@ -1681,6 +1785,12 @@ function App() {
         status: 1
       }
 
+      const saved = await saveTransactionToSupabase(newIncome)
+      if (!saved.ok) {
+        alert(`Gelir kaydedilemedi: ${saved.message || 'Bilinmeyen hata'}`)
+        return
+      }
+
       setData(prev => ({
         ...prev,
         transactions: [...prev.transactions, newIncome]
@@ -1689,6 +1799,7 @@ function App() {
 
     setIncomeAmount('')
     setIncomeDescription('')
+    setIncomeDate(formatDateKey(getIstanbulToday()))
     setEditingTransaction(null)
     setShowIncomeModal(false)
     setSuccessMessage(editingTransaction ? 'Gelir basariyla guncellendi.' : 'Gelir basariyla kaydedildi.')
@@ -1702,10 +1813,11 @@ function App() {
     const incomeTransactions = activeTransactions
       .filter(isIncomeTransaction)
       .sort((a, b) => b.date.localeCompare(a.date))
+    const pendingIncomeDelete = activeTransactions.find(item => item.id === transactionToDelete && isIncomeTransaction(item))
 
     return (
       <div className="absolute inset-0 z-[90] flex items-end sm:items-center justify-center pointer-events-none overflow-x-hidden">
-        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => { setShowIncomeModal(false); setEditingTransaction(null); }}></div>
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={closeIncomeModal}></div>
         <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-full sm:w-[420px] max-h-[90vh] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors overflow-x-hidden">
           <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
           <div className="flex justify-between items-center mb-6">
@@ -1713,7 +1825,7 @@ function App() {
               <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{editingTransaction && isIncomeTransaction(editingTransaction) ? t.editIncome : t.incomeEntry}</h3>
               <p className="text-sm text-gray-500 font-medium">{t.incomeSub}</p>
             </div>
-            <button onClick={() => { setShowIncomeModal(false); setEditingTransaction(null); }} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
+            <button onClick={closeIncomeModal} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
           </div>
 
           <div className="overflow-y-auto overflow-x-hidden custom-scrollbar pr-1 min-w-0">
@@ -1726,6 +1838,11 @@ function App() {
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">{t.description}</label>
               <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder={language === 'en' ? 'Salary, bonus, side income...' : 'Maaş, prim, ek gelir...'} value={incomeDescription} onChange={e => setIncomeDescription(e.target.value)} />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">{t.date}</label>
+              <input type="date" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} />
             </div>
 
             <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
@@ -1771,7 +1888,7 @@ function App() {
                       <button type="button" onClick={() => handleEditTransaction(item)} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 text-green-600 dark:text-green-300 flex items-center justify-center hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
                         <Edit2 size={16} />
                       </button>
-                      <button type="button" onClick={() => handleDeleteTransaction(item.id)} className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                      <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDeleteTransaction(item.id); }} className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -1786,6 +1903,22 @@ function App() {
             </div>
           </div>
         </div>
+        {pendingIncomeDelete && showDeleteConfirmModal && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 pointer-events-auto">
+            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowDeleteConfirmModal(false)}></div>
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4"><Trash2 size={40} className="text-red-500" /></div>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">{language === 'en' ? 'Delete Income?' : 'Geliri Sil?'}</h3>
+                <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">{language === 'en' ? 'Are you sure you want to delete this income?' : 'Bu geliri silmek istediğinize emin misiniz?'}</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setShowDeleteConfirmModal(false)} className="flex-1 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-4 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700">{t.cancel}</button>
+                <button onClick={confirmDeleteTransaction} className="flex-1 bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95">{t.delete}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -2188,7 +2321,7 @@ function App() {
           onOpenUsers={() => { setShowUserModal(true); setIsMenuOpen(false); }}
           onOpenCards={() => setShowCardsModal(true)}
           onOpenLimit={() => { setShowLimitModal(true); setIsMenuOpen(false); }}
-          onOpenIncome={() => { setEditingTransaction(null); setShowIncomeModal(true); }}
+          onOpenIncome={() => { setEditingTransaction(null); setIncomeDate(formatDateKey(getIstanbulToday())); setShowIncomeModal(true); }}
           onResetAll={handleResetAllData}
           language={language}
           setLanguage={setLanguage}
@@ -3101,7 +3234,7 @@ function App() {
           </div>
         )}
 
-        {showDeleteConfirmModal && (
+        {showDeleteConfirmModal && !showIncomeModal && (
           <div className="absolute inset-0 z-[110] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowDeleteConfirmModal(false)}></div>
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
@@ -4596,7 +4729,7 @@ function App() {
       )}
 
       {/* Confirmation Modal for Transaction Delete */}
-      {showDeleteConfirmModal && (
+      {showDeleteConfirmModal && !showIncomeModal && (
         <div className="absolute inset-0 z-[80] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowDeleteConfirmModal(false)}></div>
           <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[360px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
@@ -4674,7 +4807,7 @@ function App() {
         onOpenUsers={() => { setShowUserModal(true); setIsMenuOpen(false); }}
         onOpenCards={() => setShowCardsModal(true)}
         onOpenLimit={() => { setShowLimitModal(true); setIsMenuOpen(false); }}
-        onOpenIncome={() => { setEditingTransaction(null); setShowIncomeModal(true); }}
+        onOpenIncome={() => { setEditingTransaction(null); setIncomeDate(formatDateKey(getIstanbulToday())); setShowIncomeModal(true); }}
         onResetAll={handleResetAllData}
         isFamilyAdmin={isFamilyAdmin}
         language={language}
