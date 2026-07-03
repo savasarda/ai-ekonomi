@@ -11,7 +11,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured, language = 'tr' }) => {
     const [needs, setNeeds] = useState([]);
     const [newItem, setNewItem] = useState('');
     const [suggestions, setSuggestions] = useState(commonItems);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(Boolean(isSupabaseConfigured));
     const listRef = useRef(null);
 
     useEffect(() => {
@@ -22,6 +22,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured, language = 'tr' }) => {
         if (!isSupabaseConfigured) {
             const saved = localStorage.getItem('needs_list');
             if (saved) setNeeds(JSON.parse(saved));
+            setIsLoading(false);
             return;
         }
 
@@ -220,6 +221,29 @@ const NeedsList = ({ onBack, isSupabaseConfigured, language = 'tr' }) => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24 custom-scrollbar" ref={listRef}>
+                    {isLoading && (
+                        <div className="flex min-h-[280px] flex-col items-center justify-center text-center animate-fade-in">
+                            <div className="relative mb-7">
+                                <div className="absolute inset-[-18px] rounded-full border-2 border-pink-100 border-t-pink-500 dark:border-pink-900/30 dark:border-t-pink-400 animate-spin"></div>
+                                <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-pink-50 text-pink-500 shadow-xl shadow-pink-100 dark:bg-pink-900/20 dark:text-pink-300 dark:shadow-none">
+                                    <ShoppingBag size={38} strokeWidth={1.8} />
+                                </div>
+                            </div>
+                            <p className="text-sm font-black text-gray-500 dark:text-gray-400">{t.loading}</p>
+                            <div className="mt-8 w-full max-w-sm space-y-3">
+                                {[0, 1, 2].map((item) => (
+                                    <div key={item} className="h-[58px] rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-gray-100 dark:border-slate-700 p-4 overflow-hidden relative">
+                                        <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-pink-100/70 to-transparent dark:via-slate-700/60 animate-[shimmer_1.4s_infinite]"></div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-6 w-6 rounded-full bg-gray-100 dark:bg-slate-700"></div>
+                                            <div className="h-3 w-2/3 rounded-full bg-gray-100 dark:bg-slate-700"></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {needs.length === 0 && !isLoading && (
                         <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-600 opacity-50">
                             <ShoppingBag size={48} className="mb-2 stroke-1" />
@@ -227,7 +251,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured, language = 'tr' }) => {
                         </div>
                     )}
 
-                    {needs.filter(n => !n.completed).map(item => (
+                    {!isLoading && needs.filter(n => !n.completed).map(item => (
                         <NeedItem
                             key={item.id}
                             item={item}
@@ -236,7 +260,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured, language = 'tr' }) => {
                         />
                     ))}
 
-                    {needs.some(n => n.completed) && (
+                    {!isLoading && needs.some(n => n.completed) && (
                         <div className="mt-8">
                             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-3">{t.completed}</h3>
                             <div className="space-y-2 opacity-60">

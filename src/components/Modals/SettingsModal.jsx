@@ -14,7 +14,6 @@ export default function SettingsModal({
     onResetAll,
     isFamilyAdmin,
     language = 'tr',
-    setLanguage,
     currency = 'TRY',
     setCurrency,
     onExportData
@@ -39,7 +38,7 @@ export default function SettingsModal({
                 .insert({
                     family_id: profile.family_id,
                     sender_id: profile.id,
-                    title: 'Aile Duyurusu',
+                    title: t.announcementTitle,
                     message: announcementText.trim()
                 });
 
@@ -53,7 +52,7 @@ export default function SettingsModal({
             }, 3000);
         } catch (err) {
             console.error('Duyuru gönderme hatası:', err);
-            alert('Duyuru gönderilemedi. Lütfen tekrar deneyin.');
+            alert(t.announcementError);
         } finally {
             setIsSending(false);
         }
@@ -71,7 +70,7 @@ export default function SettingsModal({
 
     const shareToWhatsApp = () => {
         if (profile?.families?.invite_code) {
-            const text = `AIEkonomi aile grubumuza katıl! Davet kodumuz: #${profile.families.invite_code}`;
+            const text = `${t.shareInviteText} #${profile.families.invite_code}`;
             const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
             window.open(url, '_blank');
         }
@@ -135,62 +134,6 @@ export default function SettingsModal({
                 </div>
 
                 <div className="space-y-4 overflow-y-auto custom-scrollbar pr-1 pb-3">
-                    <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700">
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="text-left">
-                                <p className="font-bold text-gray-800 dark:text-white">{t.languageTitle}</p>
-                                <p className="text-[10px] text-gray-400 font-bold">{t.languageSub}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-1 bg-gray-100 dark:bg-slate-900 p-1 rounded-2xl">
-                                {['tr', 'en'].map(item => (
-                                    <button
-                                        key={item}
-                                        type="button"
-                                        onClick={() => setLanguage?.(item)}
-                                        className={`px-3 py-2 rounded-xl text-xs font-black transition-all ${language === item ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-400'}`}
-                                    >
-                                        {item.toUpperCase()}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={() => setShowTrustCenter(true)}
-                        className="w-full bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700 flex items-center justify-between group hover:border-emerald-500 transition-all hover:shadow-lg active:scale-[0.98]"
-                    >
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                                <ShieldCheck size={24} />
-                            </div>
-                            <div className="text-left">
-                                <p className="font-bold text-gray-800 dark:text-white">{trustCopy.title}</p>
-                                <p className="text-[10px] text-gray-400 font-bold">{trustCopy.subtitle}</p>
-                            </div>
-                        </div>
-                        <ChevronRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
-                    </button>
-
-                    <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700">
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="text-left">
-                                <p className="font-bold text-gray-800 dark:text-white">{t.currencyTitle}</p>
-                                <p className="text-[10px] text-gray-400 font-bold">{t.currencySub}</p>
-                            </div>
-                            <select
-                                value={currency}
-                                onChange={(event) => setCurrency?.(event.target.value)}
-                                className="bg-gray-100 dark:bg-slate-900 text-gray-800 dark:text-white rounded-2xl px-3 py-2 text-xs font-black outline-none"
-                            >
-                                <option value="TRY">TRY ₺</option>
-                                <option value="USD">USD $</option>
-                                <option value="EUR">EUR €</option>
-                                <option value="GBP">GBP £</option>
-                            </select>
-                        </div>
-                    </div>
-
                     <button 
                         onClick={() => { onOpenUsers(); onClose(); }}
                         className="w-full bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700 flex items-center justify-between group hover:border-indigo-500 transition-all hover:shadow-lg active:scale-[0.98]"
@@ -200,8 +143,8 @@ export default function SettingsModal({
                                 <Users size={24} />
                             </div>
                             <div className="text-left">
-                                <p className="font-bold text-gray-800 dark:text-white">Kişiler</p>
-                                <p className="text-[10px] text-gray-400 font-bold">Bütçe sahiplerini yönet</p>
+                                <p className="font-bold text-gray-800 dark:text-white">{t.peopleTitle}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{t.peopleSub}</p>
                             </div>
                         </div>
                         <ChevronRight size={18} className="text-gray-300 group-hover:text-indigo-500 transition-colors" />
@@ -216,8 +159,8 @@ export default function SettingsModal({
                                 <CreditCard size={24} />
                             </div>
                             <div className="text-left">
-                                <p className="font-bold text-gray-800 dark:text-white">Kartlar</p>
-                                <p className="text-[10px] text-gray-400 font-bold">Ödeme yöntemlerini yönet</p>
+                                <p className="font-bold text-gray-800 dark:text-white">{t.cardsTitle}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{t.cardsSub}</p>
                             </div>
                         </div>
                         <ChevronRight size={18} className="text-gray-300 group-hover:text-pink-500 transition-colors" />
@@ -232,8 +175,8 @@ export default function SettingsModal({
                                 <Gauge size={24} />
                             </div>
                             <div className="text-left">
-                                <p className="font-bold text-gray-800 dark:text-white">Limitler</p>
-                                <p className="text-[10px] text-gray-400 font-bold">Aylık harcama limitlerini ayarla</p>
+                                <p className="font-bold text-gray-800 dark:text-white">{t.limitsTitle}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{t.limitsSub}</p>
                             </div>
                         </div>
                         <ChevronRight size={18} className="text-gray-300 group-hover:text-orange-500 transition-colors" />
@@ -248,8 +191,8 @@ export default function SettingsModal({
                                 <Wallet size={24} />
                             </div>
                             <div className="text-left">
-                                <p className="font-bold text-gray-800 dark:text-white">Gelirler</p>
-                                <p className="text-[10px] text-gray-400 font-bold">Kişi bazlı gelir girişi</p>
+                                <p className="font-bold text-gray-800 dark:text-white">{t.incomesTitle}</p>
+                                <p className="text-[10px] text-gray-400 font-bold">{t.incomesSub}</p>
                             </div>
                         </div>
                         <ChevronRight size={18} className="text-gray-300 group-hover:text-green-500 transition-colors" />
@@ -261,10 +204,10 @@ export default function SettingsModal({
                                 <Bell size={24} />
                             </div>
                             <div className="text-left flex-1 min-w-0">
-                                <p className="font-bold text-gray-800 dark:text-white">Bildirim Durumu</p>
+                                <p className="font-bold text-gray-800 dark:text-white">{t.notificationTitle}</p>
                                 {profile?.fcm_token ? (
                                     <p className="text-[10px] text-gray-400 font-bold truncate">
-                                        Aktif: {profile.fcm_token.substring(0, 15)}...
+                                        {t.notificationActive}: {profile.fcm_token.substring(0, 15)}...
                                     </p>
                                 ) : (
                                     <button 
@@ -275,12 +218,12 @@ export default function SettingsModal({
                                                 await supabase.from('profiles').update({ fcm_token: token }).eq('id', profile.id);
                                                 window.location.reload();
                                             } else {
-                                                alert("Bildirim izni alınamadı. Telefon ayarlarından uygulamanın bildirimlerine izin verdiğinizden emin olun.");
+                                                alert(t.notificationPermissionError);
                                             }
                                         }}
                                         className="mt-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-all"
                                     >
-                                        Bildirimleri Aç
+                                        {t.enableNotifications}
                                     </button>
                                 )}
                             </div>
@@ -299,8 +242,8 @@ export default function SettingsModal({
                                             <MessageCircle size={24} />
                                         </div>
                                         <div className="text-left">
-                                            <p className="font-bold text-indigo-700 dark:text-indigo-400">Duyuru Gönder</p>
-                                            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Tüm aileye bildirim gider</p>
+                                            <p className="font-bold text-indigo-700 dark:text-indigo-400">{t.announcementAction}</p>
+                                            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">{t.announcementSub}</p>
                                         </div>
                                     </div>
                                     <ChevronRight size={18} className="text-indigo-300 group-hover:text-indigo-500 transition-colors" />
@@ -309,12 +252,12 @@ export default function SettingsModal({
                                 <div className="bg-indigo-50 dark:bg-indigo-900/20 p-5 rounded-[32px] border border-indigo-100 dark:border-indigo-900/30 animate-in zoom-in-95 duration-200">
                                     <h4 className="text-sm font-black text-indigo-900 dark:text-indigo-300 mb-3 flex items-center gap-2">
                                         <MessageCircle size={16} />
-                                        Aile Duyurusu
+                                        {t.announcementTitle}
                                     </h4>
                                     <textarea
                                         value={announcementText}
                                         onChange={(e) => setAnnouncementText(e.target.value)}
-                                        placeholder="Mesajınızı buraya yazın..."
+                                        placeholder={t.announcementPlaceholder}
                                         className="w-full bg-white dark:bg-slate-800 border-none rounded-2xl p-4 text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 min-h-[100px] mb-3 resize-none shadow-inner"
                                     />
                                     <div className="flex gap-2">
@@ -322,7 +265,7 @@ export default function SettingsModal({
                                             onClick={() => setShowAnnouncement(false)}
                                             className="flex-1 py-3 text-sm font-bold text-gray-500 hover:text-gray-700"
                                         >
-                                            Vazgeç
+                                            {t.announcementCancel}
                                         </button>
                                         <button 
                                             onClick={handleSendAnnouncement}
@@ -334,10 +277,10 @@ export default function SettingsModal({
                                             ) : success ? (
                                                 <>
                                                     <Check size={18} />
-                                                    Gönderildi!
+                                                    {t.announcementSent}
                                                 </>
                                             ) : (
-                                                'Hemen Gönder'
+                                                t.announcementSendNow
                                             )}
                                         </button>
                                     </div>
@@ -347,6 +290,40 @@ export default function SettingsModal({
                     )}
 
                     <div className="pt-4 mt-4 border-t border-gray-100 dark:border-slate-800 space-y-3">
+                        <div className="bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700">
+                            <div className="flex items-center justify-between gap-4">
+                                <div className="text-left">
+                                    <p className="font-bold text-gray-800 dark:text-white">{t.currencyTitle}</p>
+                                    <p className="text-[10px] text-gray-400 font-bold">{t.currencySub}</p>
+                                </div>
+                                <select
+                                    value={currency}
+                                    onChange={(event) => setCurrency?.(event.target.value)}
+                                    className="bg-gray-100 dark:bg-slate-900 text-gray-800 dark:text-white rounded-2xl px-3 py-2 text-xs font-black outline-none"
+                                >
+                                    <option value="TRY">TRY ₺</option>
+                                    <option value="USD">USD $</option>
+                                    <option value="EUR">EUR €</option>
+                                    <option value="GBP">GBP £</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setShowTrustCenter(true)}
+                            className="w-full bg-white dark:bg-slate-800 p-5 rounded-3xl border border-gray-100 dark:border-slate-700 flex items-center justify-between group hover:border-emerald-500 transition-all hover:shadow-lg active:scale-[0.98]"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                    <ShieldCheck size={24} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-gray-800 dark:text-white">{trustCopy.title}</p>
+                                    <p className="text-[10px] text-gray-400 font-bold">{trustCopy.subtitle}</p>
+                                </div>
+                            </div>
+                            <ChevronRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                        </button>
 
                         <button 
                             onClick={() => { onResetAll(); onClose(); }}
@@ -357,8 +334,8 @@ export default function SettingsModal({
                                     <Trash2 size={24} />
                                 </div>
                                 <div className="text-left">
-                                    <p className="font-bold text-red-600">Sıfırla</p>
-                                    <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Tüm verileri temizle</p>
+                                    <p className="font-bold text-red-600">{t.resetTitle}</p>
+                                    <p className="text-[10px] text-red-400 font-bold uppercase tracking-wider">{t.resetSub}</p>
                                 </div>
                             </div>
                             <ChevronRight size={18} className="text-red-300 group-hover:text-red-500 transition-colors" />

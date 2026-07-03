@@ -201,7 +201,6 @@ function App() {
   const [showUpcomingPaymentsModal, setShowUpcomingPaymentsModal] = useState(false)
   const [incomeAmount, setIncomeAmount] = useState('')
   const [incomeDescription, setIncomeDescription] = useState('')
-  const [incomeDate, setIncomeDate] = useState(new Date().toISOString().split('T')[0])
   const [incomeUser, setIncomeUser] = useState(activeUsers[0]?.id || '')
   const [incomeAccount, setIncomeAccount] = useState(activeAccounts[0]?.id || '')
   const [cashFlowUser, setCashFlowUser] = useState('all')
@@ -260,6 +259,11 @@ function App() {
 
   // Extract Filter
   const [extractFilterUser, setExtractFilterUser] = useState(null)
+  const [extractMonth, setExtractMonth] = useState(() => {
+    const date = new Date()
+    date.setMonth(date.getMonth() - 1)
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  })
 
 
   // Dark Mode State
@@ -779,6 +783,10 @@ function App() {
 
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const getPreviousMonthKey = () => {
+    const date = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  }
 
   const parseMoneyInput = (value) => {
     if (!value) return NaN
@@ -976,10 +984,29 @@ function App() {
   useEffect(() => {
     if (!subscriptions.length || !activeAccounts.length) return
 
+    const todayKey = formatDateKey(getIstanbulToday())
+    const isFutureGeneratedRecurring = (transaction) => {
+      return transaction.status !== 0 &&
+        transaction.date > todayKey &&
+        /\[tekrar:[^\]]+\]/.test(transaction.description || '')
+    }
+
+    if (data.transactions.some(isFutureGeneratedRecurring)) {
+      setData(prev => ({
+        ...prev,
+        transactions: prev.transactions.filter(transaction => !isFutureGeneratedRecurring(transaction))
+      }))
+      return
+    }
+
     const generatedTransactions = subscriptions
       .filter(subscription => subscription.status !== 0)
       .filter(subscription => activeAccounts.some(account => account.id === subscription.accountId))
       .filter(subscription => {
+        const dueDay = String(Math.min(Math.max(Number(subscription.dueDay) || 15, 1), 28)).padStart(2, '0')
+        const dueDateKey = `${currentMonth}-${dueDay}`
+        if (dueDateKey > todayKey) return false
+
         const marker = `[tekrar:${subscription.id}:${currentMonth}]`
         return !data.transactions.some(t => t.status !== 0 && t.description.includes(marker))
       })
@@ -1114,11 +1141,48 @@ function App() {
     return occurrences
   }
 
+  const getIncomeOccurrencesForRange = (startDate, endDate, userId = 'all') => {
+    const occurrences = []
+    const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+    const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+    const accountIds = getCashFlowAccountIds(userId)
+    const monthlyIncomes = activeTransactions
+      .filter(transaction => transaction.status === 1)
+      .filter(isIncomeTransaction)
+      .filter(transaction => accountIds.includes(transaction.accountId))
+
+    while (cursor <= lastMonth) {
+      const monthKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`
+
+      monthlyIncomes.forEach(item => {
+        const monthStartKey = `${monthKey}-01`
+        const dateKey = monthKey === formatDateKey(startDate).slice(0, 7) ? formatDateKey(startDate) : monthStartKey
+        if (!isDateBetween(dateKey, startDate, endDate)) return
+
+        occurrences.push({
+          id: `income-${item.id}-${monthKey}`,
+          date: dateKey,
+          description: getDisplayDescription(item.description) || (language === 'en' ? 'Income' : 'Gelir'),
+          amount: item.amount,
+          type: 'gelir',
+          category: 'income',
+          accountId: item.accountId,
+          source: 'monthly-income'
+        })
+      })
+
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+
+    return occurrences
+  }
+
   const getCashFlowForRange = (startDate, endDate, userId = 'all') => {
     const accountIds = getCashFlowAccountIds(userId)
 
     const realTransactions = activeTransactions
       .filter(t => t.status === 1)
+      .filter(isExpenseTransaction)
       .filter(t => accountIds.includes(t.accountId))
       .filter(t => isDateBetween(t.date, startDate, endDate))
       .map(t => ({
@@ -1133,7 +1197,8 @@ function App() {
       }))
 
     const recurringOccurrences = getRecurringOccurrencesForRange(startDate, endDate, userId)
-    const items = [...realTransactions, ...recurringOccurrences].sort((a, b) => a.date.localeCompare(b.date))
+    const incomeOccurrences = getIncomeOccurrencesForRange(startDate, endDate, userId)
+    const items = [...realTransactions, ...recurringOccurrences, ...incomeOccurrences].sort((a, b) => a.date.localeCompare(b.date))
     const income = items.filter(isIncomeTransaction).reduce((sum, item) => sum + item.amount, 0)
     const expenses = items.filter(isExpenseTransaction).reduce((sum, item) => sum + item.amount, 0)
 
@@ -1271,7 +1336,7 @@ function App() {
     setSubscriptionTotalInstallments('')
     setSubscriptionPaidInstallments('')
     setSubscriptionDueDay('15')
-    setSuccessMessage('Abonelik kaydedildi. Bu ayın gideri otomatik oluşturulacak.')
+    setSuccessMessage('Tekrarlayan ödeme kaydedildi. Günü gelince harcamalara otomatik eklenecek.')
     setShowSuccessModal(true)
   }
 
@@ -1286,7 +1351,6 @@ function App() {
       setEditingTransaction(t)
       setIncomeAmount(t.amount.toString())
       setIncomeDescription(getDisplayDescription(t.description))
-      setIncomeDate(t.date)
       setIncomeAccount(t.accountId)
       if (acc) setIncomeUser(acc.userId)
       setShowIncomeModal(true)
@@ -1348,11 +1412,23 @@ function App() {
     return activeTransactions
       .filter(t => {
         const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
-        const isMevcutAy = t.date.startsWith(currentMonth);
+        const isMevcutAy = t.date.startsWith(extractMonth);
         const isStatus1 = t.status === 1;
         return matchesUser && isMevcutAy && isStatus1;
       })
       .sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
+
+  const getExtractMonthOptions = () => {
+    const months = new Set([getPreviousMonthKey()])
+    activeTransactions
+      .filter(transaction => transaction.status === 1)
+      .forEach(transaction => {
+        const monthKey = transaction.date?.slice(0, 7)
+        if (monthKey && monthKey < currentMonth) months.add(monthKey)
+      })
+
+    return Array.from(months).sort((a, b) => b.localeCompare(a))
   }
 
   const getMonthlyReport = () => {
@@ -1387,6 +1463,7 @@ function App() {
   }
 
   const monthlyReport = getMonthlyReport()
+  const extractMonthOptions = getExtractMonthOptions()
 
   const handleShareWhatsApp = () => {
     const filteredTransactions = getExtractTransactions();
@@ -1396,7 +1473,7 @@ function App() {
       return;
     }
 
-    const monthLabel = dateLabel(currentMonth + '-01', { month: 'long', year: 'numeric' });
+    const monthLabel = dateLabel(extractMonth + '-01', { month: 'long', year: 'numeric' });
     const userLabel = extractFilterUser ? activeUsers.find(u => u.id === extractFilterUser)?.name : t.all;
     const totalAmount = filteredTransactions.reduce((acc, curr) => acc + getSignedTransactionAmount(curr), 0);
 
@@ -1580,6 +1657,7 @@ function App() {
     }
 
     if (editingTransaction && isIncomeTransaction(editingTransaction)) {
+      const incomeDate = editingTransaction.date || `${currentMonth}-01`
       setData(prev => ({
         ...prev,
         transactions: prev.transactions.map(t => t.id === editingTransaction.id ? {
@@ -1592,6 +1670,7 @@ function App() {
         } : t)
       }))
     } else {
+      const incomeDate = `${currentMonth}-01`
       const newIncome = {
         id: `income-${Date.now()}`,
         accountId: incomeAccount,
@@ -1610,7 +1689,6 @@ function App() {
 
     setIncomeAmount('')
     setIncomeDescription('')
-    setIncomeDate(new Date().toISOString().split('T')[0])
     setEditingTransaction(null)
     setShowIncomeModal(false)
     setSuccessMessage(editingTransaction ? 'Gelir basariyla guncellendi.' : 'Gelir basariyla kaydedildi.')
@@ -1650,11 +1728,6 @@ function App() {
               <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder={language === 'en' ? 'Salary, bonus, side income...' : 'Maaş, prim, ek gelir...'} value={incomeDescription} onChange={e => setIncomeDescription(e.target.value)} />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">{t.date}</label>
-              <input type="date" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" value={incomeDate} onChange={e => setIncomeDate(e.target.value)} />
-            </div>
-
             <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
               {authorizedUsers.map(u => (
                 <button key={u.id} type="button" onClick={() => handleIncomeUserChange(u.id)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${incomeUser === u.id ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>{u.name}</button>
@@ -1690,7 +1763,7 @@ function App() {
                     <div className="min-w-0">
                       <p className="font-black text-gray-800 dark:text-white truncate">{getDisplayDescription(item.description) || t.income}</p>
                       <p className="text-[11px] font-bold text-gray-400">
-                        {user?.name || t.general} - {account?.name || t.noAccount} - {dateLabel(item.date, { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {user?.name || t.general} - {account?.name || t.noAccount} - {language === 'en' ? 'Monthly income' : 'Aylık gelir'}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -3230,7 +3303,7 @@ function App() {
                         case 'cards': setShowCardsModal(true); break;
                         case 'users': setShowUserModal(true); break;
                         case 'reset': handleResetAllData(); break;
-                        case 'extract': setExtractFilterUser(null); setShowExtractModal(true); break;
+                        case 'extract': setExtractFilterUser(null); setExtractMonth(getPreviousMonthKey()); setShowExtractModal(true); break;
                         case 'portfolio': handleOpenPortfolio(); break;
                         case 'feedback': setShowFeedbackModal(true); break;
                         case 'settings': setShowSettingsModal(true); break;
@@ -4181,7 +4254,7 @@ function App() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-gray-800">{dateLabel(new Date(), { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-                    <p className="text-xs text-gray-500 capitalize">{dateLabel(currentMonth + '-01', { month: 'long', year: 'numeric' })} Dönemi</p>
+                    <p className="text-xs text-gray-500 capitalize">{dateLabel(extractMonth + '-01', { month: 'long', year: 'numeric' })} Dönemi</p>
                   </div>
                 </div>
               </div>
@@ -4210,6 +4283,23 @@ function App() {
                 </div>
               </div>
 
+              <div className="bg-gray-100/50 dark:bg-slate-800/50 p-4 rounded-2xl mb-4 backdrop-blur-md transition-colors no-print">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                  {language === 'en' ? 'Statement Period' : 'Ekstre Dönemi'}
+                </label>
+                <select
+                  value={extractMonth}
+                  onChange={(event) => setExtractMonth(event.target.value)}
+                  className="w-full bg-white dark:bg-slate-900 text-gray-800 dark:text-white rounded-xl px-4 py-3 text-sm font-black outline-none border border-gray-100 dark:border-slate-700"
+                >
+                  {extractMonthOptions.map(monthKey => (
+                    <option key={monthKey} value={monthKey}>
+                      {dateLabel(monthKey + '-01', { month: 'long', year: 'numeric' })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Filter by User */}
               <div className="bg-gray-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl flex mb-6 backdrop-blur-md transition-colors no-print">
                 <button
@@ -4221,7 +4311,7 @@ function App() {
                     <span className={`text-[10px] mt-0.5 ${extractFilterUser === null ? 'text-indigo-500' : 'text-gray-400'}`}>
                       {money(
                         activeTransactions
-                          .filter(t => t.status === 1 && t.date.startsWith(currentMonth))
+                          .filter(t => t.status === 1 && t.date.startsWith(extractMonth))
                           .filter(isExpenseTransaction)
                           .reduce((acc, curr) => acc + curr.amount, 0)
                       )}
@@ -4231,7 +4321,7 @@ function App() {
                 {activeUsers.map(u => {
                   const userAccs = activeAccounts.filter(a => a.userId === u.id).map(a => a.id);
                   const userTotal = activeTransactions
-                    .filter(t => t.status === 1 && t.date.startsWith(currentMonth) && userAccs.includes(t.accountId))
+                    .filter(t => t.status === 1 && t.date.startsWith(extractMonth) && userAccs.includes(t.accountId))
                     .filter(isExpenseTransaction)
                     .reduce((acc, curr) => acc + curr.amount, 0);
 
@@ -4258,7 +4348,7 @@ function App() {
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Aylık Rapor</p>
                     <h4 className="text-lg font-black text-gray-800 dark:text-white capitalize">
-                      {dateLabel(currentMonth + '-01', { month: 'long', year: 'numeric' })}
+                      {dateLabel(extractMonth + '-01', { month: 'long', year: 'numeric' })}
                     </h4>
                   </div>
                   <span className={`px-3 py-1.5 rounded-2xl text-[10px] font-black ${monthlyReport.net >= 0 ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300'}`}>
@@ -4331,7 +4421,7 @@ function App() {
                 {activeTransactions
                   .filter(t => {
                     const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
-                    const isMevcutAy = t.date.startsWith(currentMonth);
+                    const isMevcutAy = t.date.startsWith(extractMonth);
                     const isStatus1 = t.status === 1;
                     return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
                   })
@@ -4361,7 +4451,7 @@ function App() {
                   })}
                 {activeTransactions.filter(t => {
                   const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
-                  const isMevcutAy = t.date.startsWith(currentMonth);
+                  const isMevcutAy = t.date.startsWith(extractMonth);
                   const isStatus1 = t.status === 1;
                   return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
                 }).length === 0 && (
@@ -4374,7 +4464,7 @@ function App() {
 
                 {activeTransactions.filter(t => {
                   const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
-                  const isMevcutAy = t.date.startsWith(currentMonth);
+                  const isMevcutAy = t.date.startsWith(extractMonth);
                   const isStatus1 = t.status === 1;
                   return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
                 }).length > 0 && (
@@ -4383,7 +4473,7 @@ function App() {
                         activeTransactions
                           .filter(t => {
                             const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
-                            const isMevcutAy = t.date.startsWith(currentMonth);
+                            const isMevcutAy = t.date.startsWith(extractMonth);
                             const isStatus1 = t.status === 1;
                             return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
                           })
