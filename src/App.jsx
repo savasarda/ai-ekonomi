@@ -3100,7 +3100,7 @@ function App() {
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">Açıklama</label>
-                          <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-300 dark:placeholder-gray-600" placeholder="?rn: Market al??veri?i" value={description} onChange={e => { setDescription(e.target.value); if (!categoryTouched) setTransactionCategory(inferTransactionCategory(e.target.value)); }} />
+                          <input type="text" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all placeholder-gray-300 dark:placeholder-gray-600" placeholder="Örn: Market alışverişi" value={description} onChange={e => { setDescription(e.target.value); if (!categoryTouched) setTransactionCategory(inferTransactionCategory(e.target.value)); }} />
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-gray-400 mb-2.5 uppercase tracking-wide pl-2">{language === 'en' ? 'Category' : 'Kategori'}</label>
