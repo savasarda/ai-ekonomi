@@ -319,7 +319,7 @@ const NeedsList = ({ onBack, isSupabaseConfigured, language = 'tr' }) => {
             </div>
 
             {showDeleteCompletedConfirm && (
-                <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 px-4 pb-6 pt-20 backdrop-blur-sm sm:items-center sm:p-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm sm:p-6">
                     <div className="w-full max-w-sm rounded-[28px] bg-white p-5 shadow-2xl shadow-slate-900/20 ring-1 ring-black/5 dark:bg-slate-900 dark:ring-white/10">
                         <div className="mb-5 flex items-start gap-4">
                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-500 dark:bg-red-900/25 dark:text-red-300">
