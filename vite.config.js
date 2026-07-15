@@ -13,7 +13,7 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true
       },
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'pwa-icon.png'],
+      includeAssets: ['apple-touch-icon.png', 'app-icon-192.png', 'app-icon-512.png', 'app-icon-1024.png'],
       manifest: {
         name: 'AI Ekonomi',
         short_name: 'Ekonomi',
@@ -23,19 +23,22 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-icon.png',
-            sizes: '1024x1024',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-icon.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-icon.png',
+            src: 'app-icon-192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'app-icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
+          {
+            src: 'app-icon-1024.png',
+            sizes: '1024x1024',
+            type: 'image/png',
+            purpose: 'any'
           }
         ]
       }
