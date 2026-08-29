@@ -207,6 +207,7 @@ function App() {
   const [incomeDescription, setIncomeDescription] = useState('')
   const [incomeDate, setIncomeDate] = useState(() => new Date().toISOString().split('T')[0])
   const [incomeFrequency, setIncomeFrequency] = useState('monthly')
+  const [expandedIncomeHistoryKeys, setExpandedIncomeHistoryKeys] = useState([])
   const [incomeUser, setIncomeUser] = useState(activeUsers[0]?.id || '')
   const [incomeAccount, setIncomeAccount] = useState(activeAccounts[0]?.id || '')
   const incomeModalScrollRef = useRef(null)
@@ -2011,6 +2012,25 @@ function App() {
     const incomeTransactions = activeTransactions
       .filter(isIncomeTransaction)
       .sort((a, b) => b.date.localeCompare(a.date))
+    const incomeGroups = []
+    const monthlyIncomeGroups = new Map()
+
+    incomeTransactions.forEach(transaction => {
+      if (isOneTimeIncome(transaction)) {
+        incomeGroups.push({ key: `one-time-${transaction.id}`, current: transaction, history: [], isOneTime: true })
+        return
+      }
+
+      const key = getIncomeLogKey(transaction)
+      const existingGroup = monthlyIncomeGroups.get(key)
+      if (existingGroup) {
+        existingGroup.history.push(transaction)
+      } else {
+        const group = { key, current: transaction, history: [], isOneTime: false }
+        monthlyIncomeGroups.set(key, group)
+        incomeGroups.push(group)
+      }
+    })
     const pendingIncomeDelete = activeTransactions.find(item => item.id === transactionToDelete && isIncomeTransaction(item))
 
     return (
@@ -2085,32 +2105,58 @@ function App() {
             <div className="space-y-3">
               <div className="flex items-center justify-between px-1">
                 <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">{t.incomes}</h4>
-                <span className="text-[10px] font-bold text-gray-400">{incomeTransactions.length} {t.record}</span>
+                <span className="text-[10px] font-bold text-gray-400">{incomeGroups.length} {t.record}</span>
               </div>
-              {incomeTransactions.map(item => {
+              {incomeGroups.map(group => {
+                const item = group.current
                 const account = activeAccounts.find(acc => acc.id === item.accountId)
                 const user = activeUsers.find(u => u.id === account?.userId)
+                const isHistoryExpanded = expandedIncomeHistoryKeys.includes(group.key)
                 return (
-                  <div key={item.id} className="bg-green-50/70 dark:bg-green-900/20 rounded-2xl p-4 border border-green-100 dark:border-green-900/30 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-black text-gray-800 dark:text-white truncate">{getDisplayDescription(item.description) || t.income}</p>
-                      <p className="text-[11px] font-bold text-gray-400">
-                        {user?.name || t.general} - {account?.name || t.noAccount} - {isOneTimeIncome(item) ? (language === 'en' ? 'One-time income' : 'Tek seferlik gelir') : (language === 'en' ? 'Monthly income' : 'Aylık gelir')}
-                      </p>
+                  <div key={group.key} className="bg-green-50/70 dark:bg-green-900/20 rounded-2xl p-4 border border-green-100 dark:border-green-900/30">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-black text-gray-800 dark:text-white truncate">{getDisplayDescription(item.description) || t.income}</p>
+                        <p className="text-[11px] font-bold text-gray-400">
+                          {user?.name || t.general} - {account?.name || t.noAccount} - {group.isOneTime ? (language === 'en' ? 'One-time income' : 'Tek seferlik gelir') : (language === 'en' ? 'Monthly income' : 'Aylık gelir')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-black text-green-600 dark:text-green-400">{money(item.amount)}</span>
+                        <button type="button" onClick={() => handleEditTransaction(item)} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 text-green-600 dark:text-green-300 flex items-center justify-center hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
+                          <Edit2 size={16} />
+                        </button>
+                        <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDeleteTransaction(item.id); }} className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-black text-green-600 dark:text-green-400">{money(item.amount)}</span>
-                      <button type="button" onClick={() => handleEditTransaction(item)} className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 text-green-600 dark:text-green-300 flex items-center justify-center hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
-                        <Edit2 size={16} />
-                      </button>
-                      <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); handleDeleteTransaction(item.id); }} className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+                    {!group.isOneTime && group.history.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-green-100 dark:border-green-900/30">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedIncomeHistoryKeys(previous => previous.includes(group.key) ? previous.filter(key => key !== group.key) : [...previous, group.key])}
+                          className="w-full flex items-center justify-between text-xs font-black text-green-700 dark:text-green-300"
+                        >
+                          <span>{language === 'en' ? `Salary history (${group.history.length})` : `Maaş geçmişi (${group.history.length})`}</span>
+                          {isHistoryExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                        {isHistoryExpanded && (
+                          <div className="mt-2 space-y-2">
+                            {group.history.map(historyItem => (
+                              <div key={historyItem.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/70 dark:bg-slate-800/70 px-3 py-2">
+                                <span className="text-[11px] font-bold text-gray-400">{dateLabel(historyItem.date, { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                <span className="text-xs font-black text-gray-600 dark:text-gray-300">{money(historyItem.amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
-              {incomeTransactions.length === 0 && (
+              {incomeGroups.length === 0 && (
                 <div className="bg-gray-50 dark:bg-slate-800 rounded-2xl p-4 border border-gray-100 dark:border-slate-700 text-center">
                   <p className="text-sm font-bold text-gray-400">{t.noIncome}</p>
                 </div>
