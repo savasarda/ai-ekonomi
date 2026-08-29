@@ -1267,6 +1267,11 @@ function App() {
         .filter(item => item.status !== 0)
         .filter(item => accountIds.includes(item.accountId))
         .forEach(item => {
+          const createdAt = item.createdAt || item.created_at || formatDateKey(getIstanbulToday())
+          const startMonthKey = String(createdAt).slice(0, 7)
+          const endMonthKey = item.endDate || item.end_date ? String(item.endDate || item.end_date).slice(0, 7) : null
+          if (monthKey < startMonthKey || (endMonthKey && monthKey > endMonthKey)) return
+
           const dueDay = Math.min(Math.max(Number(item.dueDay) || 15, 1), 28)
           const dateKey = `${monthKey}-${String(dueDay).padStart(2, '0')}`
           if (!isDateBetween(dateKey, startDate, endDate)) return
@@ -1486,6 +1491,7 @@ function App() {
     const payment = {
       ...editingSubscription,
       id: editingSubscription?.id || Date.now().toString(),
+      createdAt: editingSubscription?.createdAt || editingSubscription?.created_at || new Date().toISOString(),
       name: subscriptionName.trim(),
       amount: amountVal,
       userId: subscriptionUser,
