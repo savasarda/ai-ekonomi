@@ -12,7 +12,7 @@ import SettingsModal from './components/Modals/SettingsModal'
 
 import { moneyTips } from './data/moneyTips'
 import { requestNotificationPermission } from './lib/firebase'
-import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer, Menu, ChevronDown, ChevronUp, Settings, Eye, EyeOff, Home, Repeat } from 'lucide-react'
+import { Sun, Moon, Bell, BarChart3, Gauge, Calendar, CreditCard, Users, Trash2, Edit2, Receipt, Coins, Briefcase, Wallet, Lightbulb, MessageSquare, Plus, ArrowLeft, ArrowRight, Lock, AlertTriangle, CheckCircle, Loader2, Share2, Printer, Menu, ChevronDown, ChevronUp, Settings, Eye, EyeOff, Home, Repeat, History } from 'lucide-react'
 
 import WelcomeScreen from './components/WelcomeScreen'
 import NeedsList from './components/NeedsList'
@@ -2011,9 +2011,18 @@ function App() {
     const selectableAccounts = activeAccounts.filter(a => a.userId === incomeUser)
     const incomeTransactions = activeTransactions
       .filter(isIncomeTransaction)
-      .sort((a, b) => b.date.localeCompare(a.date))
+      .sort((a, b) => {
+        const dateCompare = b.date.localeCompare(a.date)
+        if (dateCompare !== 0) return dateCompare
+        return String(b.createdAt || b.id).localeCompare(String(a.createdAt || a.id))
+      })
     const incomeGroups = []
     const monthlyIncomeGroups = new Map()
+    const getIncomeDisplayHistoryKey = (transaction) => {
+      const account = activeAccounts.find(item => item.id === transaction.accountId)
+      const descriptionKey = (getDisplayDescription(transaction.description) || '').trim().toLocaleLowerCase('tr-TR')
+      return `${account?.userId || transaction.accountId || 'no-owner'}::${descriptionKey}`
+    }
 
     incomeTransactions.forEach(transaction => {
       if (isOneTimeIncome(transaction)) {
@@ -2021,7 +2030,7 @@ function App() {
         return
       }
 
-      const key = getIncomeLogKey(transaction)
+      const key = getIncomeDisplayHistoryKey(transaction)
       const existingGroup = monthlyIncomeGroups.get(key)
       if (existingGroup) {
         existingGroup.history.push(transaction)
@@ -2136,10 +2145,11 @@ function App() {
                         <button
                           type="button"
                           onClick={() => setExpandedIncomeHistoryKeys(previous => previous.includes(group.key) ? previous.filter(key => key !== group.key) : [...previous, group.key])}
-                          className="w-full flex items-center justify-between text-xs font-black text-green-700 dark:text-green-300"
+                          aria-label={language === 'en' ? 'Show salary history' : 'Maaş geçmişini göster'}
+                          title={language === 'en' ? 'Salary history' : 'Maaş geçmişi'}
+                          className="ml-auto flex w-8 h-8 items-center justify-center rounded-lg bg-white/80 dark:bg-slate-800 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
                         >
-                          <span>{language === 'en' ? `Salary history (${group.history.length})` : `Maaş geçmişi (${group.history.length})`}</span>
-                          {isHistoryExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          {isHistoryExpanded ? <ChevronUp size={16} /> : <History size={16} />}
                         </button>
                         {isHistoryExpanded && (
                           <div className="mt-2 space-y-2">
