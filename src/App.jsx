@@ -113,6 +113,7 @@ function App() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [showLimitModal, setShowLimitModal] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const [editingSubscription, setEditingSubscription] = useState(null)
 
   const [userLimits, setUserLimits] = useState({})
 
@@ -173,6 +174,7 @@ function App() {
   // Transaction Delete Confirmation State
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
   const [transactionToDelete, setTransactionToDelete] = useState(null)
+  const [installmentDeleteChoice, setInstallmentDeleteChoice] = useState(null)
 
   // Toggled Section States
   const [showExtractModal, setShowExtractModal] = useState(false)
@@ -867,7 +869,7 @@ function App() {
   }
 
   const getDisplayDescription = (value) => {
-    return (value || '').replace(/\s*\[(abonelik|tekrar|kategori):[^\]]+\]/g, '').trim()
+    return (value || '').replace(/\s*\[(abonelik|tekrar|kategori|taksit):[^\]]+\]/g, '').trim()
   }
 
   const expenseCategories = [
@@ -1416,6 +1418,33 @@ function App() {
     if (userAccs.length > 0) setSubscriptionAccount(userAccs[0].id)
   }
 
+  const resetSubscriptionForm = () => {
+    setEditingSubscription(null)
+    setSubscriptionName('')
+    setSubscriptionAmount('')
+    setSubscriptionPaymentType('subscription')
+    setSubscriptionTotalInstallments('')
+    setSubscriptionPaidInstallments('')
+    setSubscriptionDueDay('15')
+  }
+
+  const closeSubscriptionModal = () => {
+    setShowSubscriptionModal(false)
+    resetSubscriptionForm()
+  }
+
+  const handleEditSubscription = (payment) => {
+    setEditingSubscription(payment)
+    setSubscriptionName(payment.name || '')
+    setSubscriptionAmount(String(payment.amount ?? ''))
+    setSubscriptionUser(payment.userId || '')
+    setSubscriptionAccount(payment.accountId || '')
+    setSubscriptionPaymentType(normalizeRecurringPaymentType(payment.paymentType))
+    setSubscriptionTotalInstallments(payment.totalInstallments == null ? '' : String(payment.totalInstallments))
+    setSubscriptionPaidInstallments(payment.paidInstallments == null ? '' : String(payment.paidInstallments))
+    setSubscriptionDueDay(String(payment.dueDay || 15))
+  }
+
   const handleAddSubscription = async (e) => {
     e.preventDefault()
 
@@ -1444,8 +1473,10 @@ function App() {
       return
     }
 
+    const isEditingSubscription = Boolean(editingSubscription)
     const payment = {
-      id: Date.now().toString(),
+      ...editingSubscription,
+      id: editingSubscription?.id || Date.now().toString(),
       name: subscriptionName.trim(),
       amount: amountVal,
       userId: subscriptionUser,
@@ -1454,7 +1485,7 @@ function App() {
       totalInstallments: subscriptionPaymentType === 'debt' ? totalInstallments : null,
       paidInstallments: subscriptionPaymentType === 'debt' ? paidInstallments : null,
       dueDay: Math.min(Math.max(parseInt(subscriptionDueDay, 10) || 15, 1), 28),
-      status: 1
+      status: editingSubscription?.status ?? 1
     }
 
     const savedToSupabase = await saveRecurringPaymentToSupabase(payment)
@@ -1466,6 +1497,7 @@ function App() {
         setSubscriptionTotalInstallments('')
         setSubscriptionPaidInstallments('')
         setSubscriptionDueDay('15')
+        setEditingSubscription(null)
         setSuccessMessage('Yerelde kaydedildi. Supabase RLS nedeniyle DB kaydi atlanmis olabilir.')
         setShowSuccessModal(true)
         return
@@ -1483,7 +1515,8 @@ function App() {
     setSubscriptionTotalInstallments('')
     setSubscriptionPaidInstallments('')
     setSubscriptionDueDay('15')
-    setSuccessMessage('Tekrarlayan ödeme kaydedildi. Günü gelince harcamalara otomatik eklenecek.')
+    setEditingSubscription(null)
+    setSuccessMessage(isEditingSubscription ? 'Kart ve ödeme bilgileri güncellendi.' : 'Tekrarlayan ödeme kaydedildi. Günü gelince harcamalara otomatik eklenecek.')
     setShowSuccessModal(true)
   }
 
@@ -1535,7 +1568,42 @@ function App() {
     })
   }, [editingTransaction, showIncomeModal])
 
+  const getInstallmentPlanTransactions = (transaction) => {
+    const groupMatch = transaction.description?.match(/\[taksit:([^\]]+)\]/)
+    if (groupMatch) {
+      return activeTransactions.filter(item => item.description?.includes(`[taksit:${groupMatch[1]}]`))
+    }
+
+    const installmentMatch = transaction.description?.match(/\((\d+)\/(\d+)\)\s*$/)
+    if (!installmentMatch) return [transaction]
+
+    const normalizedDescription = getDisplayDescription(transaction.description).replace(/\s*\(\d+\/\d+\)\s*$/, '').trim()
+    const totalInstallments = installmentMatch[2]
+    return activeTransactions.filter(item => (
+      item.type === 'taksitli' &&
+      item.accountId === transaction.accountId &&
+      item.amount === transaction.amount &&
+      item.description?.match(new RegExp(`\\(\\d+\\/${totalInstallments}\\)\\s*$`)) &&
+      getDisplayDescription(item.description).replace(/\s*\(\d+\/\d+\)\s*$/, '').trim() === normalizedDescription
+    ))
+  }
+
+  const dismissTransactionDelete = () => {
+    setShowDeleteConfirmModal(false)
+    setTransactionToDelete(null)
+    setInstallmentDeleteChoice(null)
+  }
+
   const handleDeleteTransaction = (id) => {
+    const transaction = activeTransactions.find(item => item.id === id)
+    if (transaction?.type === 'taksitli') {
+      const relatedTransactions = getInstallmentPlanTransactions(transaction)
+      if (relatedTransactions.length > 1) {
+        setInstallmentDeleteChoice({ transactionId: id, relatedIds: relatedTransactions.map(item => item.id) })
+        return
+      }
+    }
+
     setTransactionToDelete(id)
     setShowDeleteConfirmModal(true)
   }
@@ -1550,20 +1618,32 @@ function App() {
     }
   }
 
-  const confirmDeleteTransaction = async () => {
-    if (transactionToDelete) {
-      const deleted = await softDeleteTransactionFromSupabase(transactionToDelete)
-      if (!deleted.ok) {
-        alert(`İşlem silinemedi: ${deleted.message || 'Bilinmeyen hata'}`)
-        return
-      }
-      setData(prev => ({
-        ...prev,
-        transactions: prev.transactions.map(t => t.id === transactionToDelete ? { ...t, status: 0 } : t)
-      }))
-      setTransactionToDelete(null)
-      setShowDeleteConfirmModal(false)
+  const deleteTransactions = async (transactionIds) => {
+    const results = await Promise.all(transactionIds.map(softDeleteTransactionFromSupabase))
+    const failedDelete = results.find(result => !result.ok)
+    if (failedDelete) {
+      alert(`İşlem silinemedi: ${failedDelete.message || 'Bilinmeyen hata'}`)
+      return
     }
+
+    const idsToDelete = new Set(transactionIds)
+    setData(prev => ({
+      ...prev,
+      transactions: prev.transactions.map(transaction => idsToDelete.has(transaction.id) ? { ...transaction, status: 0 } : transaction)
+    }))
+    dismissTransactionDelete()
+  }
+
+  const confirmDeleteTransaction = async () => {
+    if (transactionToDelete) await deleteTransactions([transactionToDelete])
+  }
+
+  const confirmInstallmentDeleteChoice = async (deleteWholePlan) => {
+    if (!installmentDeleteChoice) return
+    const transactionIds = deleteWholePlan
+      ? installmentDeleteChoice.relatedIds
+      : [installmentDeleteChoice.transactionId]
+    await deleteTransactions(transactionIds)
   }
 
   const handleDeleteTransaction_Manual = (id) => {
@@ -1731,20 +1811,41 @@ function App() {
       ? enteredAmountVal * installmentCount
       : enteredAmountVal
     const amountVal = isInstallment ? totalAmountVal : enteredAmountVal
+    const createInstallmentTransactions = () => {
+      const transactionsToAdd = []
+      const [year, month, day] = date.split('-').map(Number)
+      const baseId = Date.now().toString()
+
+      for (let index = 0; index < installmentCount; index++) {
+        const installmentDate = new Date(Date.UTC(year, month - 1 + index, day))
+        transactionsToAdd.push({
+          id: `${baseId}-${index}`,
+          accountId: newAccount,
+          amount: installmentAmountVal,
+          date: installmentDate.toISOString().slice(0, 10),
+          description: `${withCategoryMarker(description, transactionCategory)} [taksit:${baseId}] (${index + 1}/${installmentCount})`,
+          type: 'taksitli',
+          category: transactionCategory || inferTransactionCategory(description),
+          status: 1
+        })
+      }
+
+      return transactionsToAdd
+    }
 
     if (editingTransaction) {
-      // Update existing
       setData(prev => ({
         ...prev,
-        transactions: prev.transactions.map(t => t.id === editingTransaction.id ? {
-          ...t,
-          amount: amountVal,
-          date: date,
-          description: withCategoryMarker(description, transactionCategory),
-          accountId: newAccount,
-          category: transactionCategory || inferTransactionCategory(description),
-          // keep type
-        } : t)
+        transactions: shouldCreateInstallments
+          ? prev.transactions.flatMap(transaction => transaction.id === editingTransaction.id ? createInstallmentTransactions() : transaction)
+          : prev.transactions.map(transaction => transaction.id === editingTransaction.id ? {
+              ...transaction,
+              amount: amountVal,
+              date,
+              description: withCategoryMarker(description, transactionCategory),
+              accountId: newAccount,
+              category: transactionCategory || inferTransactionCategory(description)
+            } : transaction)
       }))
       setEditingTransaction(null)
     } else {
@@ -1761,25 +1862,7 @@ function App() {
       }
 
       if (shouldCreateInstallments) {
-        const transactionsToAdd = []
-        const [y, m, d] = date.split('-').map(Number)
-
-        for (let i = 0; i < installmentCount; i++) {
-          // Safe manual formatting to avoid timezone offset issues (since we just want the date literal):
-          const safeDate = new Date(Date.UTC(y, m - 1 + i, d))
-          const dateStr = safeDate.toISOString().slice(0, 10)
-
-          transactionsToAdd.push({
-            id: Date.now().toString() + '-' + i,
-            accountId: newAccount,
-            amount: installmentAmountVal,
-            date: dateStr,
-            description: `${withCategoryMarker(description, transactionCategory)} (${i + 1}/${installmentCount})`,
-            type: 'taksitli',
-            category: transactionCategory || inferTransactionCategory(description),
-            status: 1
-          })
-        }
+        const transactionsToAdd = createInstallmentTransactions()
 
         setData(prevData => ({
           ...prevData,
@@ -1806,9 +1889,9 @@ function App() {
     setShowAddModal(false)
 
     // Show success notification
-    if (editingTransaction) {
+    if (editingTransaction && !shouldCreateInstallments) {
       setSuccessMessage('İşlem başarıyla güncellendi.')
-    } else if (isInstallment) {
+    } else if (shouldCreateInstallments) {
       setSuccessMessage(`${installmentCount} taksitli işlem başarıyla kaydedildi.`)
     } else {
       setSuccessMessage('İşlem başarıyla kaydedildi.')
@@ -3380,6 +3463,24 @@ function App() {
           </div>
         )}
 
+        {installmentDeleteChoice && (
+          <div className="absolute inset-0 z-[120] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={dismissTransactionDelete}></div>
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[380px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+              <div className="text-center mb-7">
+                <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4"><AlertTriangle size={40} className="text-amber-500" /></div>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Diğer taksitler de silinsin mi?</h3>
+                <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">Bu planın diğer {installmentDeleteChoice.relatedIds.length - 1} taksiti de silinebilir.</p>
+              </div>
+              <div className="space-y-3">
+                <button onClick={() => confirmInstallmentDeleteChoice(true)} className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95">Evet, tüm taksitleri sil</button>
+                <button onClick={() => confirmInstallmentDeleteChoice(false)} className="w-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 py-4 rounded-2xl font-bold transition-all hover:bg-amber-100 dark:hover:bg-amber-900/30">Hayır, sadece bunu sil</button>
+                <button onClick={dismissTransactionDelete} className="w-full bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-3 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700">{t.cancel}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showDeleteConfirmModal && !showIncomeModal && (
           <div className="absolute inset-0 z-[110] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={() => setShowDeleteConfirmModal(false)}></div>
@@ -3842,15 +3943,15 @@ function App() {
 
       {showSubscriptionModal && (
         <div className="absolute inset-0 z-[70] flex items-end sm:items-center justify-center pointer-events-none">
-          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowSubscriptionModal(false)}></div>
+          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={closeSubscriptionModal}></div>
           <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] max-h-[90vh] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
             <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{t.recurringPayments}</h3>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{editingSubscription ? 'Ödemeyi Düzenle' : t.recurringPayments}</h3>
                 <p className="text-sm text-gray-500 font-medium">{language === 'en' ? 'Automatically write subscriptions, loans, and fixed expenses' : 'Abonelik, kredi ve sabit giderleri otomatik yaz'}</p>
               </div>
-              <button onClick={() => setShowSubscriptionModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
+              <button onClick={closeSubscriptionModal} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
             </div>
 
             <div className="overflow-y-auto custom-scrollbar pr-1">
@@ -3906,8 +4007,8 @@ function App() {
                 </div>
 
                 <button type="submit" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-4 rounded-2xl font-bold shadow-xl shadow-gray-200 dark:shadow-slate-800 active:scale-[0.98] transition-all hover:bg-black dark:hover:bg-gray-200 flex items-center justify-center gap-2">
-                  <Plus size={18} />
-                  <span>{t.addPayment}</span>
+                  {editingSubscription ? <Edit2 size={18} /> : <Plus size={18} />}
+                  <span>{editingSubscription ? 'Değişikliği Kaydet' : t.addPayment}</span>
                 </button>
               </form>
 
@@ -3929,6 +4030,9 @@ function App() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">{money(item.amount)}</span>
+                        <button type="button" onClick={() => handleEditSubscription(item)} className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 flex items-center justify-center hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors" title="Kartı veya ödeme bilgilerini düzenle">
+                          <Edit2 size={16} />
+                        </button>
                         <button type="button" onClick={() => handleDeleteSubscription(item.id)} className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
                           <Trash2 size={16} />
                         </button>
@@ -4910,6 +5014,24 @@ function App() {
               >
                 Sıfırla
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {installmentDeleteChoice && (
+        <div className="absolute inset-0 z-[90] flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-md transition-all" onClick={dismissTransactionDelete}></div>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-[380px] rounded-[40px] p-8 relative z-10 animate-scale-up shadow-2xl border border-white/50 dark:border-slate-800/50">
+            <div className="text-center mb-7">
+              <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4"><AlertTriangle size={40} className="text-amber-500" /></div>
+              <h3 className="text-2xl font-black text-gray-800 dark:text-white mb-3">Diğer taksitler de silinsin mi?</h3>
+              <p className="text-base text-gray-600 dark:text-gray-400 leading-relaxed">Bu planın diğer {installmentDeleteChoice.relatedIds.length - 1} taksiti de silinebilir.</p>
+            </div>
+            <div className="space-y-3">
+              <button onClick={() => confirmInstallmentDeleteChoice(true)} className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-95">Evet, tüm taksitleri sil</button>
+              <button onClick={() => confirmInstallmentDeleteChoice(false)} className="w-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 py-4 rounded-2xl font-bold transition-all hover:bg-amber-100 dark:hover:bg-amber-900/30">Hayır, sadece bunu sil</button>
+              <button onClick={dismissTransactionDelete} className="w-full bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 py-3 rounded-2xl font-bold transition-all hover:bg-gray-200 dark:hover:bg-slate-700">{t.cancel}</button>
             </div>
           </div>
         </div>
