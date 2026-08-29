@@ -206,6 +206,7 @@ function App() {
   const [incomeAmount, setIncomeAmount] = useState('')
   const [incomeDescription, setIncomeDescription] = useState('')
   const [incomeDate, setIncomeDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [incomeFrequency, setIncomeFrequency] = useState('monthly')
   const [incomeUser, setIncomeUser] = useState(activeUsers[0]?.id || '')
   const [incomeAccount, setIncomeAccount] = useState(activeAccounts[0]?.id || '')
   const incomeModalScrollRef = useRef(null)
@@ -869,7 +870,7 @@ function App() {
   }
 
   const getDisplayDescription = (value) => {
-    return (value || '').replace(/\s*\[(abonelik|tekrar|kategori|taksit):[^\]]+\]/g, '').trim()
+    return (value || '').replace(/\s*\[(abonelik|tekrar|kategori|taksit|gelir):[^\]]+\]/g, '').trim()
   }
 
   const expenseCategories = [
@@ -1176,6 +1177,13 @@ function App() {
     return `${transaction.accountId || 'no-account'}::${descriptionKey}`
   }
 
+  const isOneTimeIncome = (transaction) => isIncomeTransaction(transaction) && transaction?.description?.includes('[gelir:tek-seferlik]')
+
+  const withIncomeFrequencyMarker = (description, frequency) => {
+    const cleanDescription = getDisplayDescription(description)
+    return frequency === 'one-time' ? `${cleanDescription} [gelir:tek-seferlik]` : cleanDescription
+  }
+
   const getMonthEndKey = (monthKey) => {
     const [year, month] = monthKey.split('-').map(Number)
     return formatDateKey(new Date(year, month, 0))
@@ -1187,6 +1195,7 @@ function App() {
     const incomeLogs = activeTransactions
       .filter(transaction => transaction.status === 1)
       .filter(isIncomeTransaction)
+      .filter(transaction => !isOneTimeIncome(transaction))
       .filter(transaction => accountIds.includes(transaction.accountId))
       .sort((a, b) => {
         const dateCompare = a.date.localeCompare(b.date)
@@ -1321,7 +1330,7 @@ function App() {
 
     const realTransactions = activeTransactions
       .filter(t => t.status === 1)
-      .filter(isExpenseTransaction)
+      .filter(transaction => isExpenseTransaction(transaction) || isOneTimeIncome(transaction))
       .filter(t => accountIds.includes(t.accountId))
       .filter(t => isDateBetween(t.date, startDate, endDate))
       .map(t => ({
@@ -1532,6 +1541,7 @@ function App() {
       setIncomeAmount(t.amount.toString())
       setIncomeDescription(getDisplayDescription(t.description))
       setIncomeDate(t.date || formatDateKey(getIstanbulToday()))
+      setIncomeFrequency(isOneTimeIncome(t) ? 'one-time' : 'monthly')
       setIncomeAccount(t.accountId)
       if (acc) setIncomeUser(acc.userId)
       setShowIncomeModal(true)
@@ -1612,6 +1622,7 @@ function App() {
     setShowIncomeModal(false)
     setEditingTransaction(null)
     setIncomeDate(formatDateKey(getIstanbulToday()))
+    setIncomeFrequency('monthly')
     if (showDeleteConfirmModal) {
       setShowDeleteConfirmModal(false)
       setTransactionToDelete(null)
@@ -1670,6 +1681,12 @@ function App() {
         source: 'monthly-income'
       }))
 
+    const oneTimeIncomeTransactions = activeTransactions
+      .filter(isOneTimeIncome)
+      .filter(transaction => transaction.status === 1)
+      .filter(transaction => transaction.date?.startsWith(extractMonth))
+      .filter(transaction => extractFilterUser === null || activeAccounts.find(account => account.id === transaction.accountId)?.userId === extractFilterUser)
+
     const monthExpenseTransactions = activeTransactions
       .filter(t => {
         const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
@@ -1678,7 +1695,7 @@ function App() {
         return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
       })
 
-    return [...monthExpenseTransactions, ...monthIncomeTransactions]
+    return [...monthExpenseTransactions, ...monthIncomeTransactions, ...oneTimeIncomeTransactions]
       .sort((a, b) => new Date(b.date) - new Date(a.date));
   }
 
@@ -1932,7 +1949,7 @@ function App() {
         accountId: incomeAccount,
         amount: amountVal,
         date: incomeDate,
-        description: incomeDescription.trim(),
+        description: withIncomeFrequencyMarker(incomeDescription, incomeFrequency),
         type: 'gelir',
         status: editingTransaction.status ?? 1
       }
@@ -1951,7 +1968,7 @@ function App() {
         accountId: incomeAccount,
         amount: amountVal,
         date: incomeDate,
-        description: incomeDescription.trim(),
+        description: withIncomeFrequencyMarker(incomeDescription, incomeFrequency),
         type: 'gelir',
         status: 1
       }
@@ -1971,6 +1988,7 @@ function App() {
     setIncomeAmount('')
     setIncomeDescription('')
     setIncomeDate(formatDateKey(getIstanbulToday()))
+    setIncomeFrequency('monthly')
     setEditingTransaction(null)
     setShowIncomeModal(false)
     setSuccessMessage(editingTransaction ? 'Gelir basariyla guncellendi.' : 'Gelir basariyla kaydedildi.')
@@ -2021,6 +2039,18 @@ function App() {
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">{language === 'en' ? 'Income type' : 'Gelir türü'}</label>
+              <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl grid grid-cols-2 gap-1 border border-gray-100 dark:border-slate-700">
+                <button type="button" onClick={() => setIncomeFrequency('monthly')} className={`py-3 px-2 rounded-xl text-xs font-black transition-all ${incomeFrequency === 'monthly' ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm' : 'text-gray-400'}`}>
+                  {language === 'en' ? 'Monthly regular' : 'Aylık düzenli'}
+                </button>
+                <button type="button" onClick={() => setIncomeFrequency('one-time')} className={`py-3 px-2 rounded-xl text-xs font-black transition-all ${incomeFrequency === 'one-time' ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm' : 'text-gray-400'}`}>
+                  {language === 'en' ? 'This month only' : 'Sadece bu ay'}
+                </button>
+              </div>
+            </div>
+
             <div className="bg-gray-100/50 dark:bg-slate-800 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-gray-100 dark:border-slate-700 transition-colors">
               {authorizedUsers.map(u => (
                 <button key={u.id} type="button" onClick={() => handleIncomeUserChange(u.id)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${incomeUser === u.id ? 'bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}>{u.name}</button>
@@ -2056,7 +2086,7 @@ function App() {
                     <div className="min-w-0">
                       <p className="font-black text-gray-800 dark:text-white truncate">{getDisplayDescription(item.description) || t.income}</p>
                       <p className="text-[11px] font-bold text-gray-400">
-                        {user?.name || t.general} - {account?.name || t.noAccount} - {language === 'en' ? 'Monthly income' : 'Aylık gelir'}
+                        {user?.name || t.general} - {account?.name || t.noAccount} - {isOneTimeIncome(item) ? (language === 'en' ? 'One-time income' : 'Tek seferlik gelir') : (language === 'en' ? 'Monthly income' : 'Aylık gelir')}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
