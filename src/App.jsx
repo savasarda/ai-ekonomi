@@ -68,6 +68,8 @@ function App() {
   };
   const [currentView, setCurrentView] = useState('welcome')
   const [data, setData] = useState({ users: [], accounts: [], transactions: [] })
+  const [personOrder, setPersonOrder] = useState([])
+  const [isPersonOrderMode, setIsPersonOrderMode] = useState(false)
 
   // Migration State
   const [showMigrationModal, setShowMigrationModal] = useState(false)
@@ -204,9 +206,12 @@ function App() {
   const [incomeDate, setIncomeDate] = useState(() => new Date().toISOString().split('T')[0])
   const [incomeUser, setIncomeUser] = useState(activeUsers[0]?.id || '')
   const [incomeAccount, setIncomeAccount] = useState(activeAccounts[0]?.id || '')
+  const incomeModalScrollRef = useRef(null)
+  const incomeAmountInputRef = useRef(null)
   const [cashFlowUser, setCashFlowUser] = useState('all')
   const [cashFlowStartDate, setCashFlowStartDate] = useState('')
   const [cashFlowEndDate, setCashFlowEndDate] = useState('')
+  const [cashFlowMode, setCashFlowMode] = useState('days')
   const [showCashFlowCustomDates, setShowCashFlowCustomDates] = useState(false)
 
   // Reset Password Modal
@@ -330,6 +335,67 @@ function App() {
       window.location.hostname === '127.0.0.1' ||
       window.location.hostname.startsWith('192.168.') ||
       window.location.hostname.endsWith('.local'))
+
+  const personOrderStorageKey = `dashboard-person-order:${user?.id || profile?.id || 'local'}`
+  const orderedDashboardUsers = [...activeUsers].sort((firstUser, secondUser) => {
+    const firstPosition = personOrder.indexOf(firstUser.id)
+    const secondPosition = personOrder.indexOf(secondUser.id)
+    const normalizedFirstPosition = firstPosition === -1 ? activeUsers.length : firstPosition
+    const normalizedSecondPosition = secondPosition === -1 ? activeUsers.length : secondPosition
+    return normalizedFirstPosition - normalizedSecondPosition
+  })
+
+  useEffect(() => {
+    if (!user?.id) {
+      setPersonOrder([])
+      return
+    }
+
+    const savedOrder = JSON.parse(localStorage.getItem(personOrderStorageKey) || '[]')
+    setPersonOrder(Array.isArray(savedOrder) ? savedOrder : [])
+    if (isLocalRuntime || !isSupabaseConfigured) return
+
+    let isActive = true
+    supabase
+      .from('user_dashboard_preferences')
+      .select('person_order')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data: preferences, error }) => {
+        if (!isActive || error || !Array.isArray(preferences?.person_order)) return
+        setPersonOrder(preferences.person_order)
+        localStorage.setItem(personOrderStorageKey, JSON.stringify(preferences.person_order))
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [isLocalRuntime, isSupabaseConfigured, personOrderStorageKey, user?.id])
+
+  const savePersonOrder = async (nextOrder) => {
+    setPersonOrder(nextOrder)
+    localStorage.setItem(personOrderStorageKey, JSON.stringify(nextOrder))
+
+    if (isLocalRuntime || !isSupabaseConfigured || !user?.id) return
+
+    const { error } = await supabase
+      .from('user_dashboard_preferences')
+      .upsert({ user_id: user.id, person_order: nextOrder, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+
+    if (error) console.error('Kişi sırası kaydedilemedi:', error)
+  }
+
+  const moveDashboardUser = (userId, direction) => {
+    const nextOrder = orderedDashboardUsers.map(item => item.id)
+    const currentIndex = nextOrder.indexOf(userId)
+    const nextIndex = currentIndex + direction
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= nextOrder.length) return
+
+    const displacedUserId = nextOrder[nextIndex]
+    nextOrder[nextIndex] = nextOrder[currentIndex]
+    nextOrder[currentIndex] = displacedUserId
+    savePersonOrder(nextOrder)
+  }
 
   // Swipe and Pull Logic
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -1289,6 +1355,16 @@ function App() {
     return getCashFlowForRange(startDate, endDate, userId)
   }
 
+  const setCashFlowMonth = (monthKey) => {
+    const [year, month] = monthKey.split('-').map(Number)
+    const start = new Date(year, month - 1, 1)
+    const end = new Date(year, month, 0)
+    setCashFlowStartDate(formatDateKey(start))
+    setCashFlowEndDate(formatDateKey(end))
+    setCashFlowMode('month')
+    setShowCashFlowCustomDates(false)
+  }
+
   const getUpcomingPayments = (days = 5) => {
     const today = getIstanbulToday()
     const endDate = addDays(today, days)
@@ -1449,6 +1525,15 @@ function App() {
     setTransactionStep(1)
     setShowAddModal(true)
   }
+
+  useEffect(() => {
+    if (!showIncomeModal || !editingTransaction || !isIncomeTransaction(editingTransaction)) return
+
+    requestAnimationFrame(() => {
+      incomeModalScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      incomeAmountInputRef.current?.focus()
+    })
+  }, [editingTransaction, showIncomeModal])
 
   const handleDeleteTransaction = (id) => {
     setTransactionToDelete(id)
@@ -1831,11 +1916,11 @@ function App() {
             <button onClick={closeIncomeModal} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">x</button>
           </div>
 
-          <div className="overflow-y-auto overflow-x-hidden custom-scrollbar pr-1 min-w-0">
+          <div ref={incomeModalScrollRef} className="overflow-y-auto overflow-x-hidden custom-scrollbar pr-1 min-w-0">
           <form onSubmit={handleAddIncome} className="space-y-4 mb-6">
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide pl-2">{t.incomeAmount}</label>
-              <input type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder="0" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} autoFocus />
+              <input ref={incomeAmountInputRef} type="number" inputMode="decimal" step="0.01" className="w-full p-4 bg-gray-50/50 dark:bg-slate-800 text-gray-800 dark:text-white font-bold rounded-2xl border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all" placeholder="0" value={incomeAmount} onChange={e => setIncomeAmount(e.target.value)} autoFocus />
             </div>
 
             <div>
@@ -2553,7 +2638,7 @@ function App() {
               ))}
             </div>
 
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {[7, 30, 90].map(days => (
                 <button
                   key={`cashflow-days-${days}`}
@@ -2562,26 +2647,79 @@ function App() {
                     const start = getIstanbulToday()
                     setCashFlowStartDate(formatDateKey(start))
                     setCashFlowEndDate(formatDateKey(addDays(start, days)))
+                    setCashFlowMode('days')
                     setShowCashFlowCustomDates(false)
                   }}
-                  className={`py-3 rounded-2xl text-xs font-black transition-all ${!showCashFlowCustomDates && cashFlowPeriodDays === days ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'}`}
+                  className={`py-3 rounded-2xl text-xs font-black transition-all ${cashFlowMode === 'days' && cashFlowPeriodDays === days ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'}`}
                 >
                   {days} {t.days}
                 </button>
               ))}
               <button
                 type="button"
-                onClick={() => setShowCashFlowCustomDates(prev => !prev)}
-                className={`py-3 rounded-2xl text-xs font-black transition-all ${showCashFlowCustomDates ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-300'}`}
+                onClick={() => setCashFlowMonth((cashFlowStartDate || formatDateKey(getIstanbulToday())).slice(0, 7))}
+                className={`py-3 rounded-2xl text-xs font-black transition-all ${cashFlowMode === 'month' ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none' : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'}`}
+              >
+                {t.month}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCashFlowCustomDates(prev => !prev)
+                  setCashFlowMode('custom')
+                }}
+                className={`py-3 rounded-2xl text-xs font-black transition-all ${cashFlowMode === 'custom' && showCashFlowCustomDates ? 'bg-green-600 text-white shadow-lg shadow-green-200 dark:shadow-none' : 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-300'}`}
               >
                 {t.custom}
               </button>
             </div>
 
+            {cashFlowMode === 'month' && (
+              <div className="flex items-center justify-between gap-3 rounded-2xl bg-green-50 dark:bg-green-900/20 p-2 border border-green-100 dark:border-green-900/30">
+                <button
+                  type="button"
+                  aria-label={language === 'en' ? 'Previous month' : 'Önceki ay'}
+                  onClick={() => {
+                    const date = parseDateKey(cashFlowStartDate || formatDateKey(getIstanbulToday()))
+                    date.setMonth(date.getMonth() - 1)
+                    setCashFlowMonth(formatDateKey(date).slice(0, 7))
+                  }}
+                  className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 text-green-700 dark:text-green-300 flex items-center justify-center shadow-sm active:scale-95 transition-transform"
+                >
+                  <ArrowLeft size={18} strokeWidth={3} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCashFlowMonth(formatDateKey(getIstanbulToday()).slice(0, 7))}
+                  className="text-sm font-black text-green-800 dark:text-green-200 capitalize"
+                >
+                  {dateLabel(cashFlowSelectedRange.startDate, { month: 'long', year: 'numeric' })}
+                </button>
+                <button
+                  type="button"
+                  aria-label={language === 'en' ? 'Next month' : 'Sonraki ay'}
+                  onClick={() => {
+                    const date = parseDateKey(cashFlowStartDate || formatDateKey(getIstanbulToday()))
+                    date.setMonth(date.getMonth() + 1)
+                    setCashFlowMonth(formatDateKey(date).slice(0, 7))
+                  }}
+                  className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 text-green-700 dark:text-green-300 flex items-center justify-center shadow-sm active:scale-95 transition-transform"
+                >
+                  <ArrowRight size={18} strokeWidth={3} />
+                </button>
+              </div>
+            )}
+
             {showCashFlowCustomDates && (
               <div className="grid grid-cols-2 gap-2 sm:gap-3 overflow-hidden">
-                {renderCashFlowDatePicker(t.start, cashFlowStartDate, setCashFlowStartDate)}
-                {renderCashFlowDatePicker(t.end, cashFlowEndDate, setCashFlowEndDate)}
+                {renderCashFlowDatePicker(t.start, cashFlowStartDate, value => {
+                  setCashFlowStartDate(value)
+                  setCashFlowMode('custom')
+                })}
+                {renderCashFlowDatePicker(t.end, cashFlowEndDate, value => {
+                  setCashFlowEndDate(value)
+                  setCashFlowMode('custom')
+                })}
               </div>
             )}
           </section>
@@ -3344,7 +3482,14 @@ function App() {
                   onClick={(event) => {
                     event.preventDefault()
                     event.stopPropagation()
-                    setIsMenuOpen((open) => !open)
+                    setIsMenuOpen((open) => {
+                      if (!open) {
+                        requestAnimationFrame(() => {
+                          scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+                        })
+                      }
+                      return !open
+                    })
                   }}
                   className={`w-10 h-10 shrink-0 shadow-sm rounded-xl flex items-center justify-center border transition-all active:scale-95 ${isMenuOpen ? 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-200' : 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400'}`}
                   title={t.menu}
@@ -3529,9 +3674,18 @@ function App() {
 
 
           <div className="mx-6 mb-4">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">{t.budgetManagement}</h3>
+            <div className="flex items-center justify-between mb-2 px-1">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t.budgetManagement}</h3>
+              <button
+                type="button"
+                onClick={() => setIsPersonOrderMode(active => !active)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${isPersonOrderMode ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white dark:bg-slate-800 text-gray-400 border border-gray-100 dark:border-slate-700'}`}
+              >
+                {isPersonOrderMode ? t.done : t.edit}
+              </button>
+            </div>
             <div className="space-y-3 mb-4">
-              {activeUsers.map(user => {
+              {orderedDashboardUsers.map((user, userIndex) => {
                 const userAccountIds = activeAccounts.filter(acc => acc.userId === user.id).map(acc => acc.id)
                 const userSpending = activeTransactions
                   .filter(t => t.date.startsWith(currentMonth) && userAccountIds.includes(t.accountId))
@@ -3548,16 +3702,41 @@ function App() {
                   <div
                     key={user.id}
                     onClick={() => {
+                      if (isPersonOrderMode) return
                       setSelectedMonthDetail({ monthKey: currentMonth, selectedUserId: user.id })
                       setCurrentView('budgetDetail')
                     }}
-                    className="bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300 cursor-pointer"
+                    className={`bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group transition-transform duration-300 ${isPersonOrderMode ? 'ring-2 ring-indigo-400/60' : 'hover:scale-[1.02] cursor-pointer'}`}
                   >
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-indigo-200 ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
-                        {user.symbol || user.name.charAt(0)}
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-10 h-10 shrink-0 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-indigo-200 ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
+                          {user.symbol || user.name.charAt(0)}
+                        </div>
+                        <span className="font-bold text-gray-800 dark:text-white text-lg transition-colors truncate">{user.name}</span>
                       </div>
-                      <span className="font-bold text-gray-800 dark:text-white text-lg transition-colors">{user.name}</span>
+                      {isPersonOrderMode && (
+                        <div className="flex items-center gap-1 shrink-0" onClick={event => event.stopPropagation()}>
+                          <button
+                            type="button"
+                            aria-label={`${user.name} yukarı taşı`}
+                            disabled={userIndex === 0}
+                            onClick={() => moveDashboardUser(user.id, -1)}
+                            className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 disabled:opacity-30 flex items-center justify-center active:scale-95"
+                          >
+                            <ChevronUp size={18} strokeWidth={3} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`${user.name} aşağı taşı`}
+                            disabled={userIndex === orderedDashboardUsers.length - 1}
+                            onClick={() => moveDashboardUser(user.id, 1)}
+                            className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 disabled:opacity-30 flex items-center justify-center active:scale-95"
+                          >
+                            <ChevronDown size={18} strokeWidth={3} />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex justify-between items-end mb-4">
