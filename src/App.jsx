@@ -1546,8 +1546,9 @@ function App() {
       setEditingTransaction(t)
       setIncomeAmount(t.amount.toString())
       setIncomeDescription(getDisplayDescription(t.description))
-      setIncomeDate(t.date || formatDateKey(getIstanbulToday()))
-      setIncomeFrequency(isOneTimeIncome(t) ? 'one-time' : 'monthly')
+      const isOneTime = isOneTimeIncome(t)
+      setIncomeDate(isOneTime ? (t.date || formatDateKey(getIstanbulToday())) : formatDateKey(getIstanbulToday()))
+      setIncomeFrequency(isOneTime ? 'one-time' : 'monthly')
       setIncomeAccount(t.accountId)
       if (acc) setIncomeUser(acc.userId)
       setShowIncomeModal(true)
@@ -1949,7 +1950,9 @@ function App() {
       return
     }
 
-    if (editingTransaction && isIncomeTransaction(editingTransaction)) {
+    const shouldCreateNewIncomePeriod = Boolean(editingTransaction && isIncomeTransaction(editingTransaction) && incomeFrequency === 'monthly')
+
+    if (editingTransaction && isIncomeTransaction(editingTransaction) && !shouldCreateNewIncomePeriod) {
       const updatedIncome = {
         ...editingTransaction,
         accountId: incomeAccount,
@@ -1997,7 +2000,7 @@ function App() {
     setIncomeFrequency('monthly')
     setEditingTransaction(null)
     setShowIncomeModal(false)
-    setSuccessMessage(editingTransaction ? 'Gelir basariyla guncellendi.' : 'Gelir basariyla kaydedildi.')
+    setSuccessMessage(shouldCreateNewIncomePeriod ? 'Yeni maaş dönemi seçilen tarihten itibaren uygulandı.' : editingTransaction ? 'Gelir basariyla guncellendi.' : 'Gelir basariyla kaydedildi.')
     setShowSuccessModal(true)
   }
 
@@ -2074,8 +2077,8 @@ function App() {
             </div>
 
             <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold shadow-xl shadow-green-200 dark:shadow-green-900/30 active:scale-[0.98] transition-all hover:bg-green-700 flex items-center justify-center gap-2">
-              <Plus size={18} />
-              <span>{editingTransaction && isIncomeTransaction(editingTransaction) ? t.incomeUpdate : t.incomeSave}</span>
+              {editingTransaction && incomeFrequency === 'monthly' ? <Calendar size={18} /> : <Plus size={18} />}
+              <span>{editingTransaction && incomeFrequency === 'monthly' ? (language === 'en' ? 'Apply from this date' : 'Bu tarihten itibaren uygula') : editingTransaction && isIncomeTransaction(editingTransaction) ? t.incomeUpdate : t.incomeSave}</span>
             </button>
           </form>
 
