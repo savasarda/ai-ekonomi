@@ -1111,8 +1111,12 @@ function App() {
 
   const getMonthlyBreakdown = () => {
     const groups = {}
+    const activeAccountIds = new Set(activeAccounts.map(account => account.id))
     activeTransactions.forEach(t => {
-      if (t.status === 1 && isExpenseTransaction(t)) {
+      // Keep period totals in the same account scope as Cash Flow. Transactions
+      // belonging to a deactivated card remain in history, but must not inflate
+      // the current period's spending total.
+      if (t.status === 1 && activeAccountIds.has(t.accountId) && isExpenseTransaction(t)) {
         const monthKey = t.date.slice(0, 7)
         if (!groups[monthKey]) groups[monthKey] = 0
         groups[monthKey] += t.amount
