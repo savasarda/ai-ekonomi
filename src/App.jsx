@@ -1777,10 +1777,16 @@ function App() {
   }
 
   const monthlyReport = getMonthlyReport()
-  const oneOffExpenses = monthlyReport.transactions.filter(item =>
+  const purchaseExpenses = monthlyReport.transactions.filter(item =>
     isExpenseTransaction(item) && !getRecurringTransactionLabel(item.type) &&
-    item.type !== 'taksitli' && !/\[(?:tekrar|taksit):|\(\d+\/\d+\)\s*$/.test(item.description || '')
+    !/\[(?:tekrar|abonelik):/.test(item.description || '')
   ).sort((a, b) => b.amount - a.amount)
+  const installmentSuffix = /\s*\((\d+)\/(\d+)\)\s*$/
+  const isInstallmentPurchase = item => item.type === 'taksitli' ||
+    item.description?.includes('[taksit:') || installmentSuffix.test(item.description || '')
+  const oneOffExpenses = purchaseExpenses.filter(item => !isInstallmentPurchase(item))
+  const monthInstallments = purchaseExpenses.filter(isInstallmentPurchase)
+  const installmentTotal = monthInstallments.reduce((sum, item) => sum + item.amount, 0)
   const oneOffTotal = oneOffExpenses.reduce((sum, item) => sum + item.amount, 0)
   const extractMonthOptions = getExtractMonthOptions()
 
@@ -1873,7 +1879,8 @@ function App() {
       const baseId = Date.now().toString()
 
       for (let index = 0; index < installmentCount; index++) {
-        const installmentDate = new Date(Date.UTC(year, month - 1 + index, day))
+        const installmentDate = new Date(Date.UTC(year, month + index, 0))
+        installmentDate.setUTCDate(Math.min(day, installmentDate.getUTCDate()))
         transactionsToAdd.push({
           id: `${baseId}-${index}`,
           accountId: newAccount,
@@ -4915,6 +4922,28 @@ function App() {
                       <strong>{money(item.amount)}</strong>
                     </div>
                   ))}
+                </details>
+                <details className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                  <summary className="cursor-pointer font-bold text-gray-800 dark:text-white">
+                    {language === 'en' ? 'Installments this month' : 'Bu ayın taksitleri'}
+                    <span className="float-right text-indigo-600 dark:text-indigo-400">{money(installmentTotal)}</span>
+                  </summary>
+                  {monthInstallments.length === 0 && <p className="mt-3 text-sm text-gray-500">{language === 'en' ? 'No installments this month.' : 'Bu aya ait alışveriş taksiti yok.'}</p>}
+                  {monthInstallments.map(item => {
+                    const description = getDisplayDescription(item.description)
+                    const sequence = description.match(installmentSuffix)
+                    return (
+                      <div key={item.id} className="mt-2 border-t border-gray-100 pt-2 text-sm dark:border-slate-700 dark:text-gray-200">
+                        <div className="flex justify-between gap-3">
+                          <span>{description.replace(installmentSuffix, '') || (language === 'en' ? 'Purchase' : 'Alışveriş')}</span>
+                          <strong>{money(item.amount)}</strong>
+                        </div>
+                        {sequence && <small className="block text-gray-500 dark:text-gray-400">
+                          {sequence[1]}/{sequence[2]} {language === 'en' ? 'installment' : 'taksit'} · {language === 'en' ? 'Purchase total' : 'Alışveriş toplamı'} {money(item.amount * Number(sequence[2]))}
+                        </small>}
+                      </div>
+                    )
+                  })}
                 </details>
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-3 sm:p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-5">
                   <div className="flex items-start justify-between gap-3 mb-5">
