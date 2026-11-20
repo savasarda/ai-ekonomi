@@ -3665,11 +3665,11 @@ function App() {
           }}
         >
 
-          <header className="px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-3 sticky top-0 z-20 bg-[#F2F4F8]/80 dark:bg-slate-900/80 backdrop-blur-md transition-colors duration-300">
+          <header className="px-3 sm:px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-3 sticky top-0 z-20 bg-[#F2F4F8]/80 dark:bg-slate-900/80 backdrop-blur-md transition-colors duration-300">
             {/* Header: Status Indicators & Days Left */}
-            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2">
 
-              <div className="flex items-center gap-2 md:gap-3">
+              <div className="flex min-w-0 items-center gap-1 sm:gap-2 md:gap-3">
                 <button
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => {
@@ -3713,11 +3713,11 @@ function App() {
                     setAmount('')
                     setShowAddModal(true)
                   }}
-                  className="h-9 px-2 md:px-3 shrink-0 bg-indigo-600 shadow-lg shadow-indigo-100 dark:shadow-none rounded-xl flex items-center justify-center gap-1.5 text-white hover:bg-indigo-700 transition-all active:scale-95"
+                  className="min-h-10 min-w-0 px-1.5 sm:px-2 md:px-3 bg-indigo-600 shadow-lg shadow-indigo-100 dark:shadow-none rounded-xl flex items-center justify-center gap-1.5 text-white hover:bg-indigo-700 transition-all active:scale-95"
                   title={t.addExpense}
                 >
-                  <Plus size={16} strokeWidth={3} />
-                  <span className="text-[10px] font-black uppercase tracking-tight">{t.addExpense}</span>
+                  <Plus size={16} strokeWidth={3} className="shrink-0" />
+                  <span className="min-w-0 text-[10px] font-black uppercase leading-tight tracking-tight">{t.addExpense}</span>
                 </button>
               </div>
 
@@ -3727,20 +3727,20 @@ function App() {
                 const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 const daysLeft = lastDay.getDate() - now.getDate();
                 return (
-                  <div className="ml-auto flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-1 sm:gap-2">
                     {upcomingPayments.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setShowUpcomingPaymentsModal(true)}
                         aria-label={`${t.upcomingPayments} (${upcomingPayments.length})`}
-                        className="relative grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                        className="relative grid h-10 w-8 place-items-center sm:w-10 rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
                       >
                         <Bell size={18} />
                         <span aria-hidden="true" className="absolute right-0 top-0 min-w-4 rounded-full bg-amber-700 px-1 text-center text-[10px] font-bold leading-4 text-white">{upcomingPayments.length}</span>
                       </button>
                     )}
                   <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 md:px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm shrink-0">
-                    <span className="text-[10px] font-bold mb-0.5">{t.daysToNewPeriod}</span>
+                    <span className="max-w-[5rem] text-right text-[9px] font-bold leading-tight mb-0.5">{t.daysToNewPeriod}</span>
                     <span className="text-xs font-black leading-none">{daysLeft === 0 ? t.tomorrow : `${daysLeft} ${t.days}`}</span>
                   </div>
                   </div>
