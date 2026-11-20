@@ -223,12 +223,12 @@ function App() {
   const [passwordInput, setPasswordInput] = useState('')
 
   // Menu Reordering State
-  const defaultMenuOrder = ['future', 'cashflow', 'subscriptions', 'users', 'limit', 'extract', 'settings']
+  const defaultMenuOrder = ['future', 'cashflow', 'subscriptions', 'limit', 'extract', 'settings']
   const [menuOrder, setMenuOrder] = useState(() => {
     const saved = localStorage.getItem('menuOrder')
     if (saved) {
       const parsed = JSON.parse(saved)
-      let finalOrder = parsed.filter(item => !['feedback', 'portfolio', 'cards', 'reset', 'family'].includes(item))
+      let finalOrder = parsed.filter(item => !['feedback', 'portfolio', 'cards', 'users', 'reset', 'family'].includes(item))
       if (!finalOrder.includes('cashflow')) finalOrder.splice(Math.min(1, finalOrder.length), 0, 'cashflow')
       if (!finalOrder.includes('subscriptions')) finalOrder.splice(1, 0, 'subscriptions')
       if (!finalOrder.includes('settings')) finalOrder.push('settings')
@@ -2053,9 +2053,9 @@ function App() {
     const pendingIncomeDelete = activeTransactions.find(item => item.id === transactionToDelete && isIncomeTransaction(item))
 
     return (
-      <div className="absolute inset-0 z-[90] flex items-end sm:items-center justify-center pointer-events-none overflow-x-hidden">
+      <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center pointer-events-none overflow-x-hidden">
         <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={closeIncomeModal}></div>
-        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full max-w-full sm:w-[420px] max-h-[90vh] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors overflow-x-hidden">
+        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[90dvh] max-h-[800px] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors overflow-x-hidden">
           <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -3796,7 +3796,6 @@ function App() {
                         case 'cashflow': setCurrentView('cashflow'); break;
                         case 'subscriptions': setShowSubscriptionModal(true); break;
                         case 'cards': setShowCardsModal(true); break;
-                        case 'users': setShowUserModal(true); break;
                         case 'reset': handleResetAllData(); break;
                         case 'extract': setExtractFilterUser(null); setExtractMonth(getPreviousMonthKey()); setShowExtractModal(true); break;
                         case 'portfolio': handleOpenPortfolio(); break;
@@ -3813,7 +3812,6 @@ function App() {
                     case 'cashflow': label = t.cashFlow; IconComponent = BarChart3; break;
                     case 'subscriptions': label = t.recurringPayments; IconComponent = Repeat; break;
                     case 'cards': label = language === 'en' ? 'Cards' : 'Kartlar'; IconComponent = CreditCard; break;
-                    case 'users': label = t.people; IconComponent = Users; break;
                     case 'feedback': label = 'İstekler'; IconComponent = MessageSquare; break;
                     case 'reset': label = 'Sıfırla'; IconComponent = Trash2; colorClass = 'bg-red-50 dark:bg-red-900/20 text-red-500/80 dark:text-red-400'; borderColorClass = 'border-red-100 dark:border-red-900/30'; break;
                     case 'extract': label = t.statement; IconComponent = Receipt; break;
@@ -3915,14 +3913,14 @@ function App() {
                       setSelectedMonthDetail({ monthKey: currentMonth, selectedUserId: user.id })
                       setCurrentView('budgetDetail')
                     }}
-                    className={`bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-700 relative overflow-hidden group transition-transform duration-300 ${isPersonOrderMode ? 'ring-2 ring-indigo-400/60' : 'hover:border-indigo-300 dark:hover:border-indigo-500 cursor-pointer'}`}
+                    className={`bg-white dark:bg-slate-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700 relative overflow-hidden group transition-transform duration-300 ${isPersonOrderMode ? 'ring-2 ring-indigo-400/60' : 'hover:border-indigo-300 dark:hover:border-indigo-500 cursor-pointer'}`}
                   >
-                    <div className="flex items-center justify-between gap-3 mb-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 shrink-0 rounded-2xl flex items-center justify-center font-bold text-xl text-white  ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-8 h-8 shrink-0 rounded-xl flex items-center justify-center font-bold text-base text-white  ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
                           {user.symbol || user.name.charAt(0)}
                         </div>
-                        <span className="font-bold text-gray-800 dark:text-white text-lg transition-colors truncate">{user.name}</span>
+                        <span className="font-bold text-gray-800 dark:text-white text-base transition-colors truncate">{user.name}</span>
                       </div>
                       {!isPersonOrderMode && <ArrowRight size={18} aria-hidden="true" className="shrink-0 text-slate-400" />}
                       {isPersonOrderMode && (
@@ -3949,16 +3947,16 @@ function App() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 p-3 mb-4">
+                    <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 px-2.5 py-1.5 mb-2.5">
                       <div>
-                        <p className="text-slate-600 dark:text-slate-400 text-xs font-semibold mb-1">{t.spent}</p>
-                        <p className={`text-xl sm:text-3xl font-bold tracking-tight tabular-nums break-words ${isLimitExceeded ? 'text-red-500' : 'text-gray-800 dark:text-white transition-colors'}`}>
+                        <p className="text-slate-600 dark:text-slate-400 text-xs font-semibold">{t.spent}</p>
+                        <p className={`text-lg sm:text-2xl font-bold tracking-tight tabular-nums break-words ${isLimitExceeded ? 'text-red-500' : 'text-gray-800 dark:text-white transition-colors'}`}>
                           {money(userSpending, { maximumFractionDigits: 0 })}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-slate-600 dark:text-slate-400 text-xs font-semibold mb-1">{t.remaining}</p>
-                        <p className="text-xl sm:text-3xl font-bold tabular-nums tracking-tight break-words text-slate-700 dark:text-slate-200 transition-colors">
+                        <p className="text-slate-600 dark:text-slate-400 text-xs font-semibold">{t.remaining}</p>
+                        <p className="text-lg sm:text-2xl font-bold tabular-nums tracking-tight break-words text-slate-700 dark:text-slate-200 transition-colors">
                           {userLimit > 0 ? money(remaining, { maximumFractionDigits: 0 }) : '—'}
                         </p>
                       </div>
@@ -3966,7 +3964,7 @@ function App() {
 
                     {userLimit > 0 && (
                       <div>
-                        <div role="progressbar" aria-label={t.spent} aria-valuenow={Math.round(percentage)} className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
+                        <div role="progressbar" aria-label={t.spent} aria-valuenow={Math.round(percentage)} className="h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
                           <div
                             className={`h-full rounded-full transition-all duration-1000 ease-out ${isLimitExceeded ? 'bg-red-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`}
                             style={{ width: `${percentage}%` }}
@@ -4576,9 +4574,9 @@ function App() {
 
       {
         showUserModal && (
-          <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowUserModal(false)}></div>
-            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[450px] h-[75vh] md:h-[80vh] md:max-h-[800px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[90dvh] max-h-[800px] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
 
               <div className="flex justify-between items-center mb-8">
@@ -4695,9 +4693,9 @@ function App() {
 
       {
         showCardsModal && (
-          <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowCardsModal(false)}></div>
-            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[450px] h-[75vh] md:h-[80vh] md:max-h-[800px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[420px] h-[90dvh] max-h-[800px] rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
               <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden"></div>
 
               <div className="flex justify-between items-center mb-8">
