@@ -3915,15 +3915,16 @@ function App() {
                       setSelectedMonthDetail({ monthKey: currentMonth, selectedUserId: user.id })
                       setCurrentView('budgetDetail')
                     }}
-                    className={`bg-white dark:bg-slate-800 p-5 rounded-[32px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-white dark:border-slate-700 relative overflow-hidden group transition-transform duration-300 ${isPersonOrderMode ? 'ring-2 ring-indigo-400/60' : 'hover:scale-[1.02] cursor-pointer'}`}
+                    className={`bg-white dark:bg-slate-800 p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-700 relative overflow-hidden group transition-transform duration-300 ${isPersonOrderMode ? 'ring-2 ring-indigo-400/60' : 'hover:border-indigo-300 dark:hover:border-indigo-500 cursor-pointer'}`}
                   >
                     <div className="flex items-center justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 shrink-0 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-indigo-200 ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
+                        <div className={`w-10 h-10 shrink-0 rounded-2xl flex items-center justify-center font-bold text-xl text-white  ${user.id === 'u1' ? 'bg-indigo-500' : 'bg-pink-500'}`}>
                           {user.symbol || user.name.charAt(0)}
                         </div>
                         <span className="font-bold text-gray-800 dark:text-white text-lg transition-colors truncate">{user.name}</span>
                       </div>
+                      {!isPersonOrderMode && <ArrowRight size={18} aria-hidden="true" className="shrink-0 text-slate-400" />}
                       {isPersonOrderMode && (
                         <div className="flex items-center gap-1 shrink-0" onClick={event => event.stopPropagation()}>
                           <button
@@ -3948,32 +3949,36 @@ function App() {
                       )}
                     </div>
 
-                    <div className="flex justify-between items-end mb-4">
+                    <div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 p-3 mb-4">
                       <div>
-                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">{t.spent}</p>
-                        <p className={`text-3xl font-black tracking-tight ${isLimitExceeded ? 'text-red-500' : 'text-gray-800 dark:text-white transition-colors'}`}>
+                        <p className="text-slate-600 dark:text-slate-400 text-xs font-semibold mb-1">{t.spent}</p>
+                        <p className={`text-xl sm:text-3xl font-bold tracking-tight tabular-nums break-words ${isLimitExceeded ? 'text-red-500' : 'text-gray-800 dark:text-white transition-colors'}`}>
                           {money(userSpending, { maximumFractionDigits: 0 })}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">{t.remaining}</p>
-                        <p className="text-lg font-bold text-gray-600 dark:text-gray-300 transition-colors">
+                        <p className="text-slate-600 dark:text-slate-400 text-xs font-semibold mb-1">{t.remaining}</p>
+                        <p className="text-xl sm:text-3xl font-bold tabular-nums tracking-tight break-words text-slate-700 dark:text-slate-200 transition-colors">
                           {userLimit > 0 ? money(remaining, { maximumFractionDigits: 0 }) : '—'}
                         </p>
                       </div>
                     </div>
 
-                    <div className="h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
-                      <div
-                        className={`h-full rounded-full transition-all duration-1000 ease-out ${isLimitExceeded ? 'bg-red-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`}
-                        style={{ width: `${percentage}%` }}
-                      ></div>
-                    </div>
+                    {userLimit > 0 && (
+                      <div>
+                        <div role="progressbar" aria-label={t.spent} aria-valuenow={Math.round(percentage)} className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
+                          <div
+                            className={`h-full rounded-full transition-all duration-1000 ease-out ${isLimitExceeded ? 'bg-red-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`}
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
 
-                    <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      <span>% {percentage.toFixed(0)}</span>
-                      <span>Limit: {money(userLimit, { maximumFractionDigits: 0 })}</span>
-                    </div>
+                        <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                          <span className="tabular-nums">{percentage.toFixed(0)}%</span>
+                          <span>Limit: {money(userLimit, { maximumFractionDigits: 0 })}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
 
