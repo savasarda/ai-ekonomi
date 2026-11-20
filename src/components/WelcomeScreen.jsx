@@ -206,7 +206,7 @@ const WelcomeScreen = ({
                                     <Icon size={24} className="md:w-7 md:h-7" />
                                 </div>
                                 <div className="text-left flex-1">
-                                    <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white leading-tight">{t[item.key]}</h2>
+                                    <h2 className="text-[22px] sm:text-2xl font-bold text-slate-800 dark:text-white leading-tight">{t[item.key]}</h2>
                                     <p className="text-[10px] md:text-xs text-slate-400 font-medium italic mt-0.5">{t[`${item.key}Sub`]}</p>
                                 </div>
                                 {item.hasReminder && (
@@ -223,17 +223,18 @@ const WelcomeScreen = ({
                             </button>
                         );
                     })}
-                    {publishedAt && (
-                        <p className="text-center text-[11px] leading-4 text-gray-500 dark:text-slate-400">
-                            {language === 'en' ? 'Published' : 'Son yayın'} · <time dateTime={publishedAt}>{new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'tr-TR', {
-                                dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Istanbul'
-                            }).format(new Date(publishedAt))}</time> (TSİ)
-                        </p>
-                    )}
+
                 </div>
 
 
             </div>
+            {publishedAt && (
+                <p className="welcome-publication text-center text-[11px] leading-4 text-gray-500 dark:text-slate-400">
+                    {language === 'en' ? 'Published' : 'Son yayın'} · <time dateTime={publishedAt}>{new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'tr-TR', {
+                        dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Istanbul'
+                    }).format(new Date(publishedAt))}</time> (TSİ)
+                </p>
+            )}
         </div>
     );
 };

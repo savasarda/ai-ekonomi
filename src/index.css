@@ -279,3 +279,13 @@ input[type=number] {
   .welcome-screen .animate-slide-up > div { padding-block: .125rem; margin-bottom: 0; }
   .welcome-menu { gap: .25rem; }
 }
+
+.welcome-screen {
+  padding-bottom: calc(max(.75rem, env(safe-area-inset-bottom)) + 1.25rem);
+}
+
+.welcome-publication {
+  position: absolute;
+  bottom: max(.5rem, env(safe-area-inset-bottom));
+  inset-inline: 1rem;
+}
