@@ -1780,7 +1780,7 @@ function App() {
   const oneOffExpenses = monthlyReport.transactions.filter(item =>
     isExpenseTransaction(item) && !getRecurringTransactionLabel(item.type) &&
     item.type !== 'taksitli' && !/\[(?:tekrar|taksit):|\(\d+\/\d+\)\s*$/.test(item.description || '')
-  )
+  ).sort((a, b) => b.amount - a.amount)
   const oneOffTotal = oneOffExpenses.reduce((sum, item) => sum + item.amount, 0)
   const extractMonthOptions = getExtractMonthOptions()
 
