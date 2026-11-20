@@ -738,7 +738,12 @@ function App() {
       // Transform camelCase from App to snake_case for DB
       if (newData.users) await supabase.from('users').upsert(addFamilyId(newData.users))
       if (newData.accounts) await supabase.from('accounts').upsert(addFamilyId(newData.accounts))
-      if (newData.transactions) await supabase.from('transactions').upsert(addFamilyIdToTransactions(newData.transactions))
+      if (newData.transactions?.length) {
+        const rows = addFamilyIdToTransactions(newData.transactions)
+        const byId = new Map(rows.map(row => [String(row.id), row]))
+        const { error } = await supabase.from('transactions').upsert([...byId.values()])
+        if (error) alert(`İşlemler kaydedilemedi: ${error.message}`)
+      }
 
       const limitsArray = Object.entries(newLimits).map(([user_id, limit_amount]) => ({
         user_id,
@@ -822,12 +827,7 @@ function App() {
   // Update data sync effect - Supabase only
   useEffect(() => {
     syncToSupabase(data, userLimits)
-  }, [data])
-
-  // Update limits sync effect - Supabase only
-  useEffect(() => {
-    syncToSupabase(data, userLimits)
-  }, [userLimits])
+  }, [data, userLimits])
 
   // Portfolio Sync - Supabase only
   useEffect(() => {
@@ -1079,7 +1079,8 @@ function App() {
         if (dueDateKey > todayKey) return false
 
         const marker = `[tekrar:${subscription.id}:${currentMonth}]`
-        return !data.transactions.some(t => t.status !== 0 && t.description.includes(marker))
+        const id = `sub-${subscription.id}-${currentMonth}`
+        return !data.transactions.some(t => t.id === id || (t.status !== 0 && t.description.includes(marker)))
       })
       .map(subscription => {
         const dueDay = String(Math.min(Math.max(Number(subscription.dueDay) || 15, 1), 28)).padStart(2, '0')
@@ -1097,10 +1098,15 @@ function App() {
       })
 
     if (generatedTransactions.length > 0) {
-      setData(prev => ({
-        ...prev,
-        transactions: [...prev.transactions, ...generatedTransactions]
-      }))
+      setData(prev => {
+        const existingIds = new Set(prev.transactions.map(t => t.id))
+        const additions = generatedTransactions.filter(t => {
+          if (existingIds.has(t.id)) return false
+          existingIds.add(t.id)
+          return true
+        })
+        return additions.length ? { ...prev, transactions: [...prev.transactions, ...additions] } : prev
+      })
     }
   }, [subscriptions, activeAccounts, currentMonth, data.transactions])
 
