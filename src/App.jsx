@@ -1706,7 +1706,7 @@ function App() {
   }
 
   const getExtractTransactions = () => {
-    const monthIncomeTransactions = getEffectiveIncomeTransactionsForMonth(extractMonth, extractFilterUser)
+    const monthIncomeTransactions = getEffectiveIncomeTransactionsForMonth(extractMonth, extractFilterUser ?? 'all')
       .map(item => ({
         ...item,
         id: `income-statement-${item.id}-${extractMonth}`,
@@ -4991,15 +4991,7 @@ function App() {
 
                 {/* Transactions List */}
                 <div className="space-y-3">
-                {activeTransactions
-                  .filter(t => {
-                    const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
-                    const isMevcutAy = t.date.startsWith(extractMonth);
-                    const isStatus1 = t.status === 1;
-                    return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
-                  })
-                  .sort((a, b) => new Date(b.date) - new Date(a.date))
-                  .map(t => {
+                {monthlyReport.transactions.map(t => {
                     const account = activeAccounts.find(a => a.id === t.accountId)
                     const user = activeUsers.find(u => u.id === account?.userId)
                     return (
@@ -5014,7 +5006,7 @@ function App() {
                             </div>
                             <p className="text-xs text-gray-400">{account?.name} • {user?.name}</p>
                           </div>
-                          <p className="max-w-[8.5rem] text-right tabular-nums font-bold text-base text-indigo-600 dark:text-indigo-400">
+                          <p className={`max-w-[8.5rem] text-right tabular-nums font-bold text-base ${getTransactionAmountClass(t)}`}>
                             {formatTransactionAmount(t)}
                           </p>
                         </div>
@@ -5022,12 +5014,7 @@ function App() {
                       </div>
                     )
                   })}
-                {activeTransactions.filter(t => {
-                  const matchesUser = extractFilterUser === null || activeAccounts.find(a => a.id === t.accountId)?.userId === extractFilterUser;
-                  const isMevcutAy = t.date.startsWith(extractMonth);
-                  const isStatus1 = t.status === 1;
-                  return matchesUser && isMevcutAy && isStatus1 && isExpenseTransaction(t);
-                }).length === 0 && (
+                {monthlyReport.transactions.length === 0 && (
                     <div className="text-center py-20 text-gray-400">
                       <div className="text-6xl mb-4 opacity-50">📄</div>
                       <p className="font-bold">Henüz işlem yok</p>
