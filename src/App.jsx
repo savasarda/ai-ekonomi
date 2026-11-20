@@ -507,6 +507,22 @@ function App() {
       const familyId = profile.family_id
       const isLocalDevFamily = familyId === '11111111-1111-1111-1111-111111111111'
 
+      async function loadTransactions() {
+        const rows = []
+        const pageSize = 500
+        let lastId
+        while (true) {
+          let query = supabase.from('transactions').select('*')
+            .eq('family_id', familyId).order('id').limit(pageSize)
+          if (lastId !== undefined) query = query.gt('id', lastId)
+          const { data: page, error } = await query
+          if (error) return { data: null, error }
+          rows.push(...page)
+          if (page.length < pageSize) return { data: rows, error: null }
+          lastId = page[page.length - 1].id
+        }
+      }
+
       const [
         { data: users, error: uErr },
         { data: accounts, error: aErr },
@@ -518,7 +534,7 @@ function App() {
       ] = await Promise.all([
         supabase.from('users').select('*').eq('family_id', familyId),
         supabase.from('accounts').select('*').eq('family_id', familyId),
-        supabase.from('transactions').select('*').eq('family_id', familyId),
+        loadTransactions(),
         supabase.from('user_limits').select('*').eq('family_id', familyId),
         supabase.from('portfolios').select('*').eq('family_id', familyId),
         supabase.from('events').select('*').eq('family_id', familyId),
