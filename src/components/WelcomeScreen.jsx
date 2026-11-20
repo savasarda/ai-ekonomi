@@ -131,11 +131,11 @@ const WelcomeScreen = ({
     }
 
     return (
-        <div className="h-screen fixed inset-0 bg-[#F8FAFC] dark:bg-slate-950 flex items-center justify-center p-4 font-sans relative overflow-hidden transition-colors duration-300">
+        <div className="welcome-screen fixed inset-0 bg-[#F8FAFC] dark:bg-slate-950 flex items-center justify-center font-sans overflow-hidden transition-colors duration-300">
             <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-300/20 dark:bg-indigo-900/10 rounded-full blur-[120px] animate-pulse"></div>
             <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-300/20 dark:bg-amber-900/10 rounded-full blur-[120px] animate-pulse delay-700"></div>
 
-            <div className="w-full max-w-md md:max-w-[760px] relative z-10 flex flex-col h-full justify-center pt-8 pb-4 md:pt-16 md:pb-8 overflow-y-auto custom-scrollbar">
+            <div className="w-full max-w-md md:max-w-[760px] relative z-10 flex flex-col justify-center">
                 <div className="flex gap-3 mb-4 md:mb-10 items-stretch">
                     <div className="flex-1 bg-white dark:bg-slate-900 rounded-[24px] md:rounded-[28px] p-4 md:p-5 shadow-xl shadow-slate-200/50 dark:shadow-none border border-white dark:border-slate-800 relative overflow-hidden flex flex-col justify-center">
                         <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-2">
@@ -145,7 +145,7 @@ const WelcomeScreen = ({
                         <p className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-snug italic">"{currentTip}"</p>
                     </div>
 
-                    <div className="flex flex-col gap-3">
+                    <div className="welcome-actions flex flex-col gap-2">
                         <div className="grid grid-cols-2 gap-1 w-14 md:w-16 bg-white dark:bg-slate-900 rounded-[18px] border border-white dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none p-1">
                             {['tr', 'en'].map(item => (
                                 <button
@@ -190,7 +190,7 @@ const WelcomeScreen = ({
                     <p className="text-xs md:text-base text-gray-400 dark:text-gray-500 font-medium">{t.subtitle}</p>
                 </div>
 
-                <div className="flex flex-col gap-3 md:gap-4">
+                <div className="welcome-menu flex flex-col gap-3 md:gap-4">
                     <p className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest px-4 mb-0 md:mb-1">{t.quickMenu}</p>
 
                     {menuItems.map(item => {
@@ -232,11 +232,7 @@ const WelcomeScreen = ({
                     )}
                 </div>
 
-                <div className="mt-4 md:mt-auto pt-4 md:pt-8 flex items-center justify-center opacity-30 gap-6">
-                    <div className="h-px bg-slate-300 dark:bg-slate-700 flex-1"></div>
-                    <Sparkles size={16} className="text-indigo-400" />
-                    <div className="h-px bg-slate-300 dark:bg-slate-700 flex-1"></div>
-                </div>
+
             </div>
         </div>
     );
