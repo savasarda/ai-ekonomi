@@ -1788,6 +1788,12 @@ function App() {
   const monthInstallments = purchaseExpenses.filter(isInstallmentPurchase)
   const installmentTotal = monthInstallments.reduce((sum, item) => sum + item.amount, 0)
   const oneOffTotal = oneOffExpenses.reduce((sum, item) => sum + item.amount, 0)
+  const renderStatementOwner = (accountId) => {
+    if (extractFilterUser !== null) return null
+    const account = activeAccounts.find(item => item.id === accountId)
+    const owner = activeUsers.find(user => user.id === account?.userId)
+    return owner?.name && <small className="ml-2 text-gray-500 dark:text-gray-400">{owner.name}</small>
+  }
   const extractMonthOptions = getExtractMonthOptions()
 
   const handleShareWhatsApp = () => {
@@ -4917,7 +4923,7 @@ function App() {
                   {oneOffExpenses.map(item => (
                     <div key={item.id} className="flex items-center justify-between gap-3 border-t border-gray-100 py-2 text-sm dark:border-slate-700 dark:text-gray-200">
                       <div>{getDisplayDescription(item.description) || (language === 'en' ? 'Expense' : 'Harcama')}
-                        <small className="block text-gray-500">{dateLabel(item.date, { day: 'numeric', month: 'long' })}</small>
+                        <small className="block text-gray-500">{dateLabel(item.date, { day: 'numeric', month: 'long' })}{renderStatementOwner(item.accountId)}</small>
                       </div>
                       <strong>{money(item.amount)}</strong>
                     </div>
@@ -4935,7 +4941,7 @@ function App() {
                     return (
                       <div key={item.id} className="mt-2 border-t border-gray-100 pt-2 text-sm dark:border-slate-700 dark:text-gray-200">
                         <div className="flex justify-between gap-3">
-                          <span>{description.replace(installmentSuffix, '') || (language === 'en' ? 'Purchase' : 'Alışveriş')}</span>
+                          <span>{description.replace(installmentSuffix, '') || (language === 'en' ? 'Purchase' : 'Alışveriş')}{renderStatementOwner(item.accountId)}</span>
                           <strong>{money(item.amount)}</strong>
                         </div>
                         {sequence && <small className="block text-gray-500 dark:text-gray-400">
@@ -5004,10 +5010,9 @@ function App() {
                       <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">En Büyük İşlemler</p>
                       <div className="space-y-2">
                         {monthlyReport.topTransactions.map(item => {
-                          const account = activeAccounts.find(a => a.id === item.accountId)
                           return (
                             <div key={`top-${item.id}`} className="flex items-center justify-between gap-3 text-xs">
-                              <span className="font-bold text-gray-600 dark:text-gray-300 truncate">{getDisplayDescription(item.description) || 'İşlem'}</span>
+                              <span className="font-bold text-gray-600 dark:text-gray-300 truncate">{getDisplayDescription(item.description) || 'İşlem'}{renderStatementOwner(item.accountId)}</span>
                               <span className="font-black text-red-500 dark:text-red-400 shrink-0">{money(item.amount, { maximumFractionDigits: 0 })}</span>
                             </div>
                           )
