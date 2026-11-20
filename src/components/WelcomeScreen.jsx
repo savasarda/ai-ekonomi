@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Wallet, ShoppingCart, Sun, Moon, Sparkles,
     Calendar as CalendarIcon, Bell, ArrowRight,
@@ -58,6 +58,26 @@ const WelcomeScreen = ({
 }) => {
     const tips = translations.welcome.tips;
     const copy = translations.welcome.copy;
+    const [publishedAt, setPublishedAt] = useState(null);
+    useEffect(() => {
+        const deployId = import.meta.env.VITE_DEPLOY_ID;
+        if (!deployId || publishedAt) return;
+        const controller = new AbortController();
+        async function loadPublishTime() {
+            try {
+                const response = await fetch(`https://api.netlify.com/api/v1/deploys/${encodeURIComponent(deployId)}`, { signal: controller.signal });
+                if (!response.ok) return;
+                const deploy = await response.json();
+                if (deploy.published_at && Number.isFinite(Date.parse(deploy.published_at))) {
+                    setPublishedAt(deploy.published_at);
+                }
+            } catch {
+                // The home screen remains usable offline.
+            }
+        }
+        loadPublishTime();
+        return () => controller.abort();
+    }, [publishedAt]);
     const [tipIndex] = useState(() => Math.floor(Math.random() * tips.tr.length));
     const t = copy[language] || copy.tr;
     const currentTip = (tips[language] || tips.tr)[tipIndex % (tips[language] || tips.tr).length];
@@ -203,6 +223,13 @@ const WelcomeScreen = ({
                             </button>
                         );
                     })}
+                    {publishedAt && (
+                        <p className="text-center text-[11px] leading-4 text-gray-500 dark:text-slate-400">
+                            {language === 'en' ? 'Published' : 'Son yayın'} · <time dateTime={publishedAt}>{new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : 'tr-TR', {
+                                dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Istanbul'
+                            }).format(new Date(publishedAt))}</time> (TSİ)
+                        </p>
+                    )}
                 </div>
 
                 <div className="mt-4 md:mt-auto pt-4 md:pt-8 flex items-center justify-center opacity-30 gap-6">

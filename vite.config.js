@@ -5,6 +5,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 // https://vite.dev/config/
 export default defineConfig({
   base: '/',
+  define: {
+    'import.meta.env.VITE_DEPLOY_ID': JSON.stringify(process.env.DEPLOY_ID || '')
+  },
   plugins: [
     react(),
     VitePWA({
