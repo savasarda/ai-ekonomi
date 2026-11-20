@@ -209,3 +209,33 @@ input[type=number] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+@media screen {
+  .statement-sheet {
+    height: 94vh;
+    height: min(94dvh, 58rem);
+    max-width: 100%;
+    padding: 0.75rem clamp(0.875rem, 4vw, 1.75rem) max(1.25rem, env(safe-area-inset-bottom));
+    overscroll-behavior: contain;
+    overflow-wrap: anywhere;
+    touch-action: pan-y pinch-zoom;
+  }
+
+  .statement-toolbar {
+    position: sticky;
+    top: -0.75rem;
+    z-index: 1;
+    padding-block: 0.75rem;
+    background: inherit;
+  }
+
+  .statement-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(6.5rem, 100%), 1fr));
+    gap: 0.25rem;
+  }
+
+  @media (min-width: 640px) {
+    .statement-sheet { max-width: 42rem; }
+  }
+}

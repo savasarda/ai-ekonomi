@@ -4769,10 +4769,10 @@ function App() {
       {/* Extract Modal */}
       {
         showExtractModal && (
-          <div className="absolute inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-md pointer-events-auto transition-opacity" onClick={() => setShowExtractModal(false)}></div>
-            <div id="print-area" className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl w-full sm:w-[480px] h-[92vh] md:h-[90vh] md:max-h-[900px] rounded-t-[40px] sm:rounded-[40px] p-8 relative z-10 animate-slide-up shadow-2xl flex flex-col overflow-y-auto custom-scrollbar pointer-events-auto border border-white/50 dark:border-slate-800/50 transition-colors">
-              <div className="w-16 h-1.5 bg-gray-300/50 rounded-full mx-auto mb-8 sm:hidden no-print"></div>
+            <div id="print-area" role="dialog" aria-modal="true" aria-labelledby="statement-title" className="statement-sheet bg-slate-50 dark:bg-slate-900 w-full sm:max-w-2xl rounded-t-3xl sm:rounded-3xl relative z-10 shadow-2xl overflow-y-auto custom-scrollbar pointer-events-auto">
+              <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 sm:hidden no-print"></div>
 
               {/* Print Only Header */}
               <div className="print-header hidden mb-10 border-b-2 border-indigo-900 pb-6">
@@ -4788,10 +4788,9 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center mb-8 no-print">
+              <div className="statement-toolbar flex justify-between items-center gap-2 mb-4 border-b border-slate-200 dark:border-slate-700 no-print">
                 <div>
-                  <h3 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">Ekstre</h3>
-                  <p className="text-sm text-gray-500 font-medium">Tüm işlemleriniz</p>
+                  <h3 id="statement-title" className="text-2xl font-black text-gray-800 dark:text-white tracking-tight transition-colors">{language === 'en' ? 'Statement' : 'Ekstre'}</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -4808,7 +4807,7 @@ function App() {
                   >
                     <Printer size={18} />
                   </button>
-                  <button onClick={() => setShowExtractModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+                  <button aria-label={language === 'en' ? 'Close' : 'Kapat'} onClick={() => setShowExtractModal(false)} className="w-10 h-10 rounded-full bg-gray-50 dark:bg-slate-800 flex items-center justify-center text-gray-400 font-bold text-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">✕</button>
                 </div>
               </div>
 
@@ -4830,10 +4829,10 @@ function App() {
               </div>
 
               {/* Filter by User */}
-              <div className="bg-gray-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl flex mb-6 backdrop-blur-md transition-colors no-print">
+              <div className="bg-gray-100/50 dark:bg-slate-800/50 p-1.5 rounded-2xl statement-filters mb-5 backdrop-blur-md transition-colors no-print">
                 <button
                   onClick={() => setExtractFilterUser(null)}
-                  className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 ${extractFilterUser === null ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400 scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                  className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 ${extractFilterUser === null ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                 >
                   <div className="flex flex-col items-center">
                     <span>Tümü</span>
@@ -4858,7 +4857,7 @@ function App() {
                     <button
                       key={u.id}
                       onClick={() => setExtractFilterUser(u.id)}
-                      className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 ${extractFilterUser === u.id ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400 scale-[1.02]' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+                      className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all duration-300 ${extractFilterUser === u.id ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                     >
                       <div className="flex flex-col items-center">
                         <span>{u.name}</span>
@@ -4871,8 +4870,8 @@ function App() {
                 })}
               </div>
 
-              <div className="space-y-3 pr-2">
-                <div className="bg-white dark:bg-slate-800 rounded-[28px] p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-5">
+              <div className="space-y-3">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl p-3 sm:p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-5">
                   <div className="flex items-start justify-between gap-3 mb-5">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Aylık Rapor</p>
@@ -4885,16 +4884,16 @@ function App() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-5">
-                  <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-3 border border-green-100 dark:border-green-900/30">
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-5">
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-2 sm:p-3 border border-green-100 dark:border-green-900/30">
                     <p className="text-[9px] font-black uppercase tracking-widest text-green-500 mb-1">Gelir</p>
                     <p className="text-sm font-black text-green-700 dark:text-green-300">{money(monthlyReport.income, { compact: true })}</p>
                   </div>
-                  <div className="bg-red-50 dark:bg-red-900/20 rounded-2xl p-3 border border-red-100 dark:border-red-900/30">
+                  <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-2 sm:p-3 border border-red-100 dark:border-red-900/30">
                     <p className="text-[9px] font-black uppercase tracking-widest text-red-400 mb-1">Gider</p>
                     <p className="text-sm font-black text-red-600 dark:text-red-300">{money(monthlyReport.expenses, { compact: true })}</p>
                   </div>
-                  <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-3 border border-slate-100 dark:border-slate-700">
+                  <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-2 sm:p-3 border border-slate-100 dark:border-slate-700">
                     <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Net</p>
                     <p className={`text-sm font-black ${monthlyReport.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>{money(monthlyReport.net, { compact: true })}</p>
                   </div>
@@ -4959,8 +4958,8 @@ function App() {
                     const account = activeAccounts.find(a => a.id === t.accountId)
                     const user = activeUsers.find(u => u.id === account?.userId)
                     return (
-                      <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:scale-[1.01] transition-transform print-transaction">
-                        <div className="flex justify-between items-start mb-2">
+                      <div key={t.id} className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-gray-100 dark:border-slate-700 print-transaction">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-start mb-2">
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="font-bold text-gray-800 dark:text-white text-sm">{getDisplayDescription(t.description) || 'İşlem'}</p>
@@ -4970,7 +4969,7 @@ function App() {
                             </div>
                             <p className="text-xs text-gray-400">{account?.name} • {user?.name}</p>
                           </div>
-                          <p className="font-black text-lg text-indigo-600 dark:text-indigo-400">
+                          <p className="max-w-[8.5rem] text-right tabular-nums font-bold text-base text-indigo-600 dark:text-indigo-400">
                             {formatTransactionAmount(t)}
                           </p>
                         </div>
