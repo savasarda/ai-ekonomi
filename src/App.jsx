@@ -3667,7 +3667,7 @@ function App() {
 
           <header className="px-6 md:px-8 pt-[calc(1rem+var(--safe-area-inset-top))] pb-3 sticky top-0 z-20 bg-[#F2F4F8]/80 dark:bg-slate-900/80 backdrop-blur-md transition-colors duration-300">
             {/* Header: Status Indicators & Days Left */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-2">
 
               <div className="flex items-center gap-2 md:gap-3">
                 <button
@@ -3727,19 +3727,22 @@ function App() {
                 const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
                 const daysLeft = lastDay.getDate() - now.getDate();
                 return (
-                  <div className="relative bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 md:px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm shrink-0">
+                  <div className="ml-auto flex shrink-0 items-center gap-2">
                     {upcomingPayments.length > 0 && (
                       <button
+                        type="button"
                         onClick={() => setShowUpcomingPaymentsModal(true)}
-                        className="absolute -left-2 -top-2 w-6 h-6 rounded-full bg-amber-400 text-white shadow-md border-2 border-[#F2F4F8] dark:border-slate-900 flex items-center justify-center active:scale-95 transition-all"
-                        title={t.upcomingPayments}
+                        aria-label={`${t.upcomingPayments} (${upcomingPayments.length})`}
+                        className="relative grid h-10 w-10 place-items-center rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
                       >
-                        <Bell size={12} strokeWidth={3} />
-                        <span className="absolute -right-1 -bottom-1 min-w-4 h-4 px-1 rounded-full bg-amber-600 text-[9px] leading-4 font-black text-white">{upcomingPayments.length}</span>
+                        <Bell size={18} />
+                        <span aria-hidden="true" className="absolute right-0 top-0 min-w-4 rounded-full bg-amber-700 px-1 text-center text-[10px] font-bold leading-4 text-white">{upcomingPayments.length}</span>
                       </button>
                     )}
-                    <span className="text-[8px] font-black uppercase mb-0.5 tracking-wider">{t.daysToNewPeriod}</span>
+                  <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 md:px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-800/50 flex flex-col items-end shadow-sm shrink-0">
+                    <span className="text-[10px] font-bold mb-0.5">{t.daysToNewPeriod}</span>
                     <span className="text-xs font-black leading-none">{daysLeft === 0 ? t.tomorrow : `${daysLeft} ${t.days}`}</span>
+                  </div>
                   </div>
                 );
               })()}
@@ -3751,9 +3754,9 @@ function App() {
 
           {/* Top Menu Grid */}
           {isMenuOpen && (
-            <div className="mx-6 mb-6 p-6 bg-white dark:bg-slate-800 rounded-[32px] shadow-xl border border-white dark:border-slate-700 animate-in fade-in slide-in-from-top-4 duration-300">
-              <div className="flex justify-between items-center mb-6 px-1">
-                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">{t.quickActions}</h3>
+            <div className="mx-4 sm:mx-6 mb-5 p-4 sm:p-6 bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-white dark:border-slate-700 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="flex justify-between items-center mb-3 px-1">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-widest">{t.quickActions}</h3>
                 <button
                   onClick={() => {
                     setReorderMode(!reorderMode)
@@ -3823,12 +3826,12 @@ function App() {
                     <button
                       key={itemId}
                       onClick={handleMenuClick}
-                      className={`flex flex-col items-center gap-2 group active:scale-95 transition-all duration-200 outline-none ${isShake ? 'animate-pulse' : ''} ${isSelected ? 'scale-110 z-10' : ''}`}
+                      className={`flex w-full min-w-0 flex-col items-center gap-2 rounded-xl py-2 group active:scale-95 focus-visible:ring-2 focus-visible:ring-indigo-500 transition-all duration-200 outline-none ${isShake ? 'animate-pulse' : ''} ${isSelected ? 'scale-110 z-10' : ''}`}
                     >
                       <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl shadow-sm border flex items-center justify-center transition-all relative overflow-hidden ${colorClass || 'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-700'} ${reorderMode ? 'ring-2 ring-indigo-500' : 'group-hover:-translate-y-1'}`}>
                         <IconComponent size={24} className={`transition-colors ${itemId === 'reset' ? 'text-red-500' : 'text-indigo-600 dark:text-indigo-400'}`} />
                       </div>
-                      <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap">{label}</span>
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 text-center leading-tight break-words max-w-full">{label}</span>
                     </button>
                   )
                 })}
@@ -3900,8 +3903,8 @@ function App() {
 
                 const userLimit = userLimits[user.id] || 0
                 const remaining = userLimit - userSpending
-                const percentage = Math.min((userSpending / userLimit) * 100, 100)
-                const isLimitExceeded = userSpending > userLimit
+                const percentage = userLimit > 0 ? Math.min(Math.max((userSpending / userLimit) * 100, 0), 100) : 0
+                const isLimitExceeded = userLimit > 0 && userSpending > userLimit
 
 
                 return (
@@ -3955,7 +3958,7 @@ function App() {
                       <div className="text-right">
                         <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">{t.remaining}</p>
                         <p className="text-lg font-bold text-gray-600 dark:text-gray-300 transition-colors">
-                          {money(remaining, { maximumFractionDigits: 0 })}
+                          {userLimit > 0 ? money(remaining, { maximumFractionDigits: 0 }) : '—'}
                         </p>
                       </div>
                     </div>
