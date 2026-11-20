@@ -1734,7 +1734,7 @@ function App() {
   }
 
   const getExtractMonthOptions = () => {
-    const months = new Set([getPreviousMonthKey()])
+    const months = new Set([currentMonth, getPreviousMonthKey()])
     activeTransactions
       .filter(transaction => transaction.status === 1)
       .forEach(transaction => {
@@ -1777,6 +1777,11 @@ function App() {
   }
 
   const monthlyReport = getMonthlyReport()
+  const oneOffExpenses = monthlyReport.transactions.filter(item =>
+    isExpenseTransaction(item) && !getRecurringTransactionLabel(item.type) &&
+    item.type !== 'taksitli' && !/\[(?:tekrar|taksit):|\(\d+\/\d+\)\s*$/.test(item.description || '')
+  )
+  const oneOffTotal = oneOffExpenses.reduce((sum, item) => sum + item.amount, 0)
   const extractMonthOptions = getExtractMonthOptions()
 
   const handleShareWhatsApp = () => {
@@ -3813,7 +3818,7 @@ function App() {
                         case 'subscriptions': setShowSubscriptionModal(true); break;
                         case 'cards': setShowCardsModal(true); break;
                         case 'reset': handleResetAllData(); break;
-                        case 'extract': setExtractFilterUser(null); setExtractMonth(getPreviousMonthKey()); setShowExtractModal(true); break;
+                        case 'extract': setExtractFilterUser(null); setExtractMonth(currentMonth); setShowExtractModal(true); break;
                         case 'portfolio': handleOpenPortfolio(); break;
                         case 'feedback': setShowFeedbackModal(true); break;
                         case 'settings': setShowSettingsModal(true); break;
@@ -4893,6 +4898,24 @@ function App() {
               </div>
 
               <div className="space-y-3">
+                <details className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                  <summary className="cursor-pointer font-bold text-gray-800 dark:text-white">
+                    {language === 'en' ? 'One-off expenses' : 'Tek seferlik harcamalar'}
+                    <span className="float-right text-indigo-600 dark:text-indigo-400">{money(oneOffTotal)}</span>
+                    <small className="block font-normal text-gray-500 dark:text-gray-400">
+                      {oneOffExpenses.length} {language === 'en' ? 'transactions' : 'işlem'}
+                    </small>
+                  </summary>
+                  {oneOffExpenses.length === 0 && <p className="mt-3 text-sm">{language === 'en' ? 'No one-off expenses this month.' : 'Bu ay tek seferlik harcama yok.'}</p>}
+                  {oneOffExpenses.map(item => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 border-t border-gray-100 py-2 text-sm dark:border-slate-700 dark:text-gray-200">
+                      <div>{getDisplayDescription(item.description) || (language === 'en' ? 'Expense' : 'Harcama')}
+                        <small className="block text-gray-500">{dateLabel(item.date, { day: 'numeric', month: 'long' })}</small>
+                      </div>
+                      <strong>{money(item.amount)}</strong>
+                    </div>
+                  ))}
+                </details>
                 <div className="bg-white dark:bg-slate-800 rounded-2xl p-3 sm:p-5 border border-gray-100 dark:border-slate-700 shadow-sm mb-5">
                   <div className="flex items-start justify-between gap-3 mb-5">
                   <div>
